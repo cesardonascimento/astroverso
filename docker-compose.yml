@@ -1,0 +1,34 @@
+name: astro-adguard
+
+services:
+  adguard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ADGUARD_VERSION: ${ADGUARD_VERSION:-v0.107.80}
+    image: localhost/astro-adguard:${ADGUARD_VERSION:-v0.107.80}
+    container_name: astro-adguard
+    hostname: astro-adguard
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # DNS
+      - "${DNS_BIND_IP:-0.0.0.0}:53:53/tcp"
+      - "${DNS_BIND_IP:-0.0.0.0}:53:53/udp"
+      # Painel web
+      - "${WEB_PORT:-8080}:80/tcp"
+      # DNS-over-TLS / DNS-over-QUIC (só funcionam após configurar TLS no painel)
+      # - "853:853/tcp"
+      # - "853:853/udp"
+    volumes:
+      # :Z = rótulo SELinux (Fedora/RHEL). Inofensivo em outras distros.
+      - ./data/conf:/opt/adguardhome/conf:Z
+      - ./data/work:/opt/adguardhome/work:Z
+    # Repetido aqui porque o Podman ignora HEALTHCHECK do Dockerfile em imagens OCI
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/login.html && nslookup -timeout=3 adguard.com 127.0.0.1 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
