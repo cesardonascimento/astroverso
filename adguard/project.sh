@@ -131,24 +131,23 @@ setup_host_dns() {
 }
 
 split_dns_mismatches() {
-    local ts_ip=$1 domain server
+    local expected=$1 domain server
     for domain in $(env_get ADGUARD_REWRITES | tr ',' ' '); do
         server="$(tailscale dns status 2>/dev/null \
             | awk -v d="$domain" '$1 == "-" && $2 == d && $3 == "->" { print $4; exit }')"
-        [[ -n $server && $server != "$ts_ip" ]] && printf '%s %s\n' "$domain" "$server"
+        [[ -n $server && $server != "$expected" ]] && printf '%s %s\n' "$domain" "$server"
     done
     return 0
 }
 
 check_tailscale_split_dns() {
-    local ts_ip domain server mismatches
-    ts_ip="$(host_tailscale_ip)"
-    if [[ -z $ts_ip || -z $(env_get ADGUARD_REWRITES) ]]; then
+    local lan_ip=$1 domain server mismatches
+    if [[ -z $(host_tailscale_ip) || -z $(env_get ADGUARD_REWRITES) ]]; then
         ui_ok "nada a verificar no Split DNS do Tailscale"
         return
     fi
     while true; do
-        mismatches="$(split_dns_mismatches "$ts_ip")"
+        mismatches="$(split_dns_mismatches "$lan_ip")"
         if [[ -z $mismatches ]]; then
             ui_ok "Split DNS do Tailscale não desvia os domínios das reescritas"
             return
@@ -157,7 +156,7 @@ check_tailscale_split_dns() {
             ui_warn "o Tailscale envia *.$domain para $server, não para este AdGuard"
         done <<< "$mismatches"
         ui_info "em https://login.tailscale.com/admin/dns → Nameservers, troque o servidor do Split DNS"
-        ui_info "desses domínios para $ts_ip (IP do Tailscale desta máquina)"
+        ui_info "desses domínios para $lan_ip (IP local desta máquina)"
         ui_confirm "já ajustou? verificar de novo?" y || { ui_warn "Split DNS pendente, esses nomes não vão resolver"; return; }
     done
 }
@@ -195,17 +194,16 @@ cmd_install() {
     fi
     ui_ok "container $CONTAINER rodando"
 
-    local lan_ip ts_ip
+    local lan_ip
     lan_ip="$(env_get DNS_BIND_IP 0.0.0.0)"
     [[ $lan_ip == 0.0.0.0 ]] && lan_ip="$(host_lan_ip)"
-    ts_ip="$(host_tailscale_ip)"
 
     ui_step "DNS"
     setup_host_dns "$lan_ip"
-    check_tailscale_split_dns
+    check_tailscale_split_dns "$lan_ip"
     ui_step "Acesso"
-    ui_ok "DNS:    $lan_ip${ts_ip:+  |  Tailscale: $ts_ip}"
-    ui_ok "Painel: http://$lan_ip:$web_port${ts_ip:+  |  http://$ts_ip:$web_port}"
+    ui_ok "DNS:    $lan_ip"
+    ui_ok "Painel: http://$lan_ip:$web_port"
 }
 
 cmd_remove() {
