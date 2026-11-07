@@ -29,6 +29,20 @@ podman compose up -d --build
 
 Painel: `http://<ip-da-maquina>:8080`
 
+## Variáveis do `.env`
+
+| Variável | Padrão | Função |
+|---|---|---|
+| `ADGUARD_USERNAME` | `admin` | Usuário do painel |
+| `ADGUARD_PASSWORD` | — | Senha do painel (obrigatória na 1ª execução) |
+| `ADGUARD_LANGUAGE` | `pt-br` | Idioma do painel |
+| `TZ` | `America/Sao_Paulo` | Fuso horário |
+| `ADGUARD_FORCE_CONFIG` | `false` | `true` regera a config do template a cada start (salva `.bak`) |
+| `DNS_BIND_IP` | `0.0.0.0` | IP do host onde o DNS escuta |
+| `WEB_PORT` | `8080` | Porta do painel no host |
+
+Usuário, senha, idioma e fuso só são aplicados quando a config é gerada.
+
 ## Comandos do dia a dia
 
 ```bash
@@ -45,7 +59,7 @@ Dockerfile                        imagem customizada
 docker-compose.yml                orquestração
 config/AdGuardHome.yaml.template  config padrão (edite aqui para mudar o padrão)
 scripts/docker-entrypoint.sh      gera a config na 1ª execução
-scripts/setup-host.sh             prepara o host (porta 53, firewall, compose)
+scripts/setup-host.sh             prepara o host (porta 53, firewall, compose, Tailscale)
 data/                             dados em runtime (fora do git)
 ```
 
@@ -57,5 +71,5 @@ data/                             dados em runtime (fora do git)
 
 ## Atualizando o AdGuard
 
-Mude `ADGUARD_VERSION` no `.env` e no `Dockerfile`, depois `podman compose up -d --build`.
+Mude `ADGUARD_VERSION` na primeira linha do `Dockerfile`, depois `podman compose up -d --build`.
 Se o `schema_version` mudar, o AdGuard migra a config sozinho.
