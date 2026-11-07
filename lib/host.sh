@@ -42,10 +42,38 @@ host_firewall() {
     ui_ok "firewall liberado: $*"
 }
 
+host_tailscale_install() {
+    local ID VERSION_ID VERSION_CODENAME UBUNTU_CODENAME repo
+    source /etc/os-release
+    if command -v dnf >/dev/null; then
+        if ! sudo dnf install -y -q tailscale 2>/dev/null; then
+            [[ $ID == fedora ]] && repo=fedora || repo="rhel/${VERSION_ID%%.*}"
+            curl -fsSL "https://pkgs.tailscale.com/stable/$repo/tailscale.repo" \
+                | sudo tee /etc/yum.repos.d/tailscale.repo >/dev/null
+            sudo dnf install -y -q tailscale
+        fi
+    elif command -v apt-get >/dev/null; then
+        if [[ -n ${UBUNTU_CODENAME:-} ]]; then
+            repo="ubuntu/$UBUNTU_CODENAME"
+        else
+            repo="debian/$VERSION_CODENAME"
+        fi
+        curl -fsSL "https://pkgs.tailscale.com/stable/$repo.noarmor.gpg" \
+            | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        curl -fsSL "https://pkgs.tailscale.com/stable/$repo.tailscale-keyring.list" \
+            | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq tailscale
+    else
+        ui_fail "instale o Tailscale manualmente: https://tailscale.com/download"
+    fi
+    command -v tailscale >/dev/null || ui_fail "falha ao instalar o Tailscale"
+    ui_ok "Tailscale $(tailscale version | head -1) instalado"
+}
+
 host_tailscale() {
     if ! command -v tailscale >/dev/null; then
-        ui_warn "Tailscale não instalado, etapa ignorada"
-        return
+        host_tailscale_install
     fi
     systemctl is-active -q tailscaled || sudo systemctl enable -q --now tailscaled
     if ! tailscale status >/dev/null 2>&1; then
