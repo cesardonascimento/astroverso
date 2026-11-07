@@ -34,4 +34,16 @@ echo "==> Habilitando o serviço que reinicia containers após o boot"
 systemctl --user enable --now podman-restart.service >/dev/null 2>&1 || true
 loginctl enable-linger "$USER" || true
 
+if command -v tailscale >/dev/null; then
+    echo "==> Configurando Tailscale (aceitar rotas de sub-rede por padrão)"
+    sudo systemctl enable --now tailscaled
+    if tailscale status >/dev/null 2>&1; then
+        # Já logado: só ajusta as preferências
+        sudo tailscale set --accept-routes --operator="$USER"
+    else
+        # Primeiro login: mostra o link para autenticar no navegador
+        sudo tailscale up --accept-routes --operator="$USER"
+    fi
+fi
+
 echo "Pronto! Agora: cp .env.example .env && podman compose up -d --build"
