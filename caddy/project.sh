@@ -10,11 +10,14 @@ source ../lib/env.sh
 CONTAINER=astro-caddy
 ROUTES=.routes
 CADDYFILE=data/etc/Caddyfile
-ROOT_CA=data/caddy/caddy/pki/authorities/local/root.crt
-PUBLIC_CA=data/etc/public/astro-ca.crt
+CLOUDFLARE_API=https://api.cloudflare.com/client/v4
+LEGACY_CA_FILES=(
+    /etc/pki/ca-trust/source/anchors/astro-caddy.crt
+    /usr/local/share/ca-certificates/astro-caddy.crt
+)
 
 cmd_describe() {
-    echo "Caddy: proxy reverso com HTTPS para os serviços da rede"
+    echo "Caddy: proxy reverso com HTTPS (Let's Encrypt) para os serviços da rede"
 }
 
 cmd_status() {
@@ -25,8 +28,7 @@ cmd_actions() {
     printf '%s\n' \
         "list|Listar rotas" \
         "add|Adicionar rotas" \
-        "remove|Remover rotas" \
-        "ca|Instalar o certificado HTTPS em outros aparelhos"
+        "remove|Remover rotas"
 }
 
 remove_container() {
@@ -53,38 +55,92 @@ route_lines() {
     [[ -f $ROUTES ]] && grep -v '^\s*$' "$ROUTES" || true
 }
 
+cloudflare_get() {
+    curl -s -m 15 -H "Authorization: Bearer $1" "$CLOUDFLARE_API/$2"
+}
+
+cloudflare_check() {
+    local token=$1 domain=$2 zone=$2
+    if ! cloudflare_get "$token" user/tokens/verify | grep -q '"status":"active"'; then
+        ui_warn "token inválido ou inativo na Cloudflare"
+        return 1
+    fi
+    while [[ $zone == *.* ]]; do
+        if cloudflare_get "$token" "zones?name=$zone" | grep -q '"count":1'; then
+            ui_ok "token válido com acesso à zona $zone"
+            return 0
+        fi
+        zone="${zone#*.}"
+    done
+    ui_warn "o token não tem acesso à zona de $domain (use o modelo \"Edit zone DNS\")"
+    return 1
+}
+
 configure() {
     ui_step "Configuração"
+    local domain http_port https_port token
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em caddy/.env?" y; then
+        domain="$(env_get CADDY_DOMAIN)"
+        http_port="$(env_get HTTP_PORT 80)"
+        https_port="$(env_get HTTPS_PORT 443)"
+        token="$(env_get CLOUDFLARE_API_TOKEN)"
         ui_ok "configuração existente mantida"
     else
-        local domain http_port https_port
         ui_input domain     "domínio base dos serviços (ex: casa.com)" "$(env_get CADDY_DOMAIN)"
         ui_input http_port  "porta HTTP no host" "$(env_get HTTP_PORT 80)"
         ui_input https_port "porta HTTPS no host" "$(env_get HTTPS_PORT 443)"
-        cat > .env <<EOF
-CADDY_DOMAIN='${domain,,}'
-HTTP_PORT='$http_port'
-HTTPS_PORT='$https_port'
-EOF
-        ui_ok "configuração salva em caddy/.env"
+        domain="${domain,,}"
+        token=""
     fi
 
+    if [[ -n $token ]] && cloudflare_check "$token" "$domain"; then
+        :
+    else
+        ui_info "crie um token em https://dash.cloudflare.com/profile/api-tokens (modelo \"Edit zone DNS\")"
+        while true; do
+            ui_secret token "token de API da Cloudflare"
+            cloudflare_check "$token" "$domain" && break
+        done
+    fi
+
+    (
+        umask 077
+        {
+            printf "CADDY_DOMAIN='%s'\nHTTP_PORT='%s'\nHTTPS_PORT='%s'\nCLOUDFLARE_API_TOKEN='%s'\n" \
+                "$domain" "$http_port" "$https_port" "$token"
+            [[ -z $(env_get ACME_CA) ]] || printf "ACME_CA='%s'\n" "$(env_get ACME_CA)"
+        } > .env.new
+    )
+    mv .env.new .env
+    ui_ok "configuração salva em caddy/.env"
+
     if [[ ! -f $ROUTES && -x ../adguard/project.sh ]]; then
-        echo "adguard.$(env_get CADDY_DOMAIN) http://astro-adguard:80" > "$ROUTES"
-        ui_ok "rota padrão criada: adguard.$(env_get CADDY_DOMAIN) → astro-adguard:80"
+        echo "adguard.$domain http://astro-adguard:80" > "$ROUTES"
+        ui_ok "rota padrão criada: adguard.$domain → astro-adguard:80"
     fi
 }
 
 render_caddyfile() {
-    local host upstream
-    mkdir -p "$(dirname "$CADDYFILE")" "$(dirname "$PUBLIC_CA")"
+    local domain host upstream index=0 others=()
+    domain="$(env_get CADDY_DOMAIN)"
+    mkdir -p "$(dirname "$CADDYFILE")"
     {
-        printf '{\n\tlocal_certs\n\tskip_install_trust\n}\n\n'
-        printf 'http://ca.%s {\n\troot * /etc/caddy/public\n\tfile_server browse\n}\n' "$(env_get CADDY_DOMAIN)"
+        printf '{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n'
+        [[ -z $(env_get ACME_CA) ]] || printf '\tacme_ca %s\n' "$(env_get ACME_CA)"
+        printf '}\n\n*.%s {\n' "$domain"
         while read -r host upstream; do
-            printf '\n%s {\n\treverse_proxy %s\n}\n' "$host" "$upstream"
+            if [[ $host == *".$domain" && ${host%".$domain"} != *.* ]]; then
+                index=$((index + 1))
+                printf '\t@route%d host %s\n\thandle @route%d {\n\t\treverse_proxy %s\n\t}\n\n' \
+                    "$index" "$host" "$index" "$upstream"
+            else
+                others+=("$host $upstream")
+            fi
         done < <(route_lines)
+        printf '\thandle {\n\t\tabort\n\t}\n}\n'
+        for host in "${others[@]}"; do
+            printf '\n%s {\n\treverse_proxy %s\n}\n' "${host%% *}" "${host#* }"
+        done
     } > "$CADDYFILE"
 }
 
@@ -99,28 +155,39 @@ apply_routes() {
     ui_ok "Caddy recarregado sem reiniciar"
 }
 
-publish_root_ca() {
-    timeout 30 bash -c "until test -f '$ROOT_CA'; do sleep 1; done" \
-        || ui_fail "o certificado raiz não foi gerado"
-    cp "$ROOT_CA" "$PUBLIC_CA"
-    chmod 0644 "$PUBLIC_CA"
+remove_legacy_local_ca() {
+    local file found=()
+    for file in "${LEGACY_CA_FILES[@]}"; do
+        [[ -f $file ]] && found+=("$file")
+    done
+    if [[ -d data/caddy/caddy/pki || -d data/etc/public ]]; then
+        podman unshare rm -rf data/caddy/caddy/pki data/caddy/caddy/certificates/local data/etc/public
+        ui_ok "autoridade certificadora própria antiga apagada"
+    fi
+    ((${#found[@]})) || return 0
+    sudo rm -f "${found[@]}"
+    if command -v update-ca-trust >/dev/null; then
+        sudo update-ca-trust
+    else
+        sudo update-ca-certificates --fresh >/dev/null
+    fi
+    ui_ok "certificado da CA própria antiga removido da confiança desta máquina"
 }
 
-trust_root_ca_here() {
-    local ca_file
-    if [[ -d /etc/pki/ca-trust/source/anchors ]]; then
-        ca_file=/etc/pki/ca-trust/source/anchors/astro-caddy.crt
-        sudo tee "$ca_file" < "$PUBLIC_CA" >/dev/null
-        sudo update-ca-trust
-    elif [[ -d /usr/local/share/ca-certificates ]]; then
-        ca_file=/usr/local/share/ca-certificates/astro-caddy.crt
-        sudo tee "$ca_file" < "$PUBLIC_CA" >/dev/null
-        sudo update-ca-certificates >/dev/null
+wait_certificate() {
+    local domain https_port
+    domain="$(env_get CADDY_DOMAIN)"
+    https_port="$(env_get HTTPS_PORT 443)"
+    ui_info "aguardando o certificado *.$domain do Let's Encrypt (até 3 minutos)..."
+    if timeout 180 bash -c "until openssl s_client -connect 127.0.0.1:$https_port -servername astro-check.$domain \
+            -verify_return_error </dev/null >/dev/null 2>&1; do sleep 3; done"; then
+        ui_ok "certificado válido do Let's Encrypt para *.$domain"
+    elif [[ -n $(env_get ACME_CA) ]]; then
+        ui_warn "ACME_CA personalizado em uso, certificado não verificável pela confiança do sistema"
     else
-        ui_warn "não sei instalar certificados neste sistema, use o arquivo $PUBLIC_CA"
-        return
+        podman logs --tail 50 "$CONTAINER" 2>&1 | grep -iE 'error|fail' | tail -5 | ui_prefix >&2
+        ui_fail "o certificado não foi emitido em 3 minutos"
     fi
-    ui_ok "certificado raiz confiável nesta máquina"
 }
 
 print_routes() {
@@ -141,12 +208,18 @@ cmd_install() {
     host_compose
     host_autostart
     host_tailscale
+    remove_legacy_local_ca
 
     ui_step "Container"
+    local log
+    ui_info "construindo a imagem com o módulo da Cloudflare (alguns minutos na primeira vez)..."
+    if ! log="$(podman compose build 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao construir a imagem"
+    fi
     mkdir -p data/caddy data/config
     render_caddyfile
     remove_container
-    local log
     if ! log="$(podman compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir o container"
@@ -158,15 +231,10 @@ cmd_install() {
     ui_ok "container $CONTAINER rodando"
 
     ui_step "Certificado HTTPS"
-    publish_root_ca
-    ui_ok "certificado raiz próprio gerado (válido só na sua rede)"
-    if ui_confirm "confiar nesse certificado nesta máquina?" y; then
-        trust_root_ca_here
-    fi
+    wait_certificate
 
     ui_step "Rotas"
     print_routes
-    ui_info "instale o certificado nos outros aparelhos abrindo http://ca.$(env_get CADDY_DOMAIN)"
 }
 
 action_add() {
@@ -214,22 +282,11 @@ action_remove() {
     apply_routes
 }
 
-action_ca() {
-    ui_step "Certificado HTTPS"
-    ui_info "em cada aparelho, abra http://ca.$(env_get CADDY_DOMAIN) e baixe astro-ca.crt"
-    ui_info "Android: Configurações → Segurança → Criptografia → Instalar certificado → Certificado de CA"
-    ui_info "iPhone: instale o perfil baixado e ative em Ajustes → Geral → Sobre → Confiança de Certificados"
-    ui_info "Windows: abra o arquivo → Instalar → Máquina Local → Autoridades de Certificação Raiz Confiáveis"
-    ui_info "macOS: abra no Acesso às Chaves (Sistema) e marque \"Sempre Confiar\""
-    ui_info "arquivo local: $(pwd)/$PUBLIC_CA"
-}
-
 cmd_action() {
     case "${1:-}" in
         list)   ui_step "Rotas"; print_routes ;;
         add)    action_add ;;
         remove) action_remove ;;
-        ca)     action_ca ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac
 }
@@ -249,14 +306,14 @@ cmd_remove() {
     if $purge; then
         if [[ -d data ]]; then
             podman unshare rm -rf data
-            ui_ok "dados apagados (caddy/data); um novo certificado raiz será gerado na próxima instalação"
+            ui_ok "dados apagados (caddy/data); o certificado será emitido de novo na próxima instalação"
         else
             ui_info "nenhum dado para apagar"
         fi
     else
         ui_info "dados mantidos em caddy/data"
     fi
-    ui_info "rotas mantidas em caddy/$ROUTES"
+    ui_info "rotas e token mantidos em caddy/$ROUTES e caddy/.env"
 }
 
 case "${1:-}" in

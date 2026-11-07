@@ -28,7 +28,7 @@ o `sudo` pode pedir senha na primeira instalação em cada máquina.
 | Projeto | Descrição |
 |---|---|
 | [adguard](adguard/) | AdGuard Home: DNS da rede com bloqueio de anúncios |
-| [caddy](caddy/) | Caddy: proxy reverso com HTTPS para os serviços da rede |
+| [caddy](caddy/) | Caddy: proxy reverso com HTTPS (Let's Encrypt) para os serviços da rede |
 
 ## Adicionando um projeto
 

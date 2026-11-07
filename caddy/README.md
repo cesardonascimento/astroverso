@@ -1,6 +1,6 @@
 # caddy
 
-Proxy reverso com HTTPS para os serviços da rede, por exemplo
+Proxy reverso com HTTPS válido (Let's Encrypt) para os serviços da rede, por exemplo
 `https://adguard.cesardonascimento.com → astro-adguard:80`.
 
 ```bash
@@ -8,8 +8,7 @@ Proxy reverso com HTTPS para os serviços da rede, por exemplo
 ./project.sh action add        # adiciona rotas (também pelo setup.sh: "Configurar um projeto instalado")
 ./project.sh action remove     # remove rotas
 ./project.sh action list       # lista as rotas
-./project.sh action ca         # como instalar o certificado em outros aparelhos
-./project.sh remove [--purge]  # remove o container; --purge apaga certificados e a CA
+./project.sh remove [--purge]  # remove o container; --purge apaga os certificados
 ```
 
 ## Perguntas da instalação
@@ -19,6 +18,26 @@ Proxy reverso com HTTPS para os serviços da rede, por exemplo
 | Domínio base dos serviços | — |
 | Porta HTTP no host | `80` |
 | Porta HTTPS no host | `443` |
+| Token de API da Cloudflare | — (validado na hora) |
+
+## HTTPS
+
+A imagem é compilada com o módulo [`caddy-dns/cloudflare`](https://github.com/caddy-dns/cloudflare).
+O Caddy prova ao Let's Encrypt que o domínio é seu criando um registro DNS temporário pela API da
+Cloudflare (desafio DNS-01). Por isso funciona mesmo com os serviços acessíveis só na rede local, e o
+certificado é aceito por qualquer aparelho sem instalar nada. A renovação é automática.
+
+Requisitos:
+
+- O DNS do domínio precisa estar na Cloudflare (o registro do domínio pode ficar em outro lugar)
+- Um token criado em https://dash.cloudflare.com/profile/api-tokens com o modelo **Edit zone DNS**,
+  restrito à zona do domínio
+
+Os subdomínios diretos (`grafana.<domínio>`) usam um único certificado curinga `*.<domínio>`, o que
+evita expor os nomes dos serviços nos registros públicos de certificados. Outros endereços ganham
+certificados próprios.
+
+O token fica em `.env` (permissão `600`, fora do git).
 
 ## Rotas
 
@@ -27,15 +46,7 @@ subdomínio (`grafana` vira `grafana.<domínio base>`) ou um endereço completo,
 (`192.168.3.43:3000`, `http://...` ou `https://...`). As mudanças são aplicadas sem reiniciar o Caddy.
 
 Se o projeto `adguard` existir, a rota `adguard.<domínio base> → astro-adguard:80` é criada
-na primeira instalação. Containers do grupo `astro` são acessíveis pelo nome, sem depender de IP ou porta no host.
+na primeira instalação. Containers do grupo `astro` são acessíveis pelo nome.
 
-Os nomes precisam resolver para esta máquina na rede. Com o adguard, isso é feito pela reescrita
-`*.<domínio base>` configurada na instalação dele.
-
-## HTTPS
-
-O Caddy usa uma autoridade certificadora própria (`local_certs`): nada precisa ser contratado, mas
-cada aparelho precisa confiar no certificado raiz uma vez. A instalação oferece fazer isso nesta
-máquina; para os outros, abra `http://ca.<domínio base>` e baixe `astro-ca.crt`.
-
-O `remove --purge` apaga a CA. Na reinstalação uma nova é gerada e os aparelhos precisam do novo certificado.
+Os nomes não existem no DNS público: eles resolvem para esta máquina só dentro da rede, pela reescrita
+`*.<domínio base>` do adguard.
