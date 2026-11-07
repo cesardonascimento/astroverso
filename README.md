@@ -17,17 +17,24 @@ para subir idêntico em qualquer PC.
 | Logs | Consultas: 7 dias · Estatísticas: 30 dias |
 | Idioma / fuso | pt-br / America/Sao_Paulo |
 
-## Subindo em uma máquina nova
+## Uso
 
 ```bash
-git clone <seu-repo> ~/Projects/astro-adguard
+gh repo clone cesardonascimento/astro-adguard ~/Projects/astro-adguard
 cd ~/Projects/astro-adguard
-./scripts/setup-host.sh          # só na primeira vez em cada máquina (usa sudo)
-cp .env.example .env             # edite a senha!
-podman compose up -d --build
+./adguard up      # cria ou recria o container
+./adguard down    # remove o container (dados em ./data são mantidos)
 ```
 
-Painel: `http://<ip-da-maquina>:8080`
+O `up` executa, nesta ordem:
+
+1. **`.env`**: se não existir, cria a partir do `.env.example` pedindo a senha do painel
+2. **Host**: libera a porta 53 (sysctl + systemd-resolved), firewall, instala o
+   podman-compose, habilita início no boot e conecta o Tailscale com `--accept-routes`.
+   Cada etapa só roda se ainda não estiver feita, então o `sudo` só é pedido na 1ª vez
+3. **Container**: build + recriação, aguarda o AdGuard responder e mostra os endereços
+
+Rode em um terminal interativo (o `sudo` precisa pedir senha).
 
 ## Variáveis do `.env`
 
@@ -43,23 +50,21 @@ Painel: `http://<ip-da-maquina>:8080`
 
 Usuário, senha, idioma e fuso só são aplicados quando a config é gerada.
 
-## Comandos do dia a dia
+## Logs e status
 
 ```bash
-podman compose up -d --build     # sobe / atualiza
-podman compose down              # para e remove o container (dados ficam em ./data)
-podman compose logs -f           # logs
-podman compose ps                # status + healthcheck
+podman compose logs -f
+podman compose ps
 ```
 
 ## Estrutura
 
 ```
+adguard                           script único: up / down
 Dockerfile                        imagem customizada
 docker-compose.yml                orquestração
 config/AdGuardHome.yaml.template  config padrão (edite aqui para mudar o padrão)
 scripts/docker-entrypoint.sh      gera a config na 1ª execução
-scripts/setup-host.sh             prepara o host (porta 53, firewall, compose, Tailscale)
 data/                             dados em runtime (fora do git)
 ```
 
@@ -67,9 +72,9 @@ data/                             dados em runtime (fora do git)
 
 - **Pelo painel**: alterações ficam em `data/conf/AdGuardHome.yaml` (só nessa máquina).
 - **Para todas as máquinas**: edite `config/AdGuardHome.yaml.template`, faça commit,
-  e em cada máquina rode com `ADGUARD_FORCE_CONFIG=true` uma vez (um `.bak` é mantido).
+  e em cada máquina rode `./adguard up` com `ADGUARD_FORCE_CONFIG=true` uma vez (um `.bak` é mantido).
 
 ## Atualizando o AdGuard
 
-Mude `ADGUARD_VERSION` na primeira linha do `Dockerfile`, depois `podman compose up -d --build`.
+Mude `ADGUARD_VERSION` na primeira linha do `Dockerfile`, depois `./adguard up`.
 Se o `schema_version` mudar, o AdGuard migra a config sozinho.

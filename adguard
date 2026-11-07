@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+export PODMAN_COMPOSE_WARNING_LOGS=false
+
+step() { printf '\n\033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
+ok()   { printf '    \033[32m✔\033[0m %s\n' "$*"; }
+warn() { printf '    \033[33m!\033[0m %s\n' "$*"; }
+fail() { printf '    \033[31m✘\033[0m %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    cat <<EOF
+Uso: ./adguard <comando>
+
+  up     cria ou recria o container (prepara o host na primeira execução)
+  down   para e remove o container (dados em ./data são mantidos)
+EOF
+}
+
+env_value() {
+    grep -m1 "^$1=" .env | cut -d= -f2- || true
+}
+
+setup_env() {
+    step "Arquivo .env"
+    if [[ -f .env ]]; then
+        ok "já existe, mantendo"
+        return
+    fi
+
+    local password confirm
+    if [[ -t 0 ]]; then
+        while true; do
+            read -rsp "    Senha do painel: " password; echo
+            read -rsp "    Confirme a senha: " confirm; echo
+            [[ -n $password && $password == "$confirm" ]] && break
+            warn "senha vazia ou diferente, tente novamente"
+        done
+    else
+        password="$(head -c 18 /dev/urandom | base64 | tr -d '/+=')"
+        warn "sem terminal interativo, senha gerada: $password"
+    fi
+
+    PASSWORD="$password" awk '/^ADGUARD_PASSWORD=/ { $0 = "ADGUARD_PASSWORD=" ENVIRON["PASSWORD"] } 1' \
+        .env.example > .env
+    chmod 0600 .env
+    ok "criado (usuário: $(env_value ADGUARD_USERNAME))"
+}
+
+setup_port53() {
+    step "Porta 53 para Podman rootless"
+    if (( $(sysctl -n net.ipv4.ip_unprivileged_port_start) <= 53 )); then
+        ok "já liberada"
+        return
+    fi
+    echo "net.ipv4.ip_unprivileged_port_start=53" | sudo tee /etc/sysctl.d/99-astro-adguard.conf >/dev/null
+    sudo sysctl -q -p /etc/sysctl.d/99-astro-adguard.conf
+    ok "portas a partir da 53 liberadas para usuários comuns"
+}
+
+setup_resolved() {
+    step "systemd-resolved"
+    local conf=/etc/systemd/resolved.conf.d/99-astro-adguard.conf
+    if ! systemctl is-active --quiet systemd-resolved; then
+        ok "inativo, nada a fazer"
+    elif [[ -f $conf ]]; then
+        ok "DNS stub já desativado"
+    else
+        sudo mkdir -p "$(dirname "$conf")"
+        printf '[Resolve]\nDNSStubListener=no\n' | sudo tee "$conf" >/dev/null
+        sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        sudo systemctl restart systemd-resolved
+        ok "DNS stub desativado, porta 53 livre"
+    fi
+}
+
+setup_firewall() {
+    step "Firewall"
+    local web_port="$1"
+    if ! command -v firewall-cmd >/dev/null || ! firewall-cmd --state >/dev/null 2>&1; then
+        ok "firewalld inativo, nada a fazer"
+        return
+    fi
+    local changed=false
+    if ! firewall-cmd -q --query-service=dns; then
+        sudo firewall-cmd -q --permanent --add-service=dns
+        changed=true
+    fi
+    if ! firewall-cmd -q --query-port="$web_port/tcp"; then
+        sudo firewall-cmd -q --permanent --add-port="$web_port/tcp"
+        changed=true
+    fi
+    if $changed; then
+        sudo firewall-cmd -q --reload
+        ok "DNS (53) e painel ($web_port/tcp) liberados"
+    else
+        ok "DNS (53) e painel ($web_port/tcp) já liberados"
+    fi
+}
+
+setup_compose() {
+    step "podman-compose"
+    if podman compose version >/dev/null 2>&1; then
+        ok "já instalado"
+    elif command -v dnf >/dev/null; then
+        sudo dnf install -y -q podman-compose
+        ok "instalado via dnf"
+    elif command -v apt-get >/dev/null; then
+        sudo apt-get install -y -qq podman-compose
+        ok "instalado via apt"
+    else
+        fail "instale manualmente: pip install --user podman-compose"
+    fi
+}
+
+setup_autostart() {
+    step "Inicialização automática"
+    if [[ $(loginctl show-user "$USER" -P Linger) == yes ]] \
+        && systemctl --user is-enabled -q podman-restart.service 2>/dev/null; then
+        ok "já habilitada"
+        return
+    fi
+    systemctl --user enable -q --now podman-restart.service
+    loginctl enable-linger "$USER"
+    ok "container sobe sozinho após o boot"
+}
+
+setup_tailscale() {
+    step "Tailscale"
+    if ! command -v tailscale >/dev/null; then
+        warn "não instalado, etapa ignorada"
+        return
+    fi
+    systemctl is-active -q tailscaled || sudo systemctl enable -q --now tailscaled
+    if ! tailscale status >/dev/null 2>&1; then
+        sudo tailscale up --accept-routes --operator="$USER"
+    elif ! tailscale debug prefs | grep -q '"RouteAll": true'; then
+        tailscale set --accept-routes 2>/dev/null || sudo tailscale set --accept-routes --operator="$USER"
+    fi
+    ok "conectado com --accept-routes ($(tailscale ip -4))"
+}
+
+cmd_up() {
+    setup_env
+    local web_port
+    web_port="$(env_value WEB_PORT)"
+    web_port="${web_port:-8080}"
+
+    setup_port53
+    setup_resolved
+    setup_firewall "$web_port"
+    setup_compose
+    setup_autostart
+    setup_tailscale
+
+    step "Container"
+    podman compose down >/dev/null 2>&1 || true
+    local log
+    if ! log="$(podman compose up -d --build 2>&1)"; then
+        printf '%s\n' "$log" >&2
+        fail "falha ao subir o container"
+    fi
+    if ! timeout 60 bash -c "until curl -sf http://127.0.0.1:$web_port/login.html >/dev/null; do sleep 1; done"; then
+        podman compose logs --tail 20 >&2
+        fail "o AdGuard não respondeu em 60s"
+    fi
+    ok "astro-adguard rodando"
+
+    local lan_ip ts_ip
+    lan_ip="$(ip -4 route get 1.1.1.1 | grep -oP 'src \K\S+')"
+    ts_ip="$(tailscale ip -4 2>/dev/null || true)"
+
+    step "Pronto"
+    ok "DNS:    $lan_ip${ts_ip:+  |  Tailscale: $ts_ip}"
+    ok "Painel: http://$lan_ip:$web_port${ts_ip:+  |  http://$ts_ip:$web_port}"
+}
+
+cmd_down() {
+    step "Container"
+    podman compose down >/dev/null 2>&1 || true
+    ok "astro-adguard removido (dados em ./data mantidos)"
+}
+
+case "${1:-}" in
+    up)   cmd_up ;;
+    down) cmd_down ;;
+    *)    usage; exit 1 ;;
+esac
