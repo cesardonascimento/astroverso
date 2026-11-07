@@ -30,7 +30,8 @@ certificado é aceito por qualquer aparelho sem instalar nada. A renovação é 
 Requisitos:
 
 - O DNS do domínio precisa estar na Cloudflare (o registro do domínio pode ficar em outro lugar)
-- Um token criado em https://dash.cloudflare.com/profile/api-tokens com o modelo **Edit zone DNS**,
+- Um token criado em https://dash.cloudflare.com/profile/api-tokens com as permissões
+  **Zone → Zone → Read** e **Zone → DNS → Edit**, sem expiração,
   restrito à zona do domínio
 
 Os subdomínios diretos (`grafana.<domínio>`) usam um único certificado curinga `*.<domínio>`, o que

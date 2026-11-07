@@ -72,18 +72,20 @@ cloudflare_check() {
         fi
         zone="${zone#*.}"
     done
-    ui_warn "o token não tem acesso à zona de $domain (use o modelo \"Edit zone DNS\")"
+    ui_warn "o token não enxerga a zona de $domain: ele precisa de Zone → Zone → Read nessa zona"
     return 1
 }
 
 token_instructions() {
     ui_info "o Caddy precisa de um token de API da Cloudflare para provar ao Let's Encrypt que $1 é seu"
     ui_info "como criar (1 minuto):"
-    ui_info "  1. abra https://dash.cloudflare.com/profile/api-tokens"
-    ui_info "  2. Create Token → na linha \"Edit zone DNS\", clique em Use template"
-    ui_info "  3. em Zone Resources: Include → Specific zone → $1"
-    ui_info "  4. Continue to summary → Create Token"
-    ui_info "  5. copie o token e guarde no seu gerenciador de senhas (ele só aparece uma vez)"
+    ui_info "  1. abra https://dash.cloudflare.com/profile/api-tokens → Create Token"
+    ui_info "  2. use o modelo \"Edit zone DNS\" e edite a política (lápis) para ter as duas permissões:"
+    ui_info "       Zone → Zone → Read   e   Zone → DNS → Edit (ou Write)"
+    ui_info "  3. restrinja a política à zona: Include → Specific zone → $1"
+    ui_info "  4. deixe sem expiração (se expirar, o certificado para de renovar)"
+    ui_info "  5. Continue to summary → Create Token"
+    ui_info "  6. copie o token e guarde no seu gerenciador de senhas (ele só aparece uma vez)"
 }
 
 configure() {
