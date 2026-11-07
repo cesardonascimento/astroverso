@@ -97,6 +97,57 @@ host_tailscale() {
     host_tailscale_subnet
 }
 
+host_ssh_auth_methods() {
+    ssh -o BatchMode=yes -o PreferredAuthentications=none -o ConnectTimeout=5 \
+        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null 127.0.0.1 2>&1 \
+        | grep -oP 'Permission denied \(\K[^)]*' || true
+}
+
+host_ssh() {
+    local service=sshd methods
+    if [[ ! -x /usr/sbin/sshd ]]; then
+        if command -v dnf >/dev/null; then
+            sudo dnf install -y -q openssh-server
+        elif command -v apt-get >/dev/null; then
+            sudo apt-get install -y -qq openssh-server
+        else
+            ui_warn "instale o openssh-server manualmente, etapa ignorada"
+            return
+        fi
+        ui_ok "servidor SSH instalado"
+    fi
+    systemctl list-unit-files ssh.service 2>/dev/null | grep -q '^ssh\.service' && service=ssh
+
+    if systemctl is-enabled -q "$service" 2>/dev/null && systemctl is-active -q "$service"; then
+        ui_ok "SSH já ativo"
+    else
+        sudo systemctl enable -q --now "$service"
+        ui_ok "SSH ativado e configurado para iniciar no boot"
+    fi
+    host_firewall ssh
+
+    methods="$(host_ssh_auth_methods)"
+    if [[ $methods != *password* ]]; then
+        ui_ok "SSH aceita só login por chave"
+    elif [[ ! -s $HOME/.ssh/authorized_keys ]]; then
+        ui_warn "SSH aceita login por senha; para usar só chaves, adicione sua chave pública"
+        ui_info "em ~/.ssh/authorized_keys (ssh-copy-id $USER@$(host_lan_ip)) e rode a instalação de novo"
+    elif ui_confirm "desativar o login por senha no SSH (só chaves, mais seguro)?" y; then
+        printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' \
+            | sudo tee /etc/ssh/sshd_config.d/10-astro.conf >/dev/null
+        sudo systemctl reload "$service"
+        ui_ok "SSH agora aceita só login por chave"
+    fi
+    ui_info "acesso: ssh $USER@$(host_lan_ip)"
+}
+
+host_base() {
+    host_compose
+    host_autostart
+    host_ssh
+    host_tailscale
+}
+
 host_lan_subnet() {
     local device
     device="$(ip -4 route get 1.1.1.1 | grep -oP 'dev \K\S+')"

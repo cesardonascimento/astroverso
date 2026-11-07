@@ -169,9 +169,7 @@ cmd_install() {
     ui_step "Host"
     setup_port53
     host_firewall dns "$web_port/tcp"
-    host_compose
-    host_autostart
-    host_tailscale
+    host_base
 
     ui_step "Container"
     local log

@@ -217,9 +217,7 @@ cmd_install() {
     ui_step "Host"
     host_unprivileged_ports "$(env_get HTTP_PORT 80)"
     host_firewall "$(env_get HTTP_PORT 80)/tcp" "$(env_get HTTPS_PORT 443)/tcp" "$(env_get HTTPS_PORT 443)/udp"
-    host_compose
-    host_autostart
-    host_tailscale
+    host_base
     remove_legacy_local_ca
 
     ui_step "Container"
