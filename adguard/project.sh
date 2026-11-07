@@ -24,6 +24,11 @@ cmd_status() {
     podman container exists "$CONTAINER"
 }
 
+remove_container() {
+    podman compose down >/dev/null 2>&1 || true
+    podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
+}
+
 NEW_PASSWORD=""
 
 normalize_domain() {
@@ -136,7 +141,7 @@ cmd_install() {
     [[ -z $NEW_PASSWORD ]] || save_password_hash
 
     ui_info "subindo o container..."
-    podman compose down >/dev/null 2>&1 || true
+    remove_container
     if ! log="$(podman compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir o container"
@@ -162,7 +167,7 @@ cmd_remove() {
 
     ui_step "Remoção"
     if cmd_status; then
-        podman compose down >/dev/null 2>&1 || true
+        remove_container
         ui_ok "container $CONTAINER removido"
     else
         ui_info "nenhum container para remover"

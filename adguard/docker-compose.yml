@@ -1,4 +1,7 @@
-name: astro-adguard
+name: astro
+
+x-podman:
+  in_pod: false
 
 services:
   adguard:
