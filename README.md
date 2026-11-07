@@ -37,6 +37,16 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `install` | Pergunta a configuração, prepara o host e sobe os containers |
 | `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
 
+Todo `docker-compose.yml` de subprojeto deve começar com o grupo `astro` e sem pod, para que os
+containers fiquem agrupados mas independentes (remover um não afeta os outros):
+
+```yaml
+name: astro
+
+x-podman:
+  in_pod: false
+```
+
 Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
