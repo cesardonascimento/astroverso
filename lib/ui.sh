@@ -50,6 +50,24 @@ ui_secret() {
     __ui_out=$first
 }
 
+ui_list() {
+    local -n __ui_out=$1
+    local label=$2 validator=${3:-} item normalized
+    __ui_out=()
+    while true; do
+        item="$(_ui_ask "$label (Enter vazio para terminar): ")"
+        [[ -z $item ]] && break
+        if [[ -n $validator ]]; then
+            if ! normalized="$($validator "$item")"; then
+                ui_warn "valor inválido: $item"
+                continue
+            fi
+            item=$normalized
+        fi
+        __ui_out+=("$item")
+    done
+}
+
 ui_confirm() {
     local question=$1 default=${2:-n} hint answer
     [[ $default == y ]] && hint="S/n" || hint="s/N"

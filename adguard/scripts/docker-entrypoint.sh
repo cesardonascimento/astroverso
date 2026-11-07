@@ -12,7 +12,16 @@ if [ -f "$CONF_FILE" ]; then
     log "✔" "usando configuração existente"
 else
     [ -n "$ADGUARD_PASSWORD_HASH" ] || { log "✘" "ADGUARD_PASSWORD_HASH não definida"; exit 1; }
-    envsubst '${ADGUARD_USERNAME} ${ADGUARD_PASSWORD_HASH} ${ADGUARD_LANGUAGE} ${TZ}' \
+
+    ADGUARD_REWRITES_YAML=""
+    for domain in $(printf '%s' "$ADGUARD_REWRITES" | tr ',' ' '); do
+        ADGUARD_REWRITES_YAML="$ADGUARD_REWRITES_YAML{domain: '*.$domain', answer: '$ADGUARD_REWRITE_ANSWER', enabled: true}, "
+        log "✔" "reescrita *.$domain → $ADGUARD_REWRITE_ANSWER"
+    done
+    ADGUARD_REWRITES_YAML="[${ADGUARD_REWRITES_YAML%, }]"
+    export ADGUARD_REWRITES_YAML
+
+    envsubst '${ADGUARD_USERNAME} ${ADGUARD_PASSWORD_HASH} ${ADGUARD_LANGUAGE} ${TZ} ${ADGUARD_REWRITES_YAML}' \
         < "$TEMPLATE" > "$CONF_FILE"
     chmod 0600 "$CONF_FILE"
     log "✔" "configuração gerada (usuário: $ADGUARD_USERNAME, fuso: $TZ)"

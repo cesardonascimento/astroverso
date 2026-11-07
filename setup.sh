@@ -29,10 +29,13 @@ run_all() {
             failed+=("$name")
         fi
     done
+    summary
+}
 
+summary() {
     ui_step "Resumo"
-    ((${#succeeded[@]})) && ui_ok "concluído: ${succeeded[*]}"
-    ((${#failed[@]})) && ui_error "falhou: ${failed[*]}"
+    ((${#succeeded[@]} == 0)) || ui_ok "concluído: ${succeeded[*]}"
+    ((${#failed[@]} == 0)) || ui_error "falhou: ${failed[*]}"
     ((${#failed[@]} == 0))
 }
 
@@ -69,6 +72,20 @@ install_selected() {
     run_all install "" "${picked[@]}"
 }
 
+reinstall_all() {
+    ui_confirm "isso apaga os dados de TODOS os projetos e reinstala do zero. confirma?" n \
+        || { ui_warn "cancelado"; return; }
+    local name failed=() succeeded=()
+    for name in "${PROJECTS[@]}"; do
+        if project "$name" remove --purge && project "$name" install; then
+            succeeded+=("$name")
+        else
+            failed+=("$name")
+        fi
+    done
+    summary
+}
+
 remove_all() {
     local mode
     ui_menu mode "Como remover os containers de todos os projetos?" \
@@ -89,12 +106,14 @@ ui_step "Astro: ${#PROJECTS[@]} projeto(s) encontrado(s): ${PROJECTS[*]}"
 ui_menu choice "O que você quer fazer?" \
     "Instalar todos (pula os já instalados)" \
     "Escolher quais instalar" \
+    "Reinstalar tudo do zero (apaga os dados)" \
     "Remover todos os containers" \
     "Sair"
 
 case $choice in
     0) install_all ;;
     1) install_selected ;;
-    2) remove_all ;;
+    2) reinstall_all ;;
+    3) remove_all ;;
     *) ui_info "até mais!" ;;
 esac

@@ -26,6 +26,14 @@ cmd_status() {
 
 NEW_PASSWORD=""
 
+normalize_domain() {
+    local domain="${1,,}"
+    domain="${domain#\*.}"
+    domain="${domain%.}"
+    [[ $domain =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || return 1
+    printf '%s' "$domain"
+}
+
 configure() {
     ui_step "Configuração"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em adguard/.env?" y; then
@@ -41,6 +49,21 @@ configure() {
     ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo America/Sao_Paulo)"
     ui_input  language "idioma do painel" "$(env_value ADGUARD_LANGUAGE pt-br)"
 
+    ui_step "Reescritas DNS"
+    local rewrite_answer="" domains=() domain
+    if ui_confirm "adicionar domínios de reescrita (*.dominio → IP)?" n; then
+        local default_answer=$dns_ip
+        [[ $default_answer == 0.0.0.0 ]] && default_answer="$(host_lan_ip)"
+        ui_input rewrite_answer "IP de destino das reescritas" "$(env_value ADGUARD_REWRITE_ANSWER "$default_answer")"
+        ui_list domains "domínio" normalize_domain
+        for domain in "${domains[@]}"; do
+            ui_ok "*.$domain → $rewrite_answer"
+        done
+        ((${#domains[@]})) || ui_info "nenhum domínio informado"
+    else
+        ui_info "sem reescritas"
+    fi
+
     (
         umask 077
         cat > .env <<EOF
@@ -49,6 +72,8 @@ ADGUARD_LANGUAGE='$language'
 TZ='$timezone'
 DNS_BIND_IP='$dns_ip'
 WEB_PORT='$web_port'
+ADGUARD_REWRITE_ANSWER='$rewrite_answer'
+ADGUARD_REWRITES='$(IFS=,; echo "${domains[*]}")'
 EOF
     )
 
@@ -123,7 +148,8 @@ cmd_install() {
     ui_ok "container $CONTAINER rodando"
 
     local lan_ip ts_ip
-    lan_ip="$(host_lan_ip)"
+    lan_ip="$(env_value DNS_BIND_IP 0.0.0.0)"
+    [[ $lan_ip == 0.0.0.0 ]] && lan_ip="$(host_lan_ip)"
     ts_ip="$(host_tailscale_ip)"
     ui_step "Acesso"
     ui_ok "DNS:    $lan_ip${ts_ip:+  |  Tailscale: $ts_ip}"

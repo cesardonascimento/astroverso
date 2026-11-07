@@ -176,7 +176,7 @@ filtering:
   blocking_mode: default
   parental_block_host: family-block.dns.adguard.com
   safebrowsing_block_host: standard-block.dns.adguard.com
-  rewrites: []
+  rewrites: ${ADGUARD_REWRITES_YAML}
   safe_fs_patterns:
     - /opt/adguardhome/work/userfilters/*
   max_http_size: 256MB

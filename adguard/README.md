@@ -31,6 +31,12 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 | IP do host onde o DNS escuta | `0.0.0.0` (todos) |
 | Fuso horário | o do host |
 | Idioma do painel | `pt-br` |
+| Adicionar reescritas DNS? | não |
+| IP de destino das reescritas | o IP onde o DNS escuta (ou o IP da máquina na rede) |
+| Domínios | um por vez, Enter vazio termina |
+
+Cada domínio informado (`dominio.com` ou `*.dominio.com`) vira a reescrita `*.dominio.com → IP`,
+que cobre todos os subdomínios mas não o domínio puro.
 
 As respostas ficam em `.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
 a config do AdGuard é regerada, e a anterior fica em `data/conf/AdGuardHome.yaml.bak`.
