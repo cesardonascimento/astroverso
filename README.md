@@ -58,5 +58,6 @@ Bibliotecas compartilhadas:
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
 - `lib/host.sh`: preparação genérica do host (`host_unprivileged_ports`, `host_compose`, `host_autostart`,
-  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso), `host_lan_ip`, `host_tailscale_ip`).
+  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso e oferece anunciar a rede local),
+  `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`).
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto.

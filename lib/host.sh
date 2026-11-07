@@ -94,6 +94,50 @@ host_tailscale() {
         tailscale set --accept-routes 2>/dev/null || sudo tailscale set --accept-routes --operator="$USER"
     fi
     ui_ok "Tailscale conectado com --accept-routes ($(tailscale ip -4))"
+    host_tailscale_subnet
+}
+
+host_lan_subnet() {
+    local device
+    device="$(ip -4 route get 1.1.1.1 | grep -oP 'dev \K\S+')"
+    ip -4 route show dev "$device" scope link proto kernel | awk '{ print $1; exit }'
+}
+
+host_tailscale_subnet() {
+    local subnet
+    subnet="$(host_lan_subnet)"
+    if [[ -z $subnet ]]; then
+        ui_warn "rede local não detectada, anúncio da rede no Tailscale ignorado"
+        return
+    fi
+
+    if ! tailscale debug prefs | grep -q "\"$subnet\""; then
+        if ! ui_confirm "anunciar a rede local $subnet no Tailscale (acesso remoto a toda a rede)?" y; then
+            ui_info "rede local não anunciada no Tailscale"
+            return
+        fi
+        if [[ $(sysctl -n net.ipv4.ip_forward) != 1 ]]; then
+            printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' \
+                | sudo tee /etc/sysctl.d/99-astro-tailscale.conf >/dev/null
+            sudo sysctl -q -p /etc/sysctl.d/99-astro-tailscale.conf
+            ui_ok "encaminhamento de pacotes ativado"
+        fi
+        if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1 \
+            && ! firewall-cmd -q --query-masquerade; then
+            sudo firewall-cmd -q --permanent --add-masquerade
+            sudo firewall-cmd -q --reload
+            ui_ok "masquerade liberado no firewalld"
+        fi
+        tailscale set --advertise-routes="$subnet" 2>/dev/null \
+            || sudo tailscale set --advertise-routes="$subnet"
+    fi
+
+    if tailscale status --json | sed -n '/^  "Self": {/,/^  }/p' | grep -q "\"$subnet\""; then
+        ui_ok "rede $subnet anunciada e aprovada no Tailscale"
+    else
+        ui_warn "rede $subnet anunciada, falta aprovar no painel do Tailscale:"
+        ui_info "https://login.tailscale.com/admin/machines → $(hostname -s) → Edit route settings → marque $subnet"
+    fi
 }
 
 host_lan_ip() {

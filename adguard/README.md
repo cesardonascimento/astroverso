@@ -46,6 +46,8 @@ a config do AdGuard é regerada, e a anterior fica em `data/conf/AdGuardHome.yam
 - Libera a porta 53 para Podman rootless e desativa o DNS stub do `systemd-resolved`
 - Libera DNS e a porta do painel no firewalld
 - Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
+- Oferece anunciar a rede local (detectada automaticamente, ex: `192.168.3.0/24`) no Tailscale para acesso remoto,
+  ativando o encaminhamento de pacotes e o masquerade do firewalld; lembra de aprovar a rota no painel
 
 Depois que o container sobe:
 
