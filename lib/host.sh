@@ -14,6 +14,18 @@ host_compose() {
     fi
 }
 
+host_unprivileged_ports() {
+    local port=$1 current
+    current="$(sysctl -n net.ipv4.ip_unprivileged_port_start)"
+    if ((current <= port)); then
+        ui_ok "portas a partir da $current já liberadas para Podman rootless"
+        return
+    fi
+    echo "net.ipv4.ip_unprivileged_port_start=$port" | sudo tee /etc/sysctl.d/99-astro.conf >/dev/null
+    sudo sysctl -q -p /etc/sysctl.d/99-astro.conf
+    ui_ok "portas a partir da $port liberadas para Podman rootless"
+}
+
 host_autostart() {
     if [[ $(loginctl show-user "$USER" -P Linger) == yes ]] \
         && systemctl --user is-enabled -q podman-restart.service 2>/dev/null; then

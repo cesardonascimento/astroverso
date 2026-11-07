@@ -5,16 +5,11 @@ cd "$(dirname "$(readlink -f "$0")")"
 ASTRO_PROJECT=adguard
 source ../lib/ui.sh
 source ../lib/host.sh
+source ../lib/env.sh
 
 CONTAINER=astro-adguard
 IMAGE=localhost/astro-adguard:latest
 CONF_FILE=data/conf/AdGuardHome.yaml
-
-env_value() {
-    local value
-    value="$(grep -m1 "^$1=" .env 2>/dev/null | cut -d= -f2- | tr -d "'")" || true
-    printf '%s' "${value:-${2:-}}"
-}
 
 cmd_describe() {
     echo "AdGuard Home: DNS da rede com bloqueio de anúncios"
@@ -47,19 +42,19 @@ configure() {
     fi
 
     local username language timezone web_port dns_ip
-    ui_input  username "usuário do painel" "$(env_value ADGUARD_USERNAME admin)"
+    ui_input  username "usuário do painel" "$(env_get ADGUARD_USERNAME admin)"
     ui_secret NEW_PASSWORD "senha do painel"
-    ui_input  web_port "porta do painel no host" "$(env_value WEB_PORT 8080)"
-    ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_value DNS_BIND_IP 0.0.0.0)"
+    ui_input  web_port "porta do painel no host" "$(env_get WEB_PORT 8080)"
+    ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_get DNS_BIND_IP 0.0.0.0)"
     ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo America/Sao_Paulo)"
-    ui_input  language "idioma do painel" "$(env_value ADGUARD_LANGUAGE pt-br)"
+    ui_input  language "idioma do painel" "$(env_get ADGUARD_LANGUAGE pt-br)"
 
     ui_step "Reescritas DNS"
     local rewrite_answer="" domains=() domain
     if ui_confirm "adicionar domínios de reescrita (*.dominio → IP)?" n; then
         local default_answer=$dns_ip
         [[ $default_answer == 0.0.0.0 ]] && default_answer="$(host_lan_ip)"
-        ui_input rewrite_answer "IP de destino das reescritas" "$(env_value ADGUARD_REWRITE_ANSWER "$default_answer")"
+        ui_input rewrite_answer "IP de destino das reescritas" "$(env_get ADGUARD_REWRITE_ANSWER "$default_answer")"
         ui_list domains "domínio" normalize_domain
         for domain in "${domains[@]}"; do
             ui_ok "*.$domain → $rewrite_answer"
@@ -97,13 +92,7 @@ save_password_hash() {
 }
 
 setup_port53() {
-    if (( $(sysctl -n net.ipv4.ip_unprivileged_port_start) <= 53 )); then
-        ui_ok "porta 53 já liberada para Podman rootless"
-    else
-        echo "net.ipv4.ip_unprivileged_port_start=53" | sudo tee /etc/sysctl.d/99-astro-adguard.conf >/dev/null
-        sudo sysctl -q -p /etc/sysctl.d/99-astro-adguard.conf
-        ui_ok "porta 53 liberada para Podman rootless"
-    fi
+    host_unprivileged_ports 53
 
     local conf=/etc/systemd/resolved.conf.d/99-astro-adguard.conf
     if ! systemctl is-active --quiet systemd-resolved; then
@@ -122,7 +111,7 @@ setup_port53() {
 cmd_install() {
     configure
     local web_port
-    web_port="$(env_value WEB_PORT 8080)"
+    web_port="$(env_get WEB_PORT 8080)"
 
     ui_step "Host"
     setup_port53
@@ -153,7 +142,7 @@ cmd_install() {
     ui_ok "container $CONTAINER rodando"
 
     local lan_ip ts_ip
-    lan_ip="$(env_value DNS_BIND_IP 0.0.0.0)"
+    lan_ip="$(env_get DNS_BIND_IP 0.0.0.0)"
     [[ $lan_ip == 0.0.0.0 ]] && lan_ip="$(host_lan_ip)"
     ts_ip="$(host_tailscale_ip)"
     ui_step "Acesso"
@@ -188,7 +177,8 @@ cmd_remove() {
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
+    actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | install | remove [--purge]" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
 esac

@@ -102,18 +102,51 @@ remove_all() {
     esac
 }
 
-ui_step "Astro: ${#PROJECTS[@]} projeto(s) encontrado(s): ${PROJECTS[*]}"
-ui_menu choice "O que você quer fazer?" \
-    "Instalar todos (pula os já instalados)" \
-    "Escolher quais instalar" \
-    "Reinstalar tudo do zero (apaga os dados)" \
-    "Remover todos os containers" \
-    "Sair"
+configure_project() {
+    local name index candidates=() labels=()
+    for name in "${PROJECTS[@]}"; do
+        project "$name" status || continue
+        [[ -n "$(project "$name" actions 2>/dev/null)" ]] || continue
+        candidates+=("$name")
+        labels+=("$(printf '%-12s %s' "$name" "$(project "$name" describe)")")
+    done
+    if ((${#candidates[@]} == 0)); then
+        ui_warn "nenhum projeto instalado tem configurações extras"
+        return
+    fi
 
-case $choice in
-    0) install_all ;;
-    1) install_selected ;;
-    2) reinstall_all ;;
-    3) remove_all ;;
-    *) ui_info "até mais!" ;;
-esac
+    ui_menu index "Qual projeto configurar?" "${labels[@]}" "Voltar"
+    ((index < ${#candidates[@]})) || return 0
+    name=${candidates[index]}
+
+    local id label ids=() action_labels=()
+    while IFS='|' read -r id label; do
+        ids+=("$id")
+        action_labels+=("$label")
+    done < <(project "$name" actions)
+
+    ui_menu index "O que fazer no $name?" "${action_labels[@]}" "Voltar"
+    ((index < ${#ids[@]})) || return 0
+    project "$name" action "${ids[index]}"
+}
+
+ui_step "Astro: ${#PROJECTS[@]} projeto(s) encontrado(s): ${PROJECTS[*]}"
+while true; do
+    ui_menu choice "O que você quer fazer?" \
+        "Instalar todos (pula os já instalados)" \
+        "Escolher quais instalar" \
+        "Configurar um projeto instalado" \
+        "Reinstalar tudo do zero (apaga os dados)" \
+        "Remover todos os containers" \
+        "Sair"
+
+    case $choice in
+        0) install_all || true ;;
+        1) install_selected || true ;;
+        2) configure_project || true ;;
+        3) reinstall_all || true ;;
+        4) remove_all || true ;;
+        *) ui_info "até mais!"; break ;;
+    esac
+    echo
+done
