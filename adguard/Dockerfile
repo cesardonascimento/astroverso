@@ -5,9 +5,8 @@ RUN apk add --no-cache apache2-utils gettext-envsubst
 
 ENV TZ=America/Sao_Paulo \
     ADGUARD_USERNAME=admin \
-    ADGUARD_PASSWORD="" \
-    ADGUARD_LANGUAGE=pt-br \
-    ADGUARD_FORCE_CONFIG=false
+    ADGUARD_PASSWORD_HASH="" \
+    ADGUARD_LANGUAGE=pt-br
 
 COPY config/AdGuardHome.yaml.template /opt/adguardhome/
 COPY --chmod=0755 scripts/docker-entrypoint.sh /usr/local/bin/
