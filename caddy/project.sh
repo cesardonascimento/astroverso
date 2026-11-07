@@ -76,6 +76,16 @@ cloudflare_check() {
     return 1
 }
 
+token_instructions() {
+    ui_info "o Caddy precisa de um token de API da Cloudflare para provar ao Let's Encrypt que $1 é seu"
+    ui_info "como criar (1 minuto):"
+    ui_info "  1. abra https://dash.cloudflare.com/profile/api-tokens"
+    ui_info "  2. Create Token → na linha \"Edit zone DNS\", clique em Use template"
+    ui_info "  3. em Zone Resources: Include → Specific zone → $1"
+    ui_info "  4. Continue to summary → Create Token"
+    ui_info "  5. copie o token e guarde no seu gerenciador de senhas (ele só aparece uma vez)"
+}
+
 configure() {
     ui_step "Configuração"
     local domain http_port https_port token
@@ -96,7 +106,7 @@ configure() {
     if [[ -n $token ]] && cloudflare_check "$token" "$domain"; then
         :
     else
-        ui_info "crie um token em https://dash.cloudflare.com/profile/api-tokens (modelo \"Edit zone DNS\")"
+        token_instructions "$domain"
         while true; do
             ui_secret token "token de API da Cloudflare"
             cloudflare_check "$token" "$domain" && break
