@@ -47,6 +47,14 @@ a config do AdGuard é regerada, e a anterior fica em `data/conf/AdGuardHome.yam
 - Libera DNS e a porta do painel no firewalld
 - Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
 
+Depois que o container sobe:
+
+- Oferece fazer esta máquina usar só o AdGuard como DNS (via NetworkManager), sem o DNS secundário
+  do roteador. Sem isso, quando o AdGuard reinicia o sistema passa para o roteador e não volta,
+  e os nomes das reescritas param de resolver
+- Confere se o Split DNS do Tailscale desvia algum domínio das reescritas para outro servidor
+  (ex: um AdGuard antigo). Se desviar, mostra o que trocar no painel do Tailscale e verifica de novo
+
 ## Mudando a configuração padrão
 
 - **Pelo painel**: as alterações ficam em `data/conf/AdGuardHome.yaml` (só nessa máquina).
