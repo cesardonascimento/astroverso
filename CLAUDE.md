@@ -71,6 +71,8 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
 - Compose de todo projeto: `name: astro` + `x-podman: in_pod: false` (agrupados, mas independentes).
+- Estado da máquina (respostas que valem para todos os projetos, ex.: redirecionamento de porta confirmado) fica em
+  `~/.config/astro/host.env`, fora do repositório.
 - Configuração por prompts, gravada em `<projeto>/.env` (permissão 600, fora do git). "Usar a configuração já salva?" reaproveita.
 - Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `<projeto>/.proxy` e recarrega o Caddy).
   Rotas manuais ficam em `caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.

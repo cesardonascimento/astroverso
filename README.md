@@ -41,6 +41,11 @@ Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o 
   qualquer aparelho seu conectado ao Tailscale passa a acessar todos os aparelhos da casa (impressora,
   roteador, outros serviços) sem instalar nada neles. A rede é detectada automaticamente. Depois, aprove
   a rota no painel do Tailscale. Responda **N** se não precisa de acesso remoto.
+- **Já fez esse redirecionamento no roteador?** Sem uma porta aberta, o Tailscale às vezes não consegue
+  ligar seus aparelhos direto à máquina quando você está fora de casa (por exemplo, no 4G/5G) e passa o
+  tráfego por um servidor intermediário (relay), lento demais para coisas como streaming de jogos. O
+  assistente mostra a porta UDP e o IP a redirecionar no roteador; a porta só aceita aparelhos
+  autenticados na sua rede Tailscale. Só continua com **S**, e a resposta fica guardada nesta máquina.
 - **Desativar o login por senha no SSH?** Deixa o acesso remoto ao terminal só por chave, bem mais
   difícil de invadir que uma senha. Só aparece se já houver uma chave em `~/.ssh/authorized_keys`.
 

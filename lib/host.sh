@@ -95,6 +95,7 @@ host_tailscale() {
     fi
     ui_ok "Tailscale conectado com --accept-routes ($(tailscale ip -4))"
     host_tailscale_subnet
+    host_tailscale_port_forward
 }
 
 host_ssh_auth_methods() {
@@ -178,6 +179,34 @@ host_lan_subnet() {
     local device
     device="$(ip -4 route get 1.1.1.1 | grep -oP 'dev \K\S+')"
     ip -4 route show dev "$device" scope link proto kernel | awk '{ print $1; exit }'
+}
+
+HOST_STATE="${XDG_CONFIG_HOME:-$HOME/.config}/astro/host.env"
+
+host_tailscale_port() {
+    local port
+    port="$(systemctl show tailscaled -p Environment --value 2>/dev/null | grep -oP '(^|\s)PORT=\K[0-9]+')" || true
+    printf '%s' "${port:-41641}"
+}
+
+host_tailscale_port_forward() {
+    local forward
+    forward="$(host_lan_ip):$(host_tailscale_port)"
+    if grep -qx "TAILSCALE_PORT_FORWARD=$forward" "$HOST_STATE" 2>/dev/null; then
+        ui_ok "porta UDP ${forward#*:} redirecionada no roteador para ${forward%:*}"
+        return
+    fi
+    ui_info "para o Tailscale conectar direto de fora de casa (sem relay), redirecione no roteador:"
+    ui_info "  protocolo UDP, porta ${forward#*:} → ${forward%:*} (esta máquina), porta ${forward#*:}"
+    ui_info "  no roteador, procure \"Redirecionamento de portas\", \"Port Forwarding\" ou \"Servidor virtual\""
+    until ui_confirm "já fez esse redirecionamento no roteador?" n; do
+        ui_warn "a instalação continua depois do redirecionamento (Ctrl+C para sair)"
+    done
+    mkdir -p "$(dirname "$HOST_STATE")"
+    grep -v '^TAILSCALE_PORT_FORWARD=' "$HOST_STATE" 2>/dev/null > "$HOST_STATE.new" || true
+    echo "TAILSCALE_PORT_FORWARD=$forward" >> "$HOST_STATE.new"
+    mv "$HOST_STATE.new" "$HOST_STATE"
+    ui_ok "redirecionamento da porta UDP ${forward#*:} confirmado"
 }
 
 host_tailscale_subnet() {

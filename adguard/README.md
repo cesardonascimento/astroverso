@@ -64,6 +64,8 @@ dois valores com o `.env` a cada inicialização, o que também migra instalaç�
 - Ativa o servidor SSH; se houver chave em `~/.ssh/authorized_keys`, oferece desativar o login por senha
 - Oferece anunciar a rede local (detectada automaticamente, ex: `<rede>/24`) no Tailscale para acesso remoto,
   ativando o encaminhamento de pacotes e o masquerade do firewalld; lembra de aprovar a rota no painel
+- Pede o redirecionamento da porta UDP do Tailscale no roteador para esta máquina (conexões diretas de fora
+  de casa, sem relay) e só continua após a confirmação, guardada em `~/.config/astro/host.env`
 
 Depois que o container sobe:
 
