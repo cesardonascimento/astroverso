@@ -13,6 +13,8 @@ WEB_PORT=47990
 STREAM_PORTS=(47984/tcp 47989/tcp 48010/tcp 47998-48000/udp 48002/udp 48010/udp)
 GDM_CONFS=(/etc/gdm/custom.conf /etc/gdm3/custom.conf /etc/gdm3/daemon.conf)
 UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/systemd/user/sunshine.service)
+NVIDIA_VENDOR=0x10de
+MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 
 cmd_describe() {
     echo "Sunshine: streaming de jogos para o Moonlight, em um usuário próprio com login automático"
@@ -265,6 +267,80 @@ disable_service() {
     ui_ok "Sunshine não inicia mais com a sessão de $user"
 }
 
+nvidia_pci() {
+    local card
+    for card in /sys/class/drm/card[0-9]*; do
+        [[ ${card##*/} == *-* ]] && continue
+        [[ $(cat "$card/device/vendor" 2>/dev/null) == "$NVIDIA_VENDOR" ]] || continue
+        basename "$(readlink -f "$card/device")"
+        return 0
+    done
+    return 1
+}
+
+nvidia_display() {
+    local output name
+    for output in /sys/class/drm/card*-*; do
+        name="${output##*/}"
+        [[ $(cat "/sys/class/drm/${name%%-*}/device/vendor" 2>/dev/null) == "$NVIDIA_VENDOR" ]] || continue
+        [[ $(cat "$output/status" 2>/dev/null) == connected ]] || continue
+        printf '%s' "${name#*-}"
+        return 0
+    done
+    return 1
+}
+
+primary_gpu() {
+    local pci rule
+    pci="$(nvidia_pci)" || return 0
+    if ! modinfo nvidia >/dev/null 2>&1; then
+        ui_warn "sem o driver proprietário, a NVIDIA não vira a placa principal do GNOME"
+        return
+    fi
+    rule="SUBSYSTEM==\"drm\", KERNEL==\"card*\", KERNELS==\"$pci\", TAG+=\"mutter-device-preferred-primary\""
+    if [[ $(cat "$MUTTER_RULE" 2>/dev/null) == "$rule" ]]; then
+        ui_ok "NVIDIA já é a placa principal do GNOME"
+        return
+    fi
+    printf '%s\n' "$rule" | sudo tee "$MUTTER_RULE" >/dev/null
+    sudo udevadm control --reload
+    sudo udevadm trigger --subsystem-match=drm
+    HOST_REBOOT=true
+    ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os jogos)"
+}
+
+sunshine_conf() {
+    local user=$1
+    shift
+    as_user "$user" sh -c '
+        file="$HOME/.config/sunshine/sunshine.conf"
+        mkdir -p "${file%/*}"
+        touch "$file"
+        for pair; do
+            key="${pair%%=*}"
+            sed -i "/^$key *=/d" "$file"
+            [ "$pair" = "$key" ] || printf "%s = %s\n" "$key" "${pair#*=}" >> "$file"
+        done
+    ' sh "$@"
+}
+
+encoder_settings() {
+    local user=$1 output
+    if ! nvidia_pci >/dev/null; then
+        ui_ok "sem placa NVIDIA, o Sunshine escolhe o codificador sozinho"
+        return
+    fi
+    if output="$(nvidia_display)"; then
+        sunshine_conf "$user" encoder=nvenc capture=kms
+        ui_ok "tela $output ligada na NVIDIA: o Sunshine captura e codifica nela (NVENC)"
+        return
+    fi
+    sunshine_conf "$user" encoder capture
+    ui_warn "nenhuma tela ligada na saída da NVIDIA: sem NVENC, o Sunshine escolhe o codificador sozinho"
+    ui_info "ligue a TV ou um plugue HDMI fantasma na porta HDMI, mantenha a tampa fechada"
+    ui_info "e rode a instalação de novo"
+}
+
 cmd_install() {
     configure
     local user host
@@ -279,10 +355,12 @@ cmd_install() {
     create_user "$user"
     desktop_settings "$user"
     autologin "$user"
+    primary_gpu
 
     ui_step "Sunshine"
     install_sunshine
     grant_capture
+    encoder_settings "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"
@@ -314,6 +392,11 @@ cmd_remove() {
         fi
     fi
     autologin_off
+    if [[ -f $MUTTER_RULE ]]; then
+        sudo rm -f "$MUTTER_RULE"
+        sudo udevadm control --reload
+        ui_ok "a Intel volta a ser a placa principal do GNOME no próximo login"
+    fi
     proxy_unpublish
     ui_info "mantidos: pacote do Sunshine, driver da NVIDIA e o usuário${user:+ $user} com os jogos"
 }

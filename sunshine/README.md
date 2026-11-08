@@ -30,12 +30,19 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Usuário de jogos:** cria o usuário sem senha e sem `sudo`, pula a tela de boas-vindas do GNOME e
   desativa o bloqueio de tela, o escurecimento e a suspensão para ele.
 - **Login automático:** configura o GDM (`custom.conf`) para entrar com o usuário de jogos.
+- **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev
+  (`61-astro-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
+  e rodar os aplicativos na NVIDIA, sem copiar cada quadro da Intel.
 - **Sunshine:** baixa o pacote `.rpm` ou `.deb` da versão mais recente em
   [github.com/LizardByte/Sunshine/releases](https://github.com/LizardByte/Sunshine/releases), confere o
   SHA-256 publicado pelo GitHub e instala. Se a versão instalada já for a mais recente, não baixa nada.
   Rodar a instalação de novo atualiza o Sunshine.
 - Dá ao binário a permissão `cap_sys_admin`, necessária para capturar a tela pelo KMS. Ela é refeita a
   cada instalação, porque uma atualização do pacote a apaga.
+- **NVENC:** se houver uma tela ligada numa saída da NVIDIA (TV, monitor ou plugue HDMI fantasma), grava
+  `encoder = nvenc` e `capture = kms` no `sunshine.conf` do usuário de jogos: a captura e a codificação
+  acontecem na própria NVIDIA. Sem tela nela, tira essas opções, o Sunshine escolhe o codificador sozinho e
+  a instalação avisa para ligar a tela na porta HDMI e rodar de novo.
 - Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica,
   aberta pelo login automático no boot.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
@@ -44,6 +51,19 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   `https://sunshine.<domínio>`. O painel usa um certificado autoassinado, então a rota usa o destino
   `https+insecure://`.
 
+## Tela
+
+A configuração padrão considera o notebook **com a tampa fechada e uma tela externa na porta HDMI**, que
+sai pela NVIDIA. Com a tampa fechada, o GNOME desliga a tela interna (que é da Intel) e a tela externa
+vira a única. Uma TV ou um plugue HDMI fantasma servem igualmente; trocar um pelo outro não exige
+reinstalar, porque a porta é a mesma.
+
+Para conferir em qual placa está a tela ligada:
+
+```bash
+grep -H . /sys/class/drm/card*-*/status
+```
+
 ## Depois de instalar
 
 Reinicie a máquina. O login automático, o driver da NVIDIA e o Sunshine só entram em ação no boot.
@@ -51,6 +71,7 @@ No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de
 
 ## Remoção
 
-`remove` desativa o serviço e o login automático e tira a rota do Caddy. O pacote do Sunshine, o driver
+`remove` desativa o serviço e o login automático, devolve à Intel o papel de placa principal e tira a
+rota do Caddy. O pacote do Sunshine, o driver
 da NVIDIA e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
 `~/.config/sunshine` do usuário de jogos.
