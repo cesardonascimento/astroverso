@@ -214,7 +214,6 @@ host_upgrade() {
 }
 
 host_base() {
-    host_upgrade
     host_no_sleep
     host_compose
     host_autostart

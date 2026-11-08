@@ -61,9 +61,9 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Arquitetura
 
 ```
-setup.sh             assistente: descobre */project.sh e chama o contrato; não conhece os projetos
+setup.sh             assistente: atualiza o sistema (host_upgrade) e descobre */project.sh; não conhece os projetos
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
-lib/host.sh          host_base (atualização, sem suspensão, compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
+lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão]
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 <projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]

@@ -4,6 +4,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 ASTRO_PROJECT=astro
 source lib/ui.sh
+source lib/host.sh
 
 trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
@@ -32,6 +33,11 @@ run_all() {
     summary
 }
 
+system_upgrade() {
+    ui_step "Sistema"
+    host_upgrade
+}
+
 summary() {
     ui_step "Resumo"
     ((${#succeeded[@]} == 0)) || ui_ok "concluído: ${succeeded[*]}"
@@ -54,6 +60,7 @@ install_all() {
         ui_ok "tudo já está instalado"
         return
     fi
+    system_upgrade
     run_all install "" "${pending[@]}"
 }
 
@@ -69,12 +76,14 @@ install_selected() {
     ui_checklist chosen "Quais projetos instalar?" "${labels[@]}"
     ((${#chosen[@]})) || { ui_warn "nenhum projeto selecionado"; return; }
     for name in "${chosen[@]}"; do picked+=("${PROJECTS[name]}"); done
+    system_upgrade
     run_all install "" "${picked[@]}"
 }
 
 reinstall_all() {
     ui_confirm "isso apaga os dados de TODOS os projetos e reinstala do zero. confirma?" n \
         || { ui_warn "cancelado"; return; }
+    system_upgrade
     local name failed=() succeeded=()
     for name in "${PROJECTS[@]}"; do
         if project "$name" remove --purge && project "$name" install; then

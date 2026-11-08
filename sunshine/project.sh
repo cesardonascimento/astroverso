@@ -51,6 +51,10 @@ as_user() {
     (cd / && sudo -u "$user" -H "$@")
 }
 
+user_manager_running() {
+    [[ $(loginctl show-user "$1" -P State 2>/dev/null) == @(active|online) ]]
+}
+
 user_session_active() {
     [[ $(loginctl show-user "$1" -P State 2>/dev/null) == active ]]
 }
@@ -252,17 +256,17 @@ enable_service() {
     as_user "$user" sh -c 'mkdir -p "$HOME/.config/systemd/user/$1.wants" && ln -sfn "$2" "$HOME/.config/systemd/user/$1.wants/"' \
         sh "${target:-graphical-session.target}" "$unit"
     ui_ok "Sunshine inicia com a sessão de $user (login automático no boot)"
-    if user_session_active "$user"; then
+    if user_manager_running "$user"; then
         sudo systemctl --user -M "$user@" daemon-reload
         sudo systemctl --user -M "$user@" restart "${unit##*/}"
-        ui_ok "Sunshine reiniciado na sessão aberta de $user"
+        ui_ok "Sunshine reiniciado na sessão de $user"
     fi
 }
 
 disable_service() {
     local user=$1 unit
     unit="$(sunshine_unit)"
-    if user_session_active "$user"; then
+    if user_manager_running "$user"; then
         sudo systemctl --user -M "$user@" stop "${unit##*/}" || true
     fi
     as_user "$user" sh -c 'rm -f "$HOME"/.config/systemd/user/*.wants/"$1"' sh "${unit##*/}"
@@ -407,8 +411,11 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "painel: https://$host"
     ui_ok "Moonlight: $(host_lan_ip)"
-    if $HOST_REBOOT || ! user_session_active "$user"; then
+    if $HOST_REBOOT || ! user_manager_running "$user"; then
         ui_warn "reinicie a máquina para concluir: sudo systemctl reboot"
+    elif ! user_session_active "$user"; then
+        ui_warn "a sessão de $user não está na tela: o Sunshine só transmite e recebe os controles dela"
+        ui_info "encerre a outra sessão gráfica (Sair) para a de $user voltar, ou reinicie a máquina"
     fi
 }
 
