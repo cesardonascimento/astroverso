@@ -289,9 +289,11 @@ host_nvidia_gpu() {
 
 host_secure_boot_key() {
     [[ $(mokutil --sb-state 2>/dev/null) == *enabled* ]] || return 0
-    [[ -f $HOST_AKMODS_KEY ]] || sudo kmodgenca -a >/dev/null
     local state password hash
-    state="$(mokutil --test-key "$HOST_AKMODS_KEY" 2>&1)" || true
+    if ! sudo test -f "$HOST_AKMODS_KEY"; then
+        sudo kmodgenca -a >/dev/null
+    fi
+    state="$(sudo mokutil --test-key "$HOST_AKMODS_KEY" 2>&1)" || true
     if [[ $state == *"is already enrolled"* ]]; then
         ui_ok "chave que assina o driver já cadastrada no Secure Boot"
         return
@@ -311,8 +313,18 @@ host_secure_boot_key() {
     ui_info "  se ela passar sem resposta (10 segundos), rode a instalação de novo e reinicie"
 }
 
+host_nvidia_version() {
+    local kernel
+    for kernel in "$(uname -r)" $(ls -v /lib/modules | tac); do
+        if modinfo -k "$kernel" -F version nvidia 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 host_nvidia_fedora() {
-    local release
+    local release kernel
     release="$(rpm -E %fedora)"
     if ! rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1; then
         sudo dnf install -y -q \
@@ -322,13 +334,20 @@ host_nvidia_fedora() {
     fi
     sudo dnf install -y -q akmods mokutil
     host_secure_boot_key
+    ui_info "atualizando o kernel (o driver é compilado para a versão mais recente)..."
+    sudo dnf upgrade -y -q --refresh kernel
     sudo dnf install -y -q akmod-nvidia xorg-x11-drv-nvidia-cuda
-    ui_info "compilando o módulo da NVIDIA para o kernel $(uname -r) (alguns minutos)..."
-    sudo akmods --kernels "$(uname -r)" 2>&1 | ui_prefix
+    kernel="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core | sort -V | tail -1)"
+    sudo dnf install -y -q "kernel-devel-$kernel"
+    ui_info "compilando o módulo da NVIDIA para o kernel $kernel (alguns minutos)..."
+    sudo akmods --kernels "$kernel" 2>&1 | ui_prefix
+    if [[ $kernel != "$(uname -r)" ]]; then
+        ui_ok "kernel $kernel instalado, passa a ser usado depois de reiniciar"
+    fi
 }
 
 host_nvidia_driver() {
-    local id
+    local id version
     if ! host_nvidia_gpu; then
         ui_ok "nenhuma placa NVIDIA, driver proprietário dispensado"
         return
@@ -338,12 +357,12 @@ host_nvidia_driver() {
         return
     fi
     id="$(. /etc/os-release && printf '%s' "$ID")"
-    if modinfo -F version nvidia >/dev/null 2>&1; then
+    if version="$(host_nvidia_version)"; then
         if [[ $id == fedora ]]; then
             host_secure_boot_key
         fi
         HOST_REBOOT=true
-        ui_warn "driver proprietário da NVIDIA $(modinfo -F version nvidia) instalado, carrega depois de reiniciar"
+        ui_warn "driver proprietário da NVIDIA $version instalado, carrega depois de reiniciar"
         return
     fi
     ui_info "placa NVIDIA usando o driver livre (nouveau): sem NVENC e com pouco desempenho 3D"
@@ -355,7 +374,7 @@ host_nvidia_driver() {
         ui_warn "instale o driver proprietário da NVIDIA manualmente; etapa ignorada"
         return
     fi
-    modinfo -F version nvidia >/dev/null 2>&1 || ui_fail "o módulo da NVIDIA não foi compilado"
+    version="$(host_nvidia_version)" || ui_fail "o módulo da NVIDIA não foi compilado"
     HOST_REBOOT=true
-    ui_ok "driver proprietário da NVIDIA $(modinfo -F version nvidia) instalado, carrega depois de reiniciar"
+    ui_ok "driver proprietário da NVIDIA $version instalado, carrega depois de reiniciar"
 }

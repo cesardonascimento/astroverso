@@ -295,7 +295,7 @@ nvidia_display() {
 primary_gpu() {
     local pci rule
     pci="$(nvidia_pci)" || return 0
-    if ! modinfo nvidia >/dev/null 2>&1; then
+    if ! host_nvidia_version >/dev/null; then
         ui_warn "sem o driver proprietário, a NVIDIA não vira a placa principal do GNOME"
         return
     fi

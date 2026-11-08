@@ -111,6 +111,9 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
   para o servidor do Split DNS.
 - O usuário de jogos tem o `home` fechado (700): comandos nele passam por `sudo -u <usuário> -H` (`as_user`),
   e o `status` do sunshine olha só o `custom.conf` do GDM, que é legível sem `sudo`.
+- O `akmod-nvidia` puxa o `kernel-devel` (e o kernel) mais recente do repositório: numa máquina desatualizada, o
+  módulo é compilado para o kernel novo, que só entra no boot seguinte. `host_nvidia_version` procura o módulo
+  em todos os kernels. A pasta `/etc/pki/akmods/certs` só é legível pelo root (`sudo` no `test` e no `mokutil`).
 - O pacote do Sunshine não aplica o `setcap`, e uma atualização do pacote apaga a permissão.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.

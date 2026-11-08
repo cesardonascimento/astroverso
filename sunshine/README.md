@@ -23,8 +23,9 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 
 ## O que a instalação faz
 
-- **Driver da NVIDIA:** se houver uma placa NVIDIA sem o driver proprietário, instala o `akmod-nvidia` e o
-  `xorg-x11-drv-nvidia-cuda` do RPM Fusion (Fedora) ou usa o `ubuntu-drivers` (Ubuntu). Com o Secure Boot
+- **Driver da NVIDIA:** se houver uma placa NVIDIA sem o driver proprietário, atualiza o kernel e instala o
+  `akmod-nvidia` e o `xorg-x11-drv-nvidia-cuda` do RPM Fusion (Fedora), compilando o módulo para o kernel mais
+  recente ou usa o `ubuntu-drivers` (Ubuntu). Com o Secure Boot
   ligado, gera a chave que assina o módulo e pede uma senha temporária para cadastrá-la. No boot seguinte,
   na tela azul do MOK: Enroll MOK → Continue → Yes → senha → Reboot.
 - **Usuário de jogos:** cria o usuário sem senha e sem `sudo`, pula a tela de boas-vindas do GNOME e
