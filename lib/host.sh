@@ -38,7 +38,7 @@ host_autostart() {
 }
 
 host_firewall() {
-    if ! command -v firewall-cmd >/dev/null || ! firewall-cmd --state >/dev/null 2>&1; then
+    if ! command -v firewall-cmd >/dev/null || ! systemctl is-active -q firewalld; then
         ui_ok "firewalld inativo, nada a liberar"
         return
     fi
@@ -57,7 +57,7 @@ host_firewall() {
 host_firewall_block_lan() {
     local port=$1 zone rule
     rule="rule port port=\"$port\" protocol=\"tcp\" reject"
-    if ! command -v firewall-cmd >/dev/null || ! firewall-cmd --state >/dev/null 2>&1; then
+    if ! command -v firewall-cmd >/dev/null || ! systemctl is-active -q firewalld; then
         ui_warn "firewalld inativo, a porta $port continua acessível pela rede"
         return
     fi
@@ -72,7 +72,7 @@ host_firewall_block_lan() {
 host_firewall_unblock_lan() {
     local port=$1 zone rule
     rule="rule port port=\"$port\" protocol=\"tcp\" reject"
-    command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1 || return 0
+    command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld || return 0
     zone="$(firewall-cmd --get-default-zone)"
     firewall-cmd -q --zone="$zone" --query-rich-rule="$rule" || return 0
     sudo firewall-cmd -q --permanent --zone="$zone" --remove-rich-rule="$rule"
@@ -275,7 +275,7 @@ host_tailscale_subnet() {
             sudo sysctl -q -p /etc/sysctl.d/99-astro-tailscale.conf
             ui_ok "encaminhamento de pacotes ativado"
         fi
-        if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1 \
+        if command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld \
             && ! firewall-cmd -q --query-masquerade; then
             sudo firewall-cmd -q --permanent --add-masquerade
             sudo firewall-cmd -q --reload
@@ -344,15 +344,35 @@ host_nvidia_version() {
     return 1
 }
 
-host_nvidia_fedora() {
-    local release kernel
+host_rpmfusion() {
+    local release
+    rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1 && return 0
     release="$(rpm -E %fedora)"
-    if ! rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1; then
-        sudo dnf install -y -q \
-            "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$release.noarch.rpm" \
-            "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$release.noarch.rpm"
-        ui_ok "repositórios do RPM Fusion habilitados"
+    sudo dnf install -y -q \
+        "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$release.noarch.rpm" \
+        "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$release.noarch.rpm"
+    ui_ok "repositórios do RPM Fusion habilitados"
+}
+
+host_intel_media() {
+    command -v lspci >/dev/null && [[ -n "$(lspci -d 8086::0300; lspci -d 8086::0380)" ]] || return 0
+    [[ $(. /etc/os-release && printf '%s' "$ID") == fedora ]] || return 0
+    if rpm -q intel-media-driver >/dev/null 2>&1; then
+        ui_ok "driver de vídeo completo da Intel já instalado (H.264/HEVC)"
+        return
     fi
+    host_rpmfusion
+    if rpm -q libva-intel-media-driver >/dev/null 2>&1; then
+        sudo dnf swap -y -q libva-intel-media-driver intel-media-driver --allowerasing
+    else
+        sudo dnf install -y -q intel-media-driver
+    fi
+    ui_ok "driver de vídeo completo da Intel instalado: codificação H.264/HEVC pela placa integrada"
+}
+
+host_nvidia_fedora() {
+    local kernel
+    host_rpmfusion
     sudo dnf install -y -q akmods mokutil
     host_secure_boot_key
     sudo dnf install -y -q akmod-nvidia xorg-x11-drv-nvidia-cuda

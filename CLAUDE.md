@@ -114,6 +114,9 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 - O `akmod-nvidia` puxa o `kernel-devel` (e o kernel) mais recente do repositório: numa máquina desatualizada, o
   módulo é compilado para o kernel novo, que só entra no boot seguinte. `host_nvidia_version` procura o módulo
   em todos os kernels. A pasta `/etc/pki/akmods/certs` só é legível pelo root (`sudo` no `test` e no `mokutil`).
+- `firewall-cmd --state` pede autorização do polkit a usuários comuns (as consultas `--query-*` não): para saber
+  se o firewalld está ativo, usar `systemctl is-active -q firewalld`.
+- O `libva-intel-media-driver` do Fedora não codifica H.264/HEVC; o `intel-media-driver` do RPM Fusion, sim.
 - O pacote do Sunshine não aplica o `setcap`, e uma atualização do pacote apaga a permissão.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.

@@ -40,7 +40,7 @@ Bibliotecas compartilhadas:
   pela própria máquina, ex.: atrás do Caddy), `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o
   redirecionamento da porta UDP do Tailscale no roteador),
   `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, atualizando o kernel no Fedora e
-  cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`,
+  cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`.

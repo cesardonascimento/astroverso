@@ -28,6 +28,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   recente ou usa o `ubuntu-drivers` (Ubuntu). Com o Secure Boot
   ligado, gera a chave que assina o módulo e pede uma senha temporária para cadastrá-la. No boot seguinte,
   na tela azul do MOK: Enroll MOK → Continue → Yes → senha → Reboot.
+- **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
+  `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
 - **Usuário de jogos:** cria o usuário sem senha e sem `sudo`, pula a tela de boas-vindas do GNOME e
   desativa o bloqueio de tela, o escurecimento e a suspensão para ele.
 - **Login automático:** configura o GDM (`custom.conf`) para entrar com o usuário de jogos.

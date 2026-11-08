@@ -384,6 +384,7 @@ cmd_install() {
     ui_step "Host"
     host_base
     host_nvidia_driver
+    host_intel_media
 
     ui_step "Usuário de jogos"
     create_user "$user"
