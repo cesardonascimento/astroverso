@@ -41,6 +41,9 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   cada instalação, porque uma atualização do pacote a apaga.
 - **Tela no HDMI:** confere se há uma tela ligada na saída da NVIDIA (TV, monitor ou plugue HDMI
   fantasma). Se não houver, avisa: o stream sai pela Intel, sem NVENC, e só com a tampa aberta.
+- **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
+  o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
+  Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica,
   aberta pelo login automático no boot.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
@@ -60,6 +63,20 @@ O codificador não é fixado: a cada stream, o Sunshine testa os codificadores (
 primeiro que funcionar com a tela do momento. Com a tela no HDMI, é o NVENC; sem ela e com a tampa
 aberta, o da Intel. O log do Sunshine mostra o escolhido (`Found H.264 encoder: h264_nvenc`).
 
+## Resolução
+
+Quando um aparelho abre um stream, o Sunshine passa a resolução e a taxa de quadros pedidas
+(`SUNSHINE_CLIENT_WIDTH`, `SUNSHINE_CLIENT_HEIGHT`, `SUNSHINE_CLIENT_FPS`) para o
+`astro-sunshine-display do`, que troca a tela para esse modo pelo `org.gnome.Mutter.DisplayConfig`. Ao
+fechar o aplicativo no Moonlight, o `undo` volta à resolução original.
+
+- Só troca se a tela anunciar a resolução exata; a taxa escolhida é a mais próxima da pedida. Se não
+  houver, a tela fica como está e o Sunshine redimensiona o vídeo.
+- Só age com um único monitor ativo (ex.: tampa fechada e tela no HDMI).
+- A troca é temporária: o GNOME a desfaz no próximo login ou ao trocar o cabo, sem gravar no perfil de
+  telas.
+- Nunca falha: um erro vai para o log do Sunshine e o stream segue sem ajuste.
+
 Para conferir em qual placa está a tela ligada:
 
 ```bash
@@ -73,7 +90,7 @@ No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de
 
 ## Remoção
 
-`remove` desativa o serviço e o login automático, devolve à Intel o papel de placa principal e tira a
+`remove` desativa o serviço, o login automático e a troca de resolução, devolve à Intel o papel de placa principal e tira a
 rota do Caddy. O pacote do Sunshine, o driver
 da NVIDIA e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
 `~/.config/sunshine` do usuário de jogos.

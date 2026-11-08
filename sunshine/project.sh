@@ -15,6 +15,8 @@ GDM_CONFS=(/etc/gdm/custom.conf /etc/gdm3/custom.conf /etc/gdm3/daemon.conf)
 UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/systemd/user/sunshine.service)
 NVIDIA_VENDOR=0x10de
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
+DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
+PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 
 cmd_describe() {
     echo "Sunshine: streaming de jogos para o Moonlight, em um usuário próprio com login automático"
@@ -309,6 +311,59 @@ primary_gpu() {
     ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os jogos)"
 }
 
+sunshine_conf() {
+    local user=$1
+    shift
+    as_user "$user" sh -c '
+        file="$HOME/.config/sunshine/sunshine.conf"
+        mkdir -p "${file%/*}"
+        touch "$file"
+        for pair; do
+            key="${pair%%=*}"
+            sed -i "/^$key *=/d" "$file"
+            [ "$pair" = "$key" ] || printf "%s = %s\n" "$key" "${pair#*=}" >> "$file"
+        done
+    ' sh "$@"
+}
+
+sunshine_conf_get() {
+    as_user "$1" sh -c 'sed -n "s/^$1 *= *//p" "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null || true' sh "$2"
+}
+
+display_switch() {
+    local user=$1 current
+    if cmp -s scripts/display.py "$DISPLAY_BIN"; then
+        ui_ok "ajuste de resolução já instalado"
+    else
+        sudo install -m 0755 scripts/display.py "$DISPLAY_BIN"
+        if command -v restorecon >/dev/null; then
+            sudo restorecon -q "$DISPLAY_BIN"
+        fi
+        ui_ok "ajuste de resolução instalado em $DISPLAY_BIN"
+    fi
+    current="$(sunshine_conf_get "$user" global_prep_cmd)"
+    if [[ $current == "$PREP_CMD" ]]; then
+        ui_ok "a tela já troca para a resolução de cada aparelho durante o stream"
+    elif [[ -n $current && $current != *"$DISPLAY_BIN"* ]]; then
+        ui_warn "o sunshine.conf de $user já tem um global_prep_cmd próprio, troca de resolução não ativada"
+        ui_info "para ativar, inclua \"$DISPLAY_BIN do\" e \"$DISPLAY_BIN undo\" nos comandos globais do painel"
+    else
+        sunshine_conf "$user" "global_prep_cmd=$PREP_CMD"
+        ui_ok "a tela troca para a resolução de cada aparelho durante o stream e volta ao final"
+    fi
+}
+
+display_switch_off() {
+    local user=$1
+    if [[ $(sunshine_conf_get "$user" global_prep_cmd) == *"$DISPLAY_BIN"* ]]; then
+        sunshine_conf "$user" global_prep_cmd
+    fi
+    if [[ -e $DISPLAY_BIN ]]; then
+        sudo rm -f "$DISPLAY_BIN"
+        ui_ok "ajuste de resolução removido"
+    fi
+}
+
 display_check() {
     local output
     nvidia_pci >/dev/null || return 0
@@ -340,6 +395,7 @@ cmd_install() {
     install_sunshine
     grant_capture
     display_check
+    display_switch "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"
@@ -365,6 +421,7 @@ cmd_remove() {
         if command -v sunshine >/dev/null; then
             disable_service "$user"
         fi
+        display_switch_off "$user"
         if $purge; then
             as_user "$user" sh -c 'rm -rf "$HOME/.config/sunshine"'
             ui_ok "configuração do Sunshine apagada (credenciais e aparelhos pareados)"

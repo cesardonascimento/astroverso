@@ -110,8 +110,9 @@ respostas ficam em `<projeto>/.env`, fora do git.
 Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
 ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
 e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
-Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Ao terminar,
-reinicie a máquina.
+Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
+cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
+essa resolução, e volta ao final. Ao terminar, reinicie a máquina.
 
 ### Depois de instalar
 
