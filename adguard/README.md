@@ -73,6 +73,11 @@ Depois que o container sobe:
 - Pergunta se esta máquina deve usar só o AdGuard como DNS (via NetworkManager), ignorando o secundário
   do roteador (padrão: não). Só o AdGuard garante os nomes internos na própria máquina, mas a deixa sem
   DNS quando ele está parado; com o secundário ela nunca fica sem DNS
+- Mantendo o secundário, instala a verificação do DNS primário: `astro-dns-check.service`, disparado pelo
+  NetworkManager a cada conexão (`/etc/NetworkManager/dispatcher.d/90-astro-dns-check`). Ela renova a
+  conexão até 3 vezes se o primeiro DNS entregue pelo roteador não for o AdGuard, espera o AdGuard responder
+  (até 5 min) e reinicia o `systemd-resolved` se ele estiver usando o secundário. Log: `journalctl -t adguard`.
+  Removida ao escolher "só o AdGuard" ou ao remover o projeto
 - Confere se o Split DNS do Tailscale desvia algum domínio das reescritas para outro servidor
   (ex: um AdGuard antigo). Se desviar, mostra o que trocar no painel do Tailscale e verifica de novo
 - Publica o painel no Caddy (`.proxy`) no endereço respondido na instalação

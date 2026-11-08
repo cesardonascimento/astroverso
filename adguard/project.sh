@@ -11,6 +11,9 @@ source ../lib/proxy.sh
 CONTAINER=astro-adguard
 IMAGE=localhost/astro-adguard:latest
 CONF_FILE=data/conf/AdGuardHome.yaml
+DNS_CHECK_BIN=/usr/local/bin/astro-dns-check
+DNS_CHECK_UNIT=/etc/systemd/system/astro-dns-check.service
+DNS_CHECK_HOOK=/etc/NetworkManager/dispatcher.d/90-astro-dns-check
 
 cmd_describe() {
     echo "AdGuard Home: DNS da rede com bloqueio de anúncios"
@@ -133,17 +136,62 @@ setup_host_dns() {
     if [[ $(nmcli -g ipv4.ignore-auto-dns connection show "$connection") == yes \
         && $(nmcli -g ipv4.dns connection show "$connection") == "$dns_ip" ]]; then
         ui_ok "esta máquina já usa só o AdGuard como DNS ($connection)"
+        remove_dns_check
         return
     fi
     ui_info "só o AdGuard: a máquina sempre resolve os nomes internos, mas fica sem DNS quando ele está parado"
     ui_info "com o secundário: nunca fica sem DNS, mas pode deixar de resolver os nomes internos após um reinício"
     if ! ui_confirm "usar só o AdGuard como DNS desta máquina?" n; then
         ui_info "DNS desta máquina mantido"
+        install_dns_check "$dns_ip"
         return
     fi
     nmcli connection modify "$connection" ipv4.ignore-auto-dns yes ipv4.dns "$dns_ip" ipv6.ignore-auto-dns yes
     nmcli connection up "$connection" >/dev/null
     ui_ok "esta máquina agora usa só o AdGuard como DNS ($connection)"
+    remove_dns_check
+}
+
+dns_check_unit() {
+    printf '%s\n' \
+        '[Unit]' \
+        'Description=astro: AdGuard como DNS primário' \
+        'After=network-online.target' \
+        '' \
+        '[Service]' \
+        'Type=oneshot' \
+        'SyslogIdentifier=adguard' \
+        "ExecStart=$DNS_CHECK_BIN $1"
+}
+
+dns_check_hook() {
+    printf '%s\n' \
+        '#!/bin/sh' \
+        'case "$2" in up|dhcp4-change) systemctl start --no-block astro-dns-check.service ;; esac'
+}
+
+install_dns_check() {
+    local dns_ip=$1
+    if cmp -s scripts/dns-check.sh "$DNS_CHECK_BIN" \
+        && [[ $(cat "$DNS_CHECK_UNIT" 2>/dev/null) == "$(dns_check_unit "$dns_ip")" && -x $DNS_CHECK_HOOK ]]; then
+        ui_ok "verificação do DNS primário já ativa"
+        return
+    fi
+    sudo install -m 0755 scripts/dns-check.sh "$DNS_CHECK_BIN"
+    dns_check_unit "$dns_ip" | sudo tee "$DNS_CHECK_UNIT" >/dev/null
+    dns_check_hook | sudo tee "$DNS_CHECK_HOOK" >/dev/null
+    sudo chmod 0755 "$DNS_CHECK_HOOK"
+    ! command -v restorecon >/dev/null || sudo restorecon -q "$DNS_CHECK_BIN" "$DNS_CHECK_UNIT" "$DNS_CHECK_HOOK"
+    sudo systemctl daemon-reload
+    sudo systemctl start --no-block astro-dns-check.service
+    ui_ok "a cada conexão de rede, o AdGuard volta a ser o DNS primário (log: journalctl -t adguard)"
+}
+
+remove_dns_check() {
+    [[ -e $DNS_CHECK_UNIT || -e $DNS_CHECK_HOOK || -e $DNS_CHECK_BIN ]] || return 0
+    sudo rm -f "$DNS_CHECK_HOOK" "$DNS_CHECK_UNIT" "$DNS_CHECK_BIN"
+    sudo systemctl daemon-reload
+    ui_ok "verificação do DNS primário removida"
 }
 
 split_dns_mismatches() {
@@ -260,6 +308,7 @@ cmd_remove() {
     else
         ui_info "dados mantidos em adguard/data"
     fi
+    remove_dns_check
     proxy_unpublish
 }
 

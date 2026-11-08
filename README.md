@@ -73,8 +73,9 @@ respostas ficam em `<projeto>/.env`, fora do git.
 - **Usar só o AdGuard como DNS desta máquina?** Define o DNS do próprio servidor. Com **S**, ele sempre
   resolve os nomes internos, mas fica sem DNS nenhum quando o AdGuard está parado (por exemplo, durante
   um "Reinstalar tudo do zero", o que impede baixar as imagens). Com **N** (padrão), ele usa também o DNS
-  secundário do roteador e nunca fica sem DNS; os nomes internos podem falhar no próprio servidor depois
-  de um reinício do AdGuard, sem afetar os outros aparelhos.
+  secundário do roteador e nunca fica sem DNS. Nesse caso, a cada conexão de rede (inclusive no boot) o
+  servidor confere se o roteador entregou o AdGuard como DNS primário (pede de novo até 3 vezes), espera
+  o AdGuard responder e volta a usá-lo se tiver ficado preso no secundário.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
   servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
 
