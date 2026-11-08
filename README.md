@@ -29,6 +29,7 @@ o `sudo` pode pedir senha na primeira instalação em cada máquina.
 |---|---|
 | [adguard](adguard/) | AdGuard Home: DNS da rede com bloqueio de anúncios |
 | [caddy](caddy/) | Caddy: proxy reverso com HTTPS (Let's Encrypt) para os serviços da rede |
+| [cockpit](cockpit/) | Cockpit: painel web da máquina e dos containers |
 
 ## Adicionando um projeto
 
@@ -52,6 +53,11 @@ name: astro
 x-podman:
   in_pod: false
 ```
+
+Para publicar um endereço no Caddy, o projeto escreve em `<projeto>/.proxy` (fora do git) uma linha
+`endereço destino` por rota e chama `../caddy/project.sh action reload`. O Caddy junta essas rotas com
+as cadastradas manualmente. Containers do grupo `astro` são alcançados pelo nome; serviços do próprio
+sistema, por `host.containers.internal`.
 
 Bibliotecas compartilhadas:
 

@@ -42,7 +42,8 @@ O token fica em `.env` (permissão `600`, fora do git).
 
 ## Rotas
 
-Ficam em `.routes` (fora do git), uma por linha: `endereço destino`. Ao adicionar, basta informar o
+Ficam em `.routes` (fora do git), uma por linha: `endereço destino`. Rotas declaradas por outros projetos
+(arquivos `<projeto>/.proxy`) também são publicadas; a ação **Recarregar rotas** aplica mudanças nelas. Ao adicionar, basta informar o
 subdomínio (`grafana` vira `grafana.<domínio base>`) ou um endereço completo, e o destino
 (`192.168.3.43:3000`, `http://...` ou `https://...`). As mudanças são aplicadas sem reiniciar o Caddy.
 

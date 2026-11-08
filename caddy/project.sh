@@ -28,7 +28,8 @@ cmd_actions() {
     printf '%s\n' \
         "list|Listar rotas" \
         "add|Adicionar rotas" \
-        "remove|Remover rotas"
+        "remove|Remover rotas" \
+        "reload|Recarregar rotas (inclui as declaradas por outros projetos)"
 }
 
 remove_container() {
@@ -53,6 +54,18 @@ normalize_upstream() {
 
 route_lines() {
     [[ -f $ROUTES ]] && grep -v '^\s*$' "$ROUTES" || true
+}
+
+project_route_lines() {
+    local file
+    for file in ../*/.proxy; do
+        [[ -f $file && $file != ../caddy/.proxy ]] || continue
+        grep -v '^\s*$' "$file" | sed "s|\$| ${file#../}|; s|/\.proxy\$||"
+    done
+}
+
+all_route_lines() {
+    { route_lines; project_route_lines; } | awk '!seen[$1]++ { print $1, $2 }'
 }
 
 cloudflare_get() {
@@ -148,7 +161,7 @@ render_caddyfile() {
             else
                 others+=("$host $upstream")
             fi
-        done < <(route_lines)
+        done < <(all_route_lines)
         printf '\thandle {\n\t\tabort\n\t}\n}\n'
         for host in "${others[@]}"; do
             printf '\n%s {\n\treverse_proxy %s\n}\n' "${host%% *}" "${host#* }"
@@ -203,11 +216,11 @@ wait_certificate() {
 }
 
 print_routes() {
-    local host upstream count=0
-    while read -r host upstream; do
-        ui_info "https://$host → $upstream"
+    local host upstream owner count=0
+    while read -r host upstream owner; do
+        ui_info "https://$host → $upstream${owner:+  (do projeto $owner)}"
         count=$((count + 1))
-    done < <(route_lines)
+    done < <({ route_lines; project_route_lines; } | awk '!seen[$1]++')
     ((count)) || ui_info "nenhuma rota cadastrada"
 }
 
@@ -257,7 +270,7 @@ action_add() {
             ui_warn "endereço inválido"
             continue
         fi
-        if route_lines | awk -v h="$host" '$1 == h { found = 1 } END { exit !found }'; then
+        if all_route_lines | awk -v h="$host" '$1 == h { found = 1 } END { exit !found }'; then
             ui_warn "$host já existe, remova antes para alterar"
             continue
         fi
@@ -297,6 +310,7 @@ cmd_action() {
         list)   ui_step "Rotas"; print_routes ;;
         add)    action_add ;;
         remove) action_remove ;;
+        reload) ui_step "Rotas"; apply_routes ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac
 }
