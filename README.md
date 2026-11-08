@@ -106,7 +106,7 @@ respostas ficam em `<projeto>/.env`, fora do git.
   ficam os emuladores, os jogos e as configurações. Ele é criado sem senha e sem `sudo`, para que quem
   estiver jogando não tenha acesso ao homelab. Por padrão, `jogos`.
 - **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
-  aparelhos. Por padrão, `sunshine.<domínio>`.
+  aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
 
 Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
 ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,

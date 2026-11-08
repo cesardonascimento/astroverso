@@ -88,7 +88,7 @@ configure() {
         ui_input user "nome do usuário de jogos (criado se não existir)" "$(env_get GAMES_USER jogos)" is_username
         check_games_user "$user" && break
     done
-    ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine${domain:+.$domain}")" is_hostname
+    ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine.$(hostname -s)${domain:+.$domain}")" is_hostname
     (
         umask 077
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > .env.new

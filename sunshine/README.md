@@ -17,7 +17,7 @@ controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 | Pergunta | Padrão |
 |---|---|
 | Nome do usuário de jogos | `jogos` |
-| Endereço do Sunshine no Caddy | `sunshine.<domínio do caddy>` |
+| Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
 
 O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`.
 
@@ -52,7 +52,7 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
   `48010`.
 - Bloqueia a porta `47990` (painel) para a rede local: o acesso passa só pelo Caddy, em
-  `https://sunshine.<domínio>`. O painel usa um certificado autoassinado, então a rota usa o destino
+  `https://sunshine.<nome-da-máquina>.<domínio>`. O painel usa um certificado autoassinado, então a rota usa o destino
   `https+insecure://`.
 
 ## Tela
@@ -85,6 +85,10 @@ Para conferir em qual placa está a tela ligada:
 ```bash
 grep -H . /sys/class/drm/card*-*/status
 ```
+
+O endereço padrão leva o nome da máquina para permitir mais de um Sunshine na rede. Por ter dois níveis
+abaixo do domínio, ele não é coberto pelo certificado curinga `*.<domínio>`: o Caddy emite um certificado
+próprio para ele, também pelo DNS da Cloudflare.
 
 ## Depois de instalar
 
