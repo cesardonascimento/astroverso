@@ -275,7 +275,7 @@ action_add() {
             continue
         fi
         while true; do
-            upstream="$(_ui_ask "destino de $host (ex: 192.168.3.43:3000): ")"
+            upstream="$(_ui_ask "destino de $host (ex: $(host_lan_ip):3000): ")"
             upstream="$(normalize_upstream "$upstream")" && break
             ui_warn "destino inválido"
         done

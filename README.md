@@ -1,18 +1,19 @@
 # astro
 
-Meu homelab: os serviços da rede de casa rodando em containers na rigel, versionados para
-reinstalar tudo em minutos se algo der errado.
+Homelab em containers (Podman), versionado para reinstalar tudo em minutos em qualquer máquina
+se algo der errado. Domínio, IPs, portas e senhas não ficam no código: são perguntados durante a
+instalação.
 
 | Projeto | Para que serve |
 |---|---|
-| [**adguard**](adguard/) | DNS da casa: bloqueia anúncios e rastreadores em todos os aparelhos e resolve os nomes internos (`*.cesardonascimento.com`) |
-| [**caddy**](caddy/) | Porta de entrada dos serviços: `https://adguard.cesardonascimento.com` com certificado válido, sem precisar de IP e porta |
-| [**cockpit**](cockpit/) | Painel web da máquina e dos containers em `https://rigel.cesardonascimento.com` |
+| [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
+| [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
+| [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
 
 ## Como usar
 
 ```bash
-gh repo clone cesardonascimento/astro ~/Projects/astro
+git clone <url-deste-repositório> ~/Projects/astro
 ~/Projects/astro/setup.sh
 ```
 
@@ -26,28 +27,60 @@ gh repo clone cesardonascimento/astro ~/Projects/astro
 
 ## Respondendo a instalação
 
-Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor entre `[ ]`.
+Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
+`[ ]`. As respostas ficam em `<projeto>/.env`, fora do git.
 
-**Em todos**
-- *Usar a configuração já salva?* → **S** para reaproveitar as respostas da última vez
-- *Anunciar a rede local no Tailscale?* → **S** para acessar a casa de fora; depois aprove a rota no painel do Tailscale
-- *Desativar o login por senha no SSH?* → **S** (só aparece se houver chave em `~/.ssh/authorized_keys`)
+### Em todos os projetos
 
-**adguard**
-- *Usuário* e *senha do painel* → os do seu login no AdGuard
-- *Porta*, *IP*, *fuso* e *idioma* → Enter
-- *Adicionar domínios de reescrita?* → **S** → IP: Enter → domínio: `cesardonascimento.com` → Enter vazio
-- *Usar só o AdGuard como DNS desta máquina?* → **S**
-- Se avisar do *Split DNS do Tailscale*, aponte `cesardonascimento.com` para o IP da rigel no painel do Tailscale
+- **Usar a configuração já salva?** Reaproveita as respostas da última instalação. Responda **N** para
+  mudar alguma.
+- **Anunciar a rede local no Tailscale?** Transforma o servidor em ponte para a rede de casa: de fora,
+  qualquer aparelho seu conectado ao Tailscale passa a acessar todos os aparelhos da casa (impressora,
+  roteador, outros serviços) sem instalar nada neles. A rede é detectada automaticamente. Depois, aprove
+  a rota no painel do Tailscale. Responda **N** se não precisa de acesso remoto.
+- **Desativar o login por senha no SSH?** Deixa o acesso remoto ao terminal só por chave, bem mais
+  difícil de invadir que uma senha. Só aparece se já houver uma chave em `~/.ssh/authorized_keys`.
 
-**caddy**
-- *Domínio base* → `cesardonascimento.com`
-- *Portas HTTP/HTTPS* → Enter
-- *Token da Cloudflare* → o token salvo no Proton Pass (o assistente mostra como criar um, se precisar)
+### adguard
 
-**cockpit**
-- *Endereço no Caddy* → Enter (`rigel.cesardonascimento.com`)
+- **Usuário e senha do painel:** as credenciais de administração do AdGuard, usadas para entrar no painel
+  web onde se veem as consultas, as listas de bloqueio e as configurações. A senha é guardada só como
+  hash.
+- **Porta do painel no host:** a porta para abrir o painel direto pelo IP (`http://<ip>:<porta>`). Com o
+  Caddy instalado, o acesso do dia a dia é pelo endereço HTTPS.
+- **IP onde o DNS escuta:** `0.0.0.0` atende em todas as redes da máquina. Um IP específico restringe o
+  DNS a uma rede só.
+- **Fuso horário:** usado nos horários dos logs e das estatísticas e nos agendamentos de bloqueio. Por
+  padrão, o fuso da máquina.
+- **Idioma do painel.**
+- **Adicionar domínios de reescrita?** Faz o AdGuard responder localmente um domínio inteiro: todo
+  `*.<domínio>` passa a apontar para o IP informado. É o que faz os endereços do Caddy funcionarem dentro
+  de casa, então use o mesmo domínio base do Caddy.
+  - **IP de destino:** para onde os nomes apontam. Por padrão, o IP do servidor.
+  - **Domínios:** um por vez; Enter vazio termina.
+- **Usar só o AdGuard como DNS desta máquina?** Impede que o servidor fique preso no DNS secundário do
+  roteador depois que o AdGuard reinicia, o que faria os nomes internos pararem de funcionar. Recomendado.
+- **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
+  servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
 
-No roteador, use o IP da rigel (`192.168.3.43`) como único DNS.
+### caddy
+
+- **Domínio base:** um domínio seu, com o DNS gerenciado pela Cloudflare. Os serviços ficam em
+  `<nome>.<domínio>`.
+- **Portas HTTP e HTTPS:** `80` e `443`. Mude só se estiverem ocupadas: com outras portas, ela precisa ser
+  digitada no endereço.
+- **Token da Cloudflare:** permite ao Caddy criar um registro DNS temporário para provar ao Let's Encrypt
+  que o domínio é seu, que é o que libera o certificado HTTPS. Precisa das permissões Zone → Read e
+  DNS → Edit na zona. O assistente mostra como criar e valida o token na hora.
+
+### cockpit
+
+- **Endereço no Caddy:** o nome pelo qual o painel é acessado. Por padrão,
+  `<nome-da-máquina>.<domínio do Caddy>`.
+
+### Depois de instalar
+
+No roteador, configure o IP do servidor como **único** DNS entregue pelo DHCP. Assim todos os aparelhos
+da casa passam pelo AdGuard.
 
 Para criar um projeto novo, veja [lib/README.md](lib/README.md).

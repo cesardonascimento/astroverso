@@ -46,7 +46,7 @@ configure() {
     ui_secret NEW_PASSWORD "senha do painel"
     ui_input  web_port "porta do painel no host" "$(env_get WEB_PORT 8080)"
     ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_get DNS_BIND_IP 0.0.0.0)"
-    ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo America/Sao_Paulo)"
+    ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo UTC)"
     ui_input  language "idioma do painel" "$(env_get ADGUARD_LANGUAGE pt-br)"
 
     ui_step "Reescritas DNS"

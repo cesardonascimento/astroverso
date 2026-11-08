@@ -3,7 +3,7 @@ FROM docker.io/adguard/adguardhome:${ADGUARD_VERSION}
 
 RUN apk add --no-cache apache2-utils gettext-envsubst
 
-ENV TZ=America/Sao_Paulo \
+ENV TZ=UTC \
     ADGUARD_USERNAME=admin \
     ADGUARD_PASSWORD_HASH="" \
     ADGUARD_LANGUAGE=pt-br \

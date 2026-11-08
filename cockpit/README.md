@@ -15,7 +15,7 @@ Diferente dos outros projetos, o Cockpit não roda em container: são pacotes do
 
 | Pergunta | Padrão |
 |---|---|
-| Endereço do Cockpit no Caddy | `<hostname>.<domínio do caddy>` (ex: `rigel.cesardonascimento.com`) |
+| Endereço do Cockpit no Caddy | `<hostname>.<domínio do caddy>` |
 
 ## O que a instalação faz
 
