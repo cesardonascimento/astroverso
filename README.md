@@ -1,70 +1,53 @@
 # astro
 
-Infraestrutura pessoal em containers (Podman), versionada para subir idêntica em qualquer PC.
+Meu homelab: os serviços da rede de casa rodando em containers na rigel, versionados para
+reinstalar tudo em minutos se algo der errado.
 
-## Uso
+| Projeto | Para que serve |
+|---|---|
+| [**adguard**](adguard/) | DNS da casa: bloqueia anúncios e rastreadores em todos os aparelhos e resolve os nomes internos (`*.cesardonascimento.com`) |
+| [**caddy**](caddy/) | Porta de entrada dos serviços: `https://adguard.cesardonascimento.com` com certificado válido, sem precisar de IP e porta |
+| [**cockpit**](cockpit/) | Painel web da máquina e dos containers em `https://rigel.cesardonascimento.com` |
+
+## Como usar
 
 ```bash
 gh repo clone cesardonascimento/astro ~/Projects/astro
 ~/Projects/astro/setup.sh
 ```
 
-O assistente oferece:
-
-1. **Instalar todos**: instala os projetos que ainda não estão instalados
-2. **Escolher quais instalar**: lista com checkboxes (↑/↓, Espaço marca, `a` marca todos, Enter confirma); os já instalados são recriados
-3. **Configurar um projeto instalado**: ajustes depois da instalação, oferecidos por cada projeto (ex: rotas do Caddy)
-4. **Reinstalar tudo do zero**: apaga os dados de todos os projetos e instala de novo (as respostas salvas no `.env` podem ser reaproveitadas)
-5. **Remover todos os containers**: mantendo os dados ou apagando também os volumes
-
-Ao final de cada operação o menu volta, até você escolher **Sair**.
-
-Cada projeto pergunta as informações de que precisa (senhas, portas etc.) durante a instalação
-e guarda as respostas em `<projeto>/.env`, que fica fora do git. Rode em um terminal interativo:
-o `sudo` pode pedir senha na primeira instalação em cada máquina.
-
-## Projetos
-
-| Projeto | Descrição |
+| Opção | O que faz |
 |---|---|
-| [adguard](adguard/) | AdGuard Home: DNS da rede com bloqueio de anúncios |
-| [caddy](caddy/) | Caddy: proxy reverso com HTTPS (Let's Encrypt) para os serviços da rede |
-| [cockpit](cockpit/) | Cockpit: painel web da máquina e dos containers |
+| Instalar todos | Instala o que ainda não está instalado |
+| Escolher quais instalar | Marca os projetos com Espaço; os já instalados são recriados |
+| Configurar um projeto instalado | Ajustes do dia a dia, como adicionar rotas no Caddy |
+| Reinstalar tudo do zero | Apaga os dados e instala de novo |
+| Remover todos os containers | Mantendo os dados ou apagando tudo |
 
-## Adicionando um projeto
+## Respondendo a instalação
 
-O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implemente:
+Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor entre `[ ]`.
 
-| Comando | Responsabilidade |
-|---|---|
-| `describe` | Imprime uma linha de descrição |
-| `status` | Sai com código 0 se o projeto está instalado |
-| `install` | Pergunta a configuração, prepara o host e sobe os containers |
-| `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
-| `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
-| `action <id>` | Executa uma ação listada em `actions` |
+**Em todos**
+- *Usar a configuração já salva?* → **S** para reaproveitar as respostas da última vez
+- *Anunciar a rede local no Tailscale?* → **S** para acessar a casa de fora; depois aprove a rota no painel do Tailscale
+- *Desativar o login por senha no SSH?* → **S** (só aparece se houver chave em `~/.ssh/authorized_keys`)
 
-Todo `docker-compose.yml` de subprojeto deve começar com o grupo `astro` e sem pod, para que os
-containers fiquem agrupados mas independentes (remover um não afeta os outros):
+**adguard**
+- *Usuário* e *senha do painel* → os do seu login no AdGuard
+- *Porta*, *IP*, *fuso* e *idioma* → Enter
+- *Adicionar domínios de reescrita?* → **S** → IP: Enter → domínio: `cesardonascimento.com` → Enter vazio
+- *Usar só o AdGuard como DNS desta máquina?* → **S**
+- Se avisar do *Split DNS do Tailscale*, aponte `cesardonascimento.com` para o IP da rigel no painel do Tailscale
 
-```yaml
-name: astro
+**caddy**
+- *Domínio base* → `cesardonascimento.com`
+- *Portas HTTP/HTTPS* → Enter
+- *Token da Cloudflare* → o token salvo no Proton Pass (o assistente mostra como criar um, se precisar)
 
-x-podman:
-  in_pod: false
-```
+**cockpit**
+- *Endereço no Caddy* → Enter (`rigel.cesardonascimento.com`)
 
-Para publicar um endereço no Caddy, o projeto escreve em `<projeto>/.proxy` (fora do git) uma linha
-`endereço destino` por rota e chama `../caddy/project.sh action reload`. O Caddy junta essas rotas com
-as cadastradas manualmente. Containers do grupo `astro` são alcançados pelo nome; serviços do próprio
-sistema, por `host.containers.internal`.
+No roteador, use o IP da rigel (`192.168.3.43`) como único DNS.
 
-Bibliotecas compartilhadas:
-
-- `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
-  prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
-- `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (podman-compose,
-  inicialização no boot, SSH e Tailscale). Funções avulsas: `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
-  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso e oferece anunciar a rede local),
-  `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
-- `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto.
+Para criar um projeto novo, veja [lib/README.md](lib/README.md).
