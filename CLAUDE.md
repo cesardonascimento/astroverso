@@ -95,6 +95,9 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
   máquina só funciona para portas publicadas por outros containers. Do lado do serviço, a conexão chega como local.
 - Rootless + porta < 1024: `net.ipv4.ip_unprivileged_port_start` (`host_unprivileged_ports`, arquivo `99-astro.conf`).
 - O `systemd-resolved` com o DNS secundário do roteador fica preso no roteador depois de o AdGuard reiniciar.
+- Com `--accept-routes`, o Linux manda a rede local anunciada por outra máquina **pelo túnel**, mesmo estando nela
+  (tabela 52, regra 5270). Solução: regra `priority 5260 lookup main suppress_prefixlength 0`
+  (serviço `astro-tailscale-lan`, em `host_tailscale_lan_direct`), testada em namespace de rede isolado.
 - O Tailscale tem regras próprias e **passa por fora do firewalld**. Rotas `~dominio` do Split DNS mandam as consultas para o servidor do Split DNS.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.

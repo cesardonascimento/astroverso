@@ -32,7 +32,8 @@ Bibliotecas compartilhadas:
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (podman-compose,
   inicialização no boot, SSH e Tailscale). Funções avulsas: `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
-  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso e oferece anunciar a rede local),
+  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso, faz a rede local ser acessada direto mesmo
+  com o Tailscale ligado e oferece anunciar a rede local),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
