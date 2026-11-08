@@ -193,7 +193,28 @@ host_no_sleep() {
     ui_ok "suspensão e hibernação desativadas, inclusive ao fechar a tampa"
 }
 
+host_upgrade() {
+    local latest=""
+    ui_info "atualizando o sistema (pode demorar na primeira vez)..."
+    if command -v dnf >/dev/null; then
+        sudo dnf upgrade -y -q --refresh
+        latest="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -V | tail -1)" || true
+    elif command -v apt-get >/dev/null; then
+        sudo apt-get update -qq
+        sudo apt-get upgrade -y -qq
+    else
+        ui_warn "gerenciador de pacotes não reconhecido, atualização ignorada"
+        return
+    fi
+    ui_ok "sistema atualizado"
+    if [[ -n $latest && $latest != "$(uname -r)" ]] || [[ -e /var/run/reboot-required ]]; then
+        HOST_REBOOT=true
+        ui_warn "kernel novo instalado: reinicie a máquina ao final para usá-lo"
+    fi
+}
+
 host_base() {
+    host_upgrade
     host_no_sleep
     host_compose
     host_autostart
@@ -334,8 +355,6 @@ host_nvidia_fedora() {
     fi
     sudo dnf install -y -q akmods mokutil
     host_secure_boot_key
-    ui_info "atualizando o kernel (o driver é compilado para a versão mais recente)..."
-    sudo dnf upgrade -y -q --refresh kernel
     sudo dnf install -y -q akmod-nvidia xorg-x11-drv-nvidia-cuda
     kernel="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core | sort -V | tail -1)"
     sudo dnf install -y -q "kernel-devel-$kernel"

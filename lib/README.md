@@ -33,8 +33,8 @@ Bibliotecas compartilhadas:
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
-- `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
-  suspensão, podman-compose, inicialização no boot, SSH e Tailscale). Funções avulsas: `host_no_sleep`,
+- `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (sistema
+  atualizado, máquina sem suspensão, podman-compose, inicialização no boot, SSH e Tailscale). Funções avulsas: `host_upgrade` (dnf ou apt; avisa e marca `HOST_REBOOT` se veio kernel novo), `host_no_sleep`,
   `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
   `host_firewall`, `host_firewall_block_lan PORTA` / `host_firewall_unblock_lan PORTA` (porta acessível só
   pela própria máquina, ex.: atrás do Caddy), `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o

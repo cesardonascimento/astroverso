@@ -28,8 +28,9 @@ git clone <url-deste-repositório> ~/Projects/astro
 
 ## Respondendo a instalação
 
-A máquina é preparada para funcionar como servidor: nunca suspende nem hiberna, nem ao fechar a tampa
-de um notebook, para não perder o acesso remoto.
+A máquina é preparada para funcionar como servidor: o sistema é atualizado a cada instalação (se vier um
+kernel novo, o assistente pede para reiniciar ao final) e ela nunca suspende nem hiberna, nem ao fechar a
+tampa de um notebook, para não perder o acesso remoto.
 
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
