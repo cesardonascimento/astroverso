@@ -309,36 +309,15 @@ primary_gpu() {
     ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os jogos)"
 }
 
-sunshine_conf() {
-    local user=$1
-    shift
-    as_user "$user" sh -c '
-        file="$HOME/.config/sunshine/sunshine.conf"
-        mkdir -p "${file%/*}"
-        touch "$file"
-        for pair; do
-            key="${pair%%=*}"
-            sed -i "/^$key *=/d" "$file"
-            [ "$pair" = "$key" ] || printf "%s = %s\n" "$key" "${pair#*=}" >> "$file"
-        done
-    ' sh "$@"
-}
-
-encoder_settings() {
-    local user=$1 output
-    if ! nvidia_pci >/dev/null; then
-        ui_ok "sem placa NVIDIA, o Sunshine escolhe o codificador sozinho"
-        return
-    fi
+display_check() {
+    local output
+    nvidia_pci >/dev/null || return 0
     if output="$(nvidia_display)"; then
-        sunshine_conf "$user" encoder=nvenc capture=kms
-        ui_ok "tela $output ligada na NVIDIA: o Sunshine captura e codifica nela (NVENC)"
+        ui_ok "tela $output ligada na NVIDIA: o Sunshine escolhe o NVENC sozinho"
         return
     fi
-    sunshine_conf "$user" encoder capture
-    ui_warn "nenhuma tela ligada na saída da NVIDIA: sem NVENC, o Sunshine escolhe o codificador sozinho"
-    ui_info "ligue a TV ou um plugue HDMI fantasma na porta HDMI, mantenha a tampa fechada"
-    ui_info "e rode a instalação de novo"
+    ui_warn "nenhuma tela no HDMI: o stream sai pela Intel (sem NVENC) e só com a tampa aberta"
+    ui_info "ligue a TV ou um plugue HDMI fantasma na porta HDMI e feche a tampa; não precisa reinstalar"
 }
 
 cmd_install() {
@@ -360,7 +339,7 @@ cmd_install() {
     ui_step "Sunshine"
     install_sunshine
     grant_capture
-    encoder_settings "$user"
+    display_check
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"

@@ -39,10 +39,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   Rodar a instalação de novo atualiza o Sunshine.
 - Dá ao binário a permissão `cap_sys_admin`, necessária para capturar a tela pelo KMS. Ela é refeita a
   cada instalação, porque uma atualização do pacote a apaga.
-- **NVENC:** se houver uma tela ligada numa saída da NVIDIA (TV, monitor ou plugue HDMI fantasma), grava
-  `encoder = nvenc` e `capture = kms` no `sunshine.conf` do usuário de jogos: a captura e a codificação
-  acontecem na própria NVIDIA. Sem tela nela, tira essas opções, o Sunshine escolhe o codificador sozinho e
-  a instalação avisa para ligar a tela na porta HDMI e rodar de novo.
+- **Tela no HDMI:** confere se há uma tela ligada na saída da NVIDIA (TV, monitor ou plugue HDMI
+  fantasma). Se não houver, avisa: o stream sai pela Intel, sem NVENC, e só com a tampa aberta.
 - Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica,
   aberta pelo login automático no boot.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
@@ -57,6 +55,10 @@ A configuração padrão considera o notebook **com a tampa fechada e uma tela e
 sai pela NVIDIA. Com a tampa fechada, o GNOME desliga a tela interna (que é da Intel) e a tela externa
 vira a única. Uma TV ou um plugue HDMI fantasma servem igualmente; trocar um pelo outro não exige
 reinstalar, porque a porta é a mesma.
+
+O codificador não é fixado: a cada stream, o Sunshine testa os codificadores (NVENC primeiro) e usa o
+primeiro que funcionar com a tela do momento. Com a tela no HDMI, é o NVENC; sem ela e com a tampa
+aberta, o da Intel. O log do Sunshine mostra o escolhido (`Found H.264 encoder: h264_nvenc`).
 
 Para conferir em qual placa está a tela ligada:
 

@@ -109,9 +109,9 @@ respostas ficam em `<projeto>/.env`, fora do git.
 
 Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
 ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
-e é com uma tela nela que o assistente configura o Sunshine para capturar e codificar o vídeo na própria
-placa (NVENC), com menos latência. Sem tela nela, o assistente avisa e o Sunshine escolhe o codificador
-sozinho. Ao terminar, reinicie a máquina.
+e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
+Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Ao terminar,
+reinicie a máquina.
 
 ### Depois de instalar
 
