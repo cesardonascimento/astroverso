@@ -279,3 +279,83 @@ host_lan_ip() {
 host_tailscale_ip() {
     tailscale ip -4 2>/dev/null || true
 }
+
+HOST_REBOOT=false
+HOST_AKMODS_KEY=/etc/pki/akmods/certs/public_key.der
+
+host_nvidia_gpu() {
+    command -v lspci >/dev/null && [[ -n "$(lspci -d 10de::0300; lspci -d 10de::0302)" ]]
+}
+
+host_secure_boot_key() {
+    [[ $(mokutil --sb-state 2>/dev/null) == *enabled* ]] || return 0
+    [[ -f $HOST_AKMODS_KEY ]] || sudo kmodgenca -a >/dev/null
+    local state password hash
+    state="$(mokutil --test-key "$HOST_AKMODS_KEY" 2>&1)" || true
+    if [[ $state == *"is already enrolled"* ]]; then
+        ui_ok "chave que assina o driver já cadastrada no Secure Boot"
+        return
+    fi
+    if [[ $state != *"enrollment request"* ]]; then
+        ui_info "o Secure Boot só carrega módulos assinados: a chave que assina o driver precisa ser cadastrada"
+        ui_info "crie uma senha temporária, usada uma única vez na tela azul do próximo boot"
+        ui_secret password "senha temporária do Secure Boot"
+        hash="$(mktemp)"
+        printf '%s\n%s\n' "$password" "$password" | mokutil --generate-hash 2>/dev/null | tail -1 > "$hash"
+        sudo mokutil --import "$HOST_AKMODS_KEY" --hash-file "$hash"
+        rm -f "$hash"
+    fi
+    HOST_REBOOT=true
+    ui_warn "no próximo boot, com teclado e tela na máquina, aparece a tela azul do MOK:"
+    ui_info "  Enroll MOK → Continue → Yes → senha temporária → Reboot"
+    ui_info "  se ela passar sem resposta (10 segundos), rode a instalação de novo e reinicie"
+}
+
+host_nvidia_fedora() {
+    local release
+    release="$(rpm -E %fedora)"
+    if ! rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1; then
+        sudo dnf install -y -q \
+            "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$release.noarch.rpm" \
+            "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$release.noarch.rpm"
+        ui_ok "repositórios do RPM Fusion habilitados"
+    fi
+    sudo dnf install -y -q akmods mokutil
+    host_secure_boot_key
+    sudo dnf install -y -q akmod-nvidia xorg-x11-drv-nvidia-cuda
+    ui_info "compilando o módulo da NVIDIA para o kernel $(uname -r) (alguns minutos)..."
+    sudo akmods --kernels "$(uname -r)" 2>&1 | ui_prefix
+}
+
+host_nvidia_driver() {
+    local id
+    if ! host_nvidia_gpu; then
+        ui_ok "nenhuma placa NVIDIA, driver proprietário dispensado"
+        return
+    fi
+    if grep -q '^nvidia ' /proc/modules; then
+        ui_ok "driver proprietário da NVIDIA ativo ($(modinfo -F version nvidia))"
+        return
+    fi
+    id="$(. /etc/os-release && printf '%s' "$ID")"
+    if modinfo -F version nvidia >/dev/null 2>&1; then
+        if [[ $id == fedora ]]; then
+            host_secure_boot_key
+        fi
+        HOST_REBOOT=true
+        ui_warn "driver proprietário da NVIDIA $(modinfo -F version nvidia) instalado, carrega depois de reiniciar"
+        return
+    fi
+    ui_info "placa NVIDIA usando o driver livre (nouveau): sem NVENC e com pouco desempenho 3D"
+    if [[ $id == fedora ]]; then
+        host_nvidia_fedora
+    elif command -v ubuntu-drivers >/dev/null; then
+        sudo ubuntu-drivers install 2>&1 | ui_prefix
+    else
+        ui_warn "instale o driver proprietário da NVIDIA manualmente; etapa ignorada"
+        return
+    fi
+    modinfo -F version nvidia >/dev/null 2>&1 || ui_fail "o módulo da NVIDIA não foi compilado"
+    HOST_REBOOT=true
+    ui_ok "driver proprietário da NVIDIA $(modinfo -F version nvidia) instalado, carrega depois de reiniciar"
+}

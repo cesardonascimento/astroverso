@@ -89,6 +89,7 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
+| sunshine | Pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com login automático no GDM, sem bloqueio de tela; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. |
 
 ## Armadilhas conhecidas
 
@@ -108,6 +109,9 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
   regras dela (inclusive os `reject` das portas 8080 e 9090) **provavelmente** valem também para quem chega pelo
   Tailscale. Não confirmado: testar de um aparelho remoto. Rotas `~dominio` do Split DNS mandam as consultas
   para o servidor do Split DNS.
+- O usuário de jogos tem o `home` fechado (700): comandos nele passam por `sudo -u <usuário> -H` (`as_user`),
+  e o `status` do sunshine olha só o `custom.conf` do GDM, que é legível sem `sudo`.
+- O pacote do Sunshine não aplica o `setcap`, e uma atualização do pacote apaga a permissão.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).

@@ -24,7 +24,8 @@ x-podman:
 Para publicar um endereço no Caddy, o projeto chama `proxy_publish <endereço> <destino>` (de `lib/proxy.sh`),
 que escreve `<projeto>/.proxy` (fora do git) e recarrega o Caddy se ele estiver instalado. O Caddy junta essas
 rotas com as cadastradas manualmente, e as do projeto têm prioridade. Containers do grupo `astro` são
-alcançados pelo nome; serviços do próprio sistema e containers na rede do host, por `host.containers.internal`.
+alcançados pelo nome; serviços do próprio sistema e containers na rede do host, por `host.containers.internal`. Um destino
+`https+insecure://<host>:<porta>` aceita um certificado autoassinado (ex.: painéis que só abrem em HTTPS).
 
 Bibliotecas compartilhadas:
 
@@ -38,8 +39,10 @@ Bibliotecas compartilhadas:
   `host_firewall`, `host_firewall_block_lan PORTA` / `host_firewall_unblock_lan PORTA` (porta acessível só
   pela própria máquina, ex.: atrás do Caddy), `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o
   redirecionamento da porta UDP do Tailscale no roteador),
+  `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, cadastrando a chave no Secure
+  Boot; marca `HOST_REBOOT=true` quando falta reiniciar),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
-  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_timezone`.
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.

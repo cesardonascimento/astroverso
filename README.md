@@ -9,6 +9,7 @@ instalação.
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
+| [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
 
@@ -93,6 +94,20 @@ respostas ficam em `<projeto>/.env`, fora do git.
 
 - **Endereço no Caddy:** o nome pelo qual o painel é acessado. Por padrão,
   `<nome-da-máquina>.<domínio do Caddy>`.
+
+### sunshine
+
+- **Senha temporária do Secure Boot:** só aparece se a máquina tiver uma placa NVIDIA sem o driver
+  proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
+  aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
+  senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
+- **Nome do usuário de jogos:** o usuário que entra sozinho no boot e cuja tela é transmitida. É nele que
+  ficam os emuladores, os jogos e as configurações. Ele é criado sem senha e sem `sudo`, para que quem
+  estiver jogando não tenha acesso ao homelab. Por padrão, `jogos`.
+- **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
+  aparelhos. Por padrão, `sunshine.<domínio>`.
+
+Ao terminar, reinicie a máquina.
 
 ### Depois de instalar
 

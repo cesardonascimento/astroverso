@@ -28,3 +28,7 @@ is_name() {
 is_timezone() {
     [[ $1 =~ ^[A-Za-z0-9_+/-]+$ && -f /usr/share/zoneinfo/$1 ]] && printf '%s' "$1"
 }
+
+is_username() {
+    [[ $1 =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && printf '%s' "$1"
+}

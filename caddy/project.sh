@@ -130,6 +130,16 @@ configure() {
     ui_ok "configuração salva em caddy/.env"
 }
 
+render_upstream() {
+    local indent=$1 upstream=$2
+    if [[ $upstream == https+insecure://* ]]; then
+        printf '%sreverse_proxy https://%s {\n%s\ttransport http {\n%s\t\ttls_insecure_skip_verify\n%s\t}\n%s}\n' \
+            "$indent" "${upstream#https+insecure://}" "$indent" "$indent" "$indent" "$indent"
+    else
+        printf '%sreverse_proxy %s\n' "$indent" "$upstream"
+    fi
+}
+
 render_caddyfile() {
     local domain host upstream index=0 others=()
     domain="$(env_get CADDY_DOMAIN)"
@@ -139,15 +149,18 @@ render_caddyfile() {
         while read -r host upstream; do
             if [[ $host == *".$domain" && ${host%".$domain"} != *.* ]]; then
                 index=$((index + 1))
-                printf '\t@route%d host %s\n\thandle @route%d {\n\t\treverse_proxy %s\n\t}\n\n' \
-                    "$index" "$host" "$index" "$upstream"
+                printf '\t@route%d host %s\n\thandle @route%d {\n' "$index" "$host" "$index"
+                render_upstream $'\t\t' "$upstream"
+                printf '\t}\n\n'
             else
                 others+=("$host $upstream")
             fi
         done < <(all_route_lines)
         printf '\thandle {\n\t\tabort\n\t}\n}\n'
         for host in "${others[@]}"; do
-            printf '\n%s {\n\treverse_proxy %s\n}\n' "${host%% *}" "${host#* }"
+            printf '\n%s {\n' "${host%% *}"
+            render_upstream $'\t' "${host#* }"
+            printf '}\n'
         done
     } > "$CADDYFILE"
 }
