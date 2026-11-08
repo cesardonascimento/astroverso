@@ -334,6 +334,16 @@ sunshine_conf_get() {
     as_user "$1" sh -c 'sed -n "s/^$1 *= *//p" "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null || true' sh "$2"
 }
 
+capture_settings() {
+    local user=$1
+    if [[ $(sunshine_conf_get "$user" capture) == kms ]]; then
+        ui_ok "captura de tela pelo KMS já configurada"
+        return
+    fi
+    sunshine_conf "$user" capture=kms
+    ui_ok "captura de tela pelo KMS (sem a janela de permissão do portal do GNOME)"
+}
+
 display_switch() {
     local user=$1 current
     if cmp -s scripts/display.py "$DISPLAY_BIN"; then
@@ -400,6 +410,7 @@ cmd_install() {
     install_sunshine
     grant_capture
     display_check
+    capture_settings "$user"
     display_switch "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"

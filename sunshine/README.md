@@ -44,6 +44,9 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   cada instalação, porque uma atualização do pacote a apaga.
 - **Tela no HDMI:** confere se há uma tela ligada na saída da NVIDIA (TV, monitor ou plugue HDMI
   fantasma). Se não houver, avisa: o stream sai pela Intel, sem NVENC, e só com a tampa aberta.
+- **Captura pelo KMS:** grava `capture = kms` no `sunshine.conf`. Sem isso, o Sunshine também tenta o portal
+  do GNOME ao iniciar, que abre uma janela de permissão na tela e o deixa parado (sem painel) até alguém
+  responder.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
