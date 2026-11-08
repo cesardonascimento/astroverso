@@ -6,8 +6,9 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Como trabalhar
 
 - Responder sempre em **português do Brasil**, de forma direta.
-- **Fazer commit e push depois de cada mudança**, sem perguntar. Mensagens em português, terminando com a linha
-  `Co-Authored-By` da sessão.
+- **Antes de alterar código ou documentação, descrever as mudanças e esperar a validação do usuário.** Depois de
+  aprovado, fazer commit e push sem perguntar. Mensagens em português, terminando com a linha `Co-Authored-By` da
+  sessão.
 - **Sem comentários no código.** Mensagens de log, sim, bem formatadas.
 - Toda mensagem na tela usa o prefixo do projeto (`[astro]`, `[adguard]`, `[caddy]`...), inclusive prompts,
   o prompt do `sudo` e os logs de dentro dos containers. Usar as funções de `lib/ui.sh`, nunca `echo` solto.
