@@ -10,7 +10,6 @@ source ../lib/proxy.sh
 
 CONF=/etc/cockpit/cockpit.conf
 PORT=9090
-LAN_BLOCK_RULE="rule port port=\"$PORT\" protocol=\"tcp\" reject"
 
 cmd_describe() {
     echo "Cockpit: painel web da máquina e dos containers"
@@ -28,8 +27,8 @@ configure() {
     fi
     local host domain
     domain="$(proxy_domain)"
-    ui_input host "endereço do Cockpit no Caddy" "$(env_get COCKPIT_HOST "$(hostname -s)${domain:+.$domain}")"
-    printf "COCKPIT_HOST='%s'\n" "${host,,}" > .env
+    ui_input host "endereço do Cockpit no Caddy" "$(env_get COCKPIT_HOST "$(hostname -s)${domain:+.$domain}")" is_hostname
+    printf "COCKPIT_HOST='%s'\n" "$host" > .env
     ui_ok "configuração salva em cockpit/.env"
 }
 
@@ -59,21 +58,6 @@ configure_proxy_mode() {
     ui_ok "Cockpit configurado para funcionar atrás do Caddy ($host)"
 }
 
-block_lan_access() {
-    if ! command -v firewall-cmd >/dev/null || ! firewall-cmd --state >/dev/null 2>&1; then
-        ui_warn "firewalld inativo, a porta $PORT continua acessível pela rede"
-        return
-    fi
-    local zone
-    zone="$(firewall-cmd --get-zone-of-interface="$(ip -4 route get 1.1.1.1 | grep -oP 'dev \K\S+')" 2>/dev/null \
-        || firewall-cmd --get-default-zone)"
-    if ! firewall-cmd -q --zone="$zone" --query-rich-rule="$LAN_BLOCK_RULE"; then
-        sudo firewall-cmd -q --permanent --zone="$zone" --add-rich-rule="$LAN_BLOCK_RULE"
-        sudo firewall-cmd -q --reload
-    fi
-    ui_ok "porta $PORT bloqueada para a rede local (acesso só pelo Caddy)"
-}
-
 cmd_install() {
     configure
     local host
@@ -83,7 +67,7 @@ cmd_install() {
     host_base
     install_packages
     configure_proxy_mode "$host"
-    block_lan_access
+    host_firewall_block_lan "$PORT"
 
     ui_step "Serviços"
     sudo systemctl enable -q --now cockpit.socket

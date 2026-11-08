@@ -9,11 +9,7 @@ log() { printf '[adguard]     %s %s\n' "$1" "$2" >&2; }
 chmod 0700 /opt/adguardhome/conf /opt/adguardhome/work
 
 if [ -f "$CONF_FILE" ]; then
-    sed -i \
-        -e "s|^  address: .*|  address: 0.0.0.0:$WEB_PORT|" \
-        -e "/^  bind_hosts:/{n;s|^    - .*|    - $DNS_BIND_IP|}" \
-        "$CONF_FILE"
-    log "✔" "usando configuração existente (painel na porta $WEB_PORT, DNS em $DNS_BIND_IP)"
+    log "✔" "usando configuração existente"
 else
     [ -n "$ADGUARD_PASSWORD_HASH" ] || { log "✘" "ADGUARD_PASSWORD_HASH não definida"; exit 1; }
 

@@ -31,7 +31,8 @@ A máquina é preparada para funcionar como servidor: nunca suspende nem hiberna
 de um notebook, para não perder o acesso remoto.
 
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
-`[ ]`. As respostas ficam em `<projeto>/.env`, fora do git.
+`[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
+respostas ficam em `<projeto>/.env`, fora do git.
 
 ### Em todos os projetos
 
@@ -54,8 +55,9 @@ Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o 
 - **Usuário e senha do painel:** as credenciais de administração do AdGuard, usadas para entrar no painel
   web onde se veem as consultas, as listas de bloqueio e as configurações. A senha é guardada só como
   hash.
-- **Porta do painel no host:** a porta para abrir o painel direto pelo IP (`http://<ip>:<porta>`). Com o
-  Caddy instalado, o acesso do dia a dia é pelo endereço HTTPS.
+- **Porta do painel no host:** a porta em que o painel escuta na máquina. Se o painel for publicado no
+  Caddy (pergunta abaixo), essa porta é bloqueada para a rede e o acesso passa a ser só pelo endereço
+  HTTPS, para a senha nunca trafegar sem criptografia. Sem o Caddy, o painel abre em `http://<ip>:<porta>`.
 - **IP onde o DNS escuta:** `0.0.0.0` atende em todas as redes da máquina. Um IP específico restringe o
   DNS a uma rede só.
 - **Fuso horário:** usado nos horários dos logs e das estatísticas e nos agendamentos de bloqueio. Por
@@ -68,8 +70,11 @@ Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o 
   - **Domínios:** um por vez; Enter vazio termina.
 - **Endereço do painel no Caddy:** o nome pelo qual o painel do AdGuard é aberto com HTTPS. Por padrão,
   `adguard.<domínio>`.
-- **Usar só o AdGuard como DNS desta máquina?** Impede que o servidor fique preso no DNS secundário do
-  roteador depois que o AdGuard reinicia, o que faria os nomes internos pararem de funcionar. Recomendado.
+- **Usar só o AdGuard como DNS desta máquina?** Define o DNS do próprio servidor. Com **S**, ele sempre
+  resolve os nomes internos, mas fica sem DNS nenhum quando o AdGuard está parado (por exemplo, durante
+  um "Reinstalar tudo do zero", o que impede baixar as imagens). Com **N** (padrão), ele usa também o DNS
+  secundário do roteador e nunca fica sem DNS; os nomes internos podem falhar no próprio servidor depois
+  de um reinício do AdGuard, sem afetar os outros aparelhos.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
   servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
 
@@ -90,7 +95,9 @@ Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o 
 
 ### Depois de instalar
 
-No roteador, configure o IP do servidor como **único** DNS entregue pelo DHCP. Assim todos os aparelhos
-da casa passam pelo AdGuard.
+No roteador, configure o IP do servidor como DNS **primário** entregue pelo DHCP, para todos os aparelhos
+da casa passarem pelo AdGuard. Um DNS secundário (o do provedor, por exemplo) mantém a internet
+funcionando com o servidor desligado; em troca, alguns aparelhos às vezes consultam o secundário e
+escapam do bloqueio.
 
 Para criar um projeto novo, veja [lib/README.md](lib/README.md).

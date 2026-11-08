@@ -11,10 +11,6 @@ CONTAINER=astro-caddy
 ROUTES=.routes
 CADDYFILE=data/etc/Caddyfile
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
-LEGACY_CA_FILES=(
-    /etc/pki/ca-trust/source/anchors/astro-caddy.crt
-    /usr/local/share/ca-certificates/astro-caddy.crt
-)
 
 cmd_describe() {
     echo "Caddy: proxy reverso com HTTPS (Let's Encrypt) para os serviços da rede"
@@ -38,11 +34,9 @@ remove_container() {
 }
 
 normalize_host() {
-    local host="${1,,}" domain
-    domain="$(env_get CADDY_DOMAIN)"
-    [[ $host == *.* ]] || host="$host.$domain"
-    [[ $host =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || return 1
-    printf '%s' "$host"
+    local host=$1
+    [[ $host == *.* ]] || host="$host.$(env_get CADDY_DOMAIN)"
+    is_hostname "$host"
 }
 
 normalize_upstream() {
@@ -69,7 +63,7 @@ all_route_lines() {
 }
 
 cloudflare_get() {
-    curl -s -m 15 -H "Authorization: Bearer $1" "$CLOUDFLARE_API/$2"
+    curl -s -m 15 -H @- "$CLOUDFLARE_API/$2" <<< "Authorization: Bearer $1"
 }
 
 cloudflare_check() {
@@ -111,10 +105,9 @@ configure() {
         token="$(env_get CLOUDFLARE_API_TOKEN)"
         ui_ok "configuração existente mantida"
     else
-        ui_input domain     "domínio base dos serviços (ex: casa.com)" "$(env_get CADDY_DOMAIN)"
-        ui_input http_port  "porta HTTP no host" "$(env_get HTTP_PORT 80)"
-        ui_input https_port "porta HTTPS no host" "$(env_get HTTPS_PORT 443)"
-        domain="${domain,,}"
+        ui_input domain     "domínio base dos serviços (ex: casa.com)" "$(env_get CADDY_DOMAIN)" is_hostname
+        ui_input http_port  "porta HTTP no host" "$(env_get HTTP_PORT 80)" is_port
+        ui_input https_port "porta HTTPS no host" "$(env_get HTTPS_PORT 443)" is_port
         token=""
     fi
 
@@ -130,11 +123,8 @@ configure() {
 
     (
         umask 077
-        {
-            printf "CADDY_DOMAIN='%s'\nHTTP_PORT='%s'\nHTTPS_PORT='%s'\nCLOUDFLARE_API_TOKEN='%s'\n" \
-                "$domain" "$http_port" "$https_port" "$token"
-            [[ -z $(env_get ACME_CA) ]] || printf "ACME_CA='%s'\n" "$(env_get ACME_CA)"
-        } > .env.new
+        printf "CADDY_DOMAIN='%s'\nHTTP_PORT='%s'\nHTTPS_PORT='%s'\nCLOUDFLARE_API_TOKEN='%s'\n" \
+            "$domain" "$http_port" "$https_port" "$token" > .env.new
     )
     mv .env.new .env
     ui_ok "configuração salva em caddy/.env"
@@ -145,9 +135,7 @@ render_caddyfile() {
     domain="$(env_get CADDY_DOMAIN)"
     mkdir -p "$(dirname "$CADDYFILE")"
     {
-        printf '{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n'
-        [[ -z $(env_get ACME_CA) ]] || printf '\tacme_ca %s\n' "$(env_get ACME_CA)"
-        printf '}\n\n*.%s {\n' "$domain"
+        printf '{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n}\n\n*.%s {\n' "$domain"
         while read -r host upstream; do
             if [[ $host == *".$domain" && ${host%".$domain"} != *.* ]]; then
                 index=$((index + 1))
@@ -175,25 +163,6 @@ apply_routes() {
     ui_ok "Caddy recarregado sem reiniciar"
 }
 
-remove_legacy_local_ca() {
-    local file found=()
-    for file in "${LEGACY_CA_FILES[@]}"; do
-        [[ -f $file ]] && found+=("$file")
-    done
-    if [[ -d data/caddy/caddy/pki || -d data/etc/public ]]; then
-        podman unshare rm -rf data/caddy/caddy/pki data/caddy/caddy/certificates/local data/etc/public
-        ui_ok "autoridade certificadora própria antiga apagada"
-    fi
-    ((${#found[@]})) || return 0
-    sudo rm -f "${found[@]}"
-    if command -v update-ca-trust >/dev/null; then
-        sudo update-ca-trust
-    else
-        sudo update-ca-certificates --fresh >/dev/null
-    fi
-    ui_ok "certificado da CA própria antiga removido da confiança desta máquina"
-}
-
 wait_certificate() {
     local domain https_port
     domain="$(env_get CADDY_DOMAIN)"
@@ -202,8 +171,6 @@ wait_certificate() {
     if timeout 180 bash -c "until openssl s_client -connect 127.0.0.1:$https_port -servername astro-check.$domain \
             -verify_return_error </dev/null >/dev/null 2>&1; do sleep 3; done"; then
         ui_ok "certificado válido do Let's Encrypt para *.$domain"
-    elif [[ -n $(env_get ACME_CA) ]]; then
-        ui_warn "ACME_CA personalizado em uso, certificado não verificável pela confiança do sistema"
     else
         podman logs --tail 50 "$CONTAINER" 2>&1 | grep -iE 'error|fail' | tail -5 | ui_prefix >&2
         ui_fail "o certificado não foi emitido em 3 minutos"
@@ -223,10 +190,12 @@ cmd_install() {
     configure
 
     ui_step "Host"
-    host_unprivileged_ports "$(env_get HTTP_PORT 80)"
-    host_firewall "$(env_get HTTP_PORT 80)/tcp" "$(env_get HTTPS_PORT 443)/tcp" "$(env_get HTTPS_PORT 443)/udp"
+    local http_port https_port
+    http_port="$(env_get HTTP_PORT 80)"
+    https_port="$(env_get HTTPS_PORT 443)"
+    host_unprivileged_ports "$((http_port < https_port ? http_port : https_port))"
+    host_firewall "$http_port/tcp" "$https_port/tcp" "$https_port/udp"
     host_base
-    remove_legacy_local_ca
 
     ui_step "Container"
     local log

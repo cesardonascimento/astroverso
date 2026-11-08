@@ -51,13 +51,14 @@ O container usa `network_mode: host`, sem repassador de portas do Podman no meio
   a descartava;
 - o registro de consultas mostra o IP real de cada aparelho.
 
-A porta do painel e o IP do DNS ficam na própria configuração do AdGuard. O entrypoint sincroniza esses
-dois valores com o `.env` a cada inicialização, o que também migra instalações antigas.
+A porta do painel e o IP do DNS ficam na própria configuração do AdGuard, gerada a partir do `.env` na
+primeira execução ou quando a configuração é respondida de novo.
 
 ## Preparação do host
 
 - Libera a porta 53 para Podman rootless e desativa o DNS stub do `systemd-resolved`
-- Libera DNS e a porta do painel no firewalld
+- Libera o DNS no firewalld. Com o painel publicado no Caddy, a porta do painel é bloqueada para a rede
+  (acesso só por HTTPS); sem o Caddy, ela é liberada
 - Impede a máquina de suspender ou hibernar (alvos do systemd mascarados, tampa ignorada no `logind`,
   suspensão automática do GNOME desligada)
 - Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
@@ -69,9 +70,9 @@ dois valores com o `.env` a cada inicialização, o que também migra instalaç�
 
 Depois que o container sobe:
 
-- Oferece fazer esta máquina usar só o AdGuard como DNS (via NetworkManager), sem o DNS secundário
-  do roteador. Sem isso, quando o AdGuard reinicia o sistema passa para o roteador e não volta,
-  e os nomes das reescritas param de resolver
+- Pergunta se esta máquina deve usar só o AdGuard como DNS (via NetworkManager), ignorando o secundário
+  do roteador (padrão: não). Só o AdGuard garante os nomes internos na própria máquina, mas a deixa sem
+  DNS quando ele está parado; com o secundário ela nunca fica sem DNS
 - Confere se o Split DNS do Tailscale desvia algum domínio das reescritas para outro servidor
   (ex: um AdGuard antigo). Se desviar, mostra o que trocar no painel do Tailscale e verifica de novo
 - Publica o painel no Caddy (`.proxy`) no endereço respondido na instalação

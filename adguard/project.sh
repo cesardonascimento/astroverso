@@ -28,11 +28,7 @@ remove_container() {
 NEW_PASSWORD=""
 
 normalize_domain() {
-    local domain="${1,,}"
-    domain="${domain#\*.}"
-    domain="${domain%.}"
-    [[ $domain =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] || return 1
-    printf '%s' "$domain"
+    is_hostname "${1#\*.}"
 }
 
 panel_host_default() {
@@ -46,27 +42,23 @@ configure() {
     ui_step "Configuração"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em adguard/.env?" y; then
         ui_ok "configuração existente mantida"
-        if ! grep -q '^PANEL_HOST=' .env; then
-            printf "PANEL_HOST='%s'\n" "$(panel_host_default)" >> .env
-            ui_ok "endereço do painel no Caddy definido: $(env_get PANEL_HOST)"
-        fi
         return
     fi
 
     local username language timezone web_port dns_ip
-    ui_input  username "usuário do painel" "$(env_get ADGUARD_USERNAME admin)"
+    ui_input  username "usuário do painel" "$(env_get ADGUARD_USERNAME admin)" is_name
     ui_secret NEW_PASSWORD "senha do painel"
-    ui_input  web_port "porta do painel no host" "$(env_get WEB_PORT 8080)"
-    ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_get DNS_BIND_IP 0.0.0.0)"
-    ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo UTC)"
-    ui_input  language "idioma do painel" "$(env_get ADGUARD_LANGUAGE pt-br)"
+    ui_input  web_port "porta do painel no host" "$(env_get WEB_PORT 8080)" is_port
+    ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_get DNS_BIND_IP 0.0.0.0)" is_ipv4
+    ui_input  timezone "fuso horário" "$(timedatectl show -P Timezone 2>/dev/null || echo UTC)" is_timezone
+    ui_input  language "idioma do painel" "$(env_get ADGUARD_LANGUAGE pt-br)" is_name
 
     ui_step "Reescritas DNS"
     local rewrite_answer="" domains=() domain
     if ui_confirm "adicionar domínios de reescrita (*.dominio → IP)?" n; then
         local default_answer=$dns_ip
         [[ $default_answer == 0.0.0.0 ]] && default_answer="$(host_lan_ip)"
-        ui_input rewrite_answer "IP de destino das reescritas" "$(env_get ADGUARD_REWRITE_ANSWER "$default_answer")"
+        ui_input rewrite_answer "IP de destino das reescritas" "$(env_get ADGUARD_REWRITE_ANSWER "$default_answer")" is_ipv4
         ui_list domains "domínio" normalize_domain
         for domain in "${domains[@]}"; do
             ui_ok "*.$domain → $rewrite_answer"
@@ -80,8 +72,7 @@ configure() {
     local panel_host="" default_host
     default_host="$(env_get PANEL_HOST "$(panel_host_default "${domains[0]:-}")")"
     if [[ -n $default_host ]]; then
-        ui_input panel_host "endereço do painel no Caddy" "$default_host"
-        panel_host="${panel_host,,}"
+        ui_input panel_host "endereço do painel no Caddy" "$default_host" is_hostname
     else
         ui_info "nenhum domínio conhecido, o painel não será publicado no Caddy"
     fi
@@ -144,7 +135,9 @@ setup_host_dns() {
         ui_ok "esta máquina já usa só o AdGuard como DNS ($connection)"
         return
     fi
-    if ! ui_confirm "usar só o AdGuard como DNS desta máquina (ignorando o DNS secundário do roteador)?" y; then
+    ui_info "só o AdGuard: a máquina sempre resolve os nomes internos, mas fica sem DNS quando ele está parado"
+    ui_info "com o secundário: nunca fica sem DNS, mas pode deixar de resolver os nomes internos após um reinício"
+    if ! ui_confirm "usar só o AdGuard como DNS desta máquina?" n; then
         ui_info "DNS desta máquina mantido"
         return
     fi
@@ -191,7 +184,13 @@ cmd_install() {
 
     ui_step "Host"
     setup_port53
-    host_firewall dns "$web_port/tcp"
+    if [[ -n $(env_get PANEL_HOST) ]]; then
+        host_firewall dns
+        host_firewall_block_lan "$web_port"
+    else
+        host_firewall dns "$web_port/tcp"
+        host_firewall_unblock_lan "$web_port"
+    fi
     host_base
 
     ui_step "Container"
@@ -232,7 +231,11 @@ cmd_install() {
 
     ui_step "Acesso"
     ui_ok "DNS:    $lan_ip"
-    ui_ok "Painel: http://$lan_ip:$web_port${panel_host:+  |  https://$panel_host}"
+    if [[ -n $panel_host ]]; then
+        ui_ok "Painel: https://$panel_host"
+    else
+        ui_ok "Painel: http://$lan_ip:$web_port"
+    fi
 }
 
 cmd_remove() {

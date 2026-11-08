@@ -54,6 +54,32 @@ host_firewall() {
     ui_ok "firewall liberado: $*"
 }
 
+host_firewall_block_lan() {
+    local port=$1 zone rule
+    rule="rule port port=\"$port\" protocol=\"tcp\" reject"
+    if ! command -v firewall-cmd >/dev/null || ! firewall-cmd --state >/dev/null 2>&1; then
+        ui_warn "firewalld inativo, a porta $port continua acessível pela rede"
+        return
+    fi
+    zone="$(firewall-cmd --get-default-zone)"
+    if ! firewall-cmd -q --zone="$zone" --query-rich-rule="$rule"; then
+        sudo firewall-cmd -q --permanent --zone="$zone" --add-rich-rule="$rule"
+        sudo firewall-cmd -q --reload
+    fi
+    ui_ok "porta $port bloqueada para a rede (acesso só pelo Caddy, com HTTPS)"
+}
+
+host_firewall_unblock_lan() {
+    local port=$1 zone rule
+    rule="rule port port=\"$port\" protocol=\"tcp\" reject"
+    command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1 || return 0
+    zone="$(firewall-cmd --get-default-zone)"
+    firewall-cmd -q --zone="$zone" --query-rich-rule="$rule" || return 0
+    sudo firewall-cmd -q --permanent --zone="$zone" --remove-rich-rule="$rule"
+    sudo firewall-cmd -q --reload
+    ui_ok "porta $port liberada de novo para a rede"
+}
+
 host_tailscale_install() {
     local ID VERSION_ID VERSION_CODENAME UBUNTU_CODENAME repo
     source /etc/os-release

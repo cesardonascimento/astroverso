@@ -74,6 +74,10 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 - Estado da máquina (respostas que valem para todos os projetos, ex.: redirecionamento de porta confirmado) fica em
   `~/.config/astro/host.env`, fora do repositório.
 - Configuração por prompts, gravada em `<projeto>/.env` (permissão 600, fora do git). "Usar a configuração já salva?" reaproveita.
+  Toda resposta passa por um validador de `lib/env.sh` (`is_port`, `is_ipv4`, `is_hostname`...), porque vai parar
+  em `.env`, YAML, `sed` ou Caddyfile.
+- Segredos nunca em argumentos de comando (aparecem no `ps`): senha para o `htpasswd` e token para o `curl`
+  vão pela entrada padrão.
 - Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `<projeto>/.proxy` e recarrega o Caddy).
   Rotas manuais ficam em `caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.
 - Versões fixadas: AdGuard na 1ª linha de `adguard/Dockerfile`; Caddy e `caddy-dns/cloudflare` em `caddy/Dockerfile`.
@@ -97,7 +101,10 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
   máquina só funciona para portas publicadas por outros containers. Do lado do serviço, a conexão chega como local.
 - Rootless + porta < 1024: `net.ipv4.ip_unprivileged_port_start` (`host_unprivileged_ports`, arquivo `99-astro.conf`).
 - O `systemd-resolved` com o DNS secundário do roteador fica preso no roteador depois de o AdGuard reiniciar.
-- O Tailscale tem regras próprias e **passa por fora do firewalld**. Rotas `~dominio` do Split DNS mandam as consultas para o servidor do Split DNS.
+- O `tailscale0` não pertence a nenhuma zona do firewalld; interfaces sem zona caem na zona padrão, então as
+  regras dela (inclusive os `reject` das portas 8080 e 9090) **provavelmente** valem também para quem chega pelo
+  Tailscale. Não confirmado: testar de um aparelho remoto. Rotas `~dominio` do Split DNS mandam as consultas
+  para o servidor do Split DNS.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
@@ -106,7 +113,6 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 ## Pendências e ideias combinadas
 
 - Segurança:
-  - parar de publicar o painel do AdGuard na porta do host (acesso só pelo Caddy);
   - revisar as ACLs do Tailscale (hoje "todos acessam tudo" e a rede inteira está anunciada);
   - avaliar o modo paralelo do DoH (três provedores veem todas as consultas);
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.

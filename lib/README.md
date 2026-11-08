@@ -30,11 +30,16 @@ Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
+  `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
+  validador recusar a resposta.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
   suspensão, podman-compose, inicialização no boot, SSH e Tailscale). Funções avulsas: `host_no_sleep`,
   `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
-  `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o
+  `host_firewall`, `host_firewall_block_lan PORTA` / `host_firewall_unblock_lan PORTA` (porta acessível só
+  pela própria máquina, ex.: atrás do Caddy), `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o
   redirecionamento da porta UDP do Tailscale no roteador),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
-- `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto.
+- `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_timezone`.
+  Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.

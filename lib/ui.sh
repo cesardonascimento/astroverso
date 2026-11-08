@@ -23,12 +23,17 @@ _ui_ask() {
 
 ui_input() {
     local -n __ui_out=$1
-    local label=$2 default=${3:-} answer
+    local label=$2 default=${3:-} validator=${4:-} answer
     while true; do
         answer="$(_ui_ask "$label${default:+ [$default]}: ")"
         answer="${answer:-$default}"
-        [[ -n $answer ]] && break
-        ui_warn "valor obrigatório"
+        if [[ -z $answer ]]; then
+            ui_warn "valor obrigatório"
+        elif [[ -n $validator ]] && ! answer="$($validator "$answer")"; then
+            ui_warn "valor inválido"
+        else
+            break
+        fi
     done
     __ui_out=$answer
 }
