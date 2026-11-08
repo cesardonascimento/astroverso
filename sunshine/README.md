@@ -49,6 +49,9 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   responder.
 - **Painel pelo Caddy:** inclui `https://<endereço do Sunshine no Caddy>` em `csrf_allowed_origins`. Sem isso, o
   Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
+- **Notebook em silêncio:** deixa mudas, para o usuário de jogos, as saídas de som internas (alto-falante e fone;
+  HDMI fica de fora) com o `wpctl`; o PipeWire guarda o mudo entre os boots. Durante o stream, o som vai para a
+  saída virtual do Sunshine e não é afetado. Precisa da sessão do usuário de jogos aberta.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
@@ -102,7 +105,7 @@ No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de
 
 ## Remoção
 
-`remove` desativa o serviço, o login automático e a troca de resolução, devolve à Intel o papel de placa principal e tira a
+`remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o papel de placa principal e tira a
 rota do Caddy. O pacote do Sunshine, o driver
 da NVIDIA e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
 `~/.config/sunshine` do usuário de jogos.

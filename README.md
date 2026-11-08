@@ -113,7 +113,8 @@ ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela
 e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
 Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
 cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
-essa resolução, e volta ao final. Ao terminar, reinicie a máquina.
+essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos para o usuário de jogos, para a
+máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
 
 ### Depois de instalar
 

@@ -355,6 +355,38 @@ origin_settings() {
     ui_ok "painel do Sunshine aceita alterações vindas de $origin (proteção CSRF)"
 }
 
+internal_sinks() {
+    as_user "$1" env XDG_RUNTIME_DIR="/run/user/$(id -u "$1")" pw-dump 2>/dev/null | python3 -I -c '
+import json, re, sys
+for node in json.load(sys.stdin):
+    props = (node.get("info") or {}).get("props") or {}
+    if props.get("media.class") != "Audio/Sink" or props.get("device.api") != "alsa":
+        continue
+    if re.search("hdmi|displayport", (props.get("node.name", "") + props.get("node.description", "")).lower()):
+        continue
+    print(node["id"], props.get("node.description", props.get("node.name", "")))
+'
+}
+
+speakers_mute() {
+    local user=$1 state=$2 id name count=0
+    if ! user_manager_running "$user"; then
+        ui_warn "sessão de $user fechada: alto-falantes do notebook não ajustados (rode de novo depois do boot)"
+        return
+    fi
+    while read -r id name; do
+        as_user "$user" env XDG_RUNTIME_DIR="/run/user/$(id -u "$user")" wpctl set-mute "$id" "$state"
+        count=$((count + 1))
+    done < <(internal_sinks "$user")
+    if ((count == 0)); then
+        ui_info "nenhuma saída de som interna encontrada para $user"
+    elif ((state)); then
+        ui_ok "alto-falantes do notebook mudos para $user (o som do stream não é afetado)"
+    else
+        ui_ok "alto-falantes do notebook reativados para $user"
+    fi
+}
+
 display_switch() {
     local user=$1 current
     if cmp -s scripts/display.py "$DISPLAY_BIN"; then
@@ -424,6 +456,7 @@ cmd_install() {
     capture_settings "$user"
     origin_settings "$user" "$host"
     display_switch "$user"
+    speakers_mute "$user" 1
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"
@@ -453,6 +486,7 @@ cmd_remove() {
             disable_service "$user"
         fi
         display_switch_off "$user"
+        speakers_mute "$user" 0
         if $purge; then
             as_user "$user" sh -c 'rm -rf "$HOME/.config/sunshine"'
             ui_ok "configuração do Sunshine apagada (credenciais e aparelhos pareados)"
