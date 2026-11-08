@@ -119,6 +119,8 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 - O `libva-intel-media-driver` do Fedora não codifica H.264/HEVC; o `intel-media-driver` do RPM Fusion, sim.
 - Sem `capture = kms`, o Sunshine consulta o portal do GNOME (RemoteDesktop) ao iniciar: abre uma janela de
   permissão na tela e fica parado sem abrir o painel (porta 47990), ou trava.
+- O painel do Sunshine só aceita alterações de `https://localhost`: atrás do Caddy, a origem precisa estar em
+  `csrf_allowed_origins` (lista separada por vírgula, cada item com `https://`).
 - O pacote do Sunshine não aplica o `setcap`, e uma atualização do pacote apaga a permissão.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.

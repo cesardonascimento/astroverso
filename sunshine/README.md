@@ -47,6 +47,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Captura pelo KMS:** grava `capture = kms` no `sunshine.conf`. Sem isso, o Sunshine também tenta o portal
   do GNOME ao iniciar, que abre uma janela de permissão na tela e o deixa parado (sem painel) até alguém
   responder.
+- **Painel pelo Caddy:** inclui `https://<endereço do Sunshine no Caddy>` em `csrf_allowed_origins`. Sem isso, o
+  Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.

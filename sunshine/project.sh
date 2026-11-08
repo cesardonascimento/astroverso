@@ -344,6 +344,17 @@ capture_settings() {
     ui_ok "captura de tela pelo KMS (sem a janela de permissão do portal do GNOME)"
 }
 
+origin_settings() {
+    local user=$1 origin="https://$2" current
+    current="$(sunshine_conf_get "$user" csrf_allowed_origins)"
+    if [[ ,${current// /}, == *",$origin,"* ]]; then
+        ui_ok "painel do Sunshine já aceita $origin"
+        return
+    fi
+    sunshine_conf "$user" "csrf_allowed_origins=${current:+$current,}$origin"
+    ui_ok "painel do Sunshine aceita alterações vindas de $origin (proteção CSRF)"
+}
+
 display_switch() {
     local user=$1 current
     if cmp -s scripts/display.py "$DISPLAY_BIN"; then
@@ -411,6 +422,7 @@ cmd_install() {
     grant_capture
     display_check
     capture_settings "$user"
+    origin_settings "$user" "$host"
     display_switch "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
