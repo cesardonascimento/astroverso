@@ -27,6 +27,9 @@ git clone <url-deste-repositório> ~/Projects/astro
 
 ## Respondendo a instalação
 
+A máquina é preparada para funcionar como servidor: nunca suspende nem hiberna, nem ao fechar a tampa
+de um notebook, para não perder o acesso remoto.
+
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`. As respostas ficam em `<projeto>/.env`, fora do git.
 

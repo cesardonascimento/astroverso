@@ -58,6 +58,8 @@ dois valores com o `.env` a cada inicialização, o que também migra instalaç�
 
 - Libera a porta 53 para Podman rootless e desativa o DNS stub do `systemd-resolved`
 - Libera DNS e a porta do painel no firewalld
+- Impede a máquina de suspender ou hibernar (alvos do systemd mascarados, tampa ignorada no `logind`,
+  suspensão automática do GNOME desligada)
 - Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
 - Ativa o servidor SSH; se houver chave em `~/.ssh/authorized_keys`, oferece desativar o login por senha
 - Oferece anunciar a rede local (detectada automaticamente, ex: `<rede>/24`) no Tailscale para acesso remoto,

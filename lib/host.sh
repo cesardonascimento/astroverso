@@ -141,7 +141,33 @@ host_ssh() {
     ui_info "acesso: ssh $USER@$(host_lan_ip)"
 }
 
+HOST_SLEEP_TARGETS=(sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target)
+HOST_LOGIND_CONF=/etc/systemd/logind.conf.d/99-astro.conf
+
+host_no_sleep() {
+    local target masked=true
+    for target in "${HOST_SLEEP_TARGETS[@]}"; do
+        [[ $(systemctl is-enabled "$target" 2>/dev/null) == masked ]] || masked=false
+    done
+    $masked || sudo systemctl mask -q "${HOST_SLEEP_TARGETS[@]}"
+
+    if [[ ! -f $HOST_LOGIND_CONF ]]; then
+        sudo mkdir -p "$(dirname "$HOST_LOGIND_CONF")"
+        printf '[Login]\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\nHandleLidSwitchDocked=ignore\nIdleAction=ignore\n' \
+            | sudo tee "$HOST_LOGIND_CONF" >/dev/null
+        sudo systemctl reload systemd-logind 2>/dev/null || sudo systemctl kill -s HUP systemd-logind
+    fi
+
+    if command -v gsettings >/dev/null \
+        && gsettings list-schemas 2>/dev/null | grep -qx org.gnome.settings-daemon.plugins.power; then
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing 2>/dev/null || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing 2>/dev/null || true
+    fi
+    ui_ok "suspensão e hibernação desativadas, inclusive ao fechar a tampa"
+}
+
 host_base() {
+    host_no_sleep
     host_compose
     host_autostart
     host_ssh
