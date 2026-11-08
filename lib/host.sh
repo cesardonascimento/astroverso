@@ -94,7 +94,6 @@ host_tailscale() {
         tailscale set --accept-routes 2>/dev/null || sudo tailscale set --accept-routes --operator="$USER"
     fi
     ui_ok "Tailscale conectado com --accept-routes ($(tailscale ip -4))"
-    host_tailscale_lan_direct
     host_tailscale_subnet
 }
 
@@ -153,36 +152,6 @@ host_lan_subnet() {
     local device
     device="$(ip -4 route get 1.1.1.1 | grep -oP 'dev \K\S+')"
     ip -4 route show dev "$device" scope link proto kernel | awk '{ print $1; exit }'
-}
-
-host_tailscale_lan_direct() {
-    local unit=/etc/systemd/system/astro-tailscale-lan.service ip_bin
-    if systemctl is-active -q astro-tailscale-lan.service 2>/dev/null; then
-        ui_ok "rede local acessada direto, sem passar pelo Tailscale"
-        return
-    fi
-    ip_bin="$(command -v ip)"
-    sudo tee "$unit" >/dev/null <<EOF
-[Unit]
-Description=astro: rede local direta com o Tailscale ligado
-After=tailscaled.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=-$ip_bin -4 rule del priority 5260
-ExecStart=-$ip_bin -6 rule del priority 5260
-ExecStart=$ip_bin -4 rule add priority 5260 lookup main suppress_prefixlength 0
-ExecStart=-$ip_bin -6 rule add priority 5260 lookup main suppress_prefixlength 0
-ExecStop=-$ip_bin -4 rule del priority 5260
-ExecStop=-$ip_bin -6 rule del priority 5260
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    sudo systemctl daemon-reload
-    sudo systemctl enable -q --now astro-tailscale-lan.service
-    ui_ok "rede local acessada direto em casa e pelo Tailscale fora dela"
 }
 
 host_tailscale_subnet() {

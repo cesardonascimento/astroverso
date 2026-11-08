@@ -59,8 +59,6 @@ dois valores com o `.env` a cada inicialização, o que também migra instalaç�
 - Libera a porta 53 para Podman rootless e desativa o DNS stub do `systemd-resolved`
 - Libera DNS e a porta do painel no firewalld
 - Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
-- Instala o serviço `astro-tailscale-lan`: com o Tailscale ligado, a rede local continua sendo acessada direto
-  quando a máquina está nela, e pelo Tailscale quando está fora
 - Ativa o servidor SSH; se houver chave em `~/.ssh/authorized_keys`, oferece desativar o login por senha
 - Oferece anunciar a rede local (detectada automaticamente, ex: `<rede>/24`) no Tailscale para acesso remoto,
   ativando o encaminhamento de pacotes e o masquerade do firewalld; lembra de aprovar a rota no painel
