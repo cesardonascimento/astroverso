@@ -21,10 +21,10 @@ x-podman:
   in_pod: false
 ```
 
-Para publicar um endereço no Caddy, o projeto escreve em `<projeto>/.proxy` (fora do git) uma linha
-`endereço destino` por rota e chama `../caddy/project.sh action reload`. O Caddy junta essas rotas com
-as cadastradas manualmente. Containers do grupo `astro` são alcançados pelo nome; serviços do próprio
-sistema, por `host.containers.internal`.
+Para publicar um endereço no Caddy, o projeto chama `proxy_publish <endereço> <destino>` (de `lib/proxy.sh`),
+que escreve `<projeto>/.proxy` (fora do git) e recarrega o Caddy se ele estiver instalado. O Caddy junta essas
+rotas com as cadastradas manualmente, e as do projeto têm prioridade. Containers do grupo `astro` são
+alcançados pelo nome; serviços do próprio sistema e containers na rede do host, por `host.containers.internal`.
 
 Bibliotecas compartilhadas:
 
@@ -35,3 +35,4 @@ Bibliotecas compartilhadas:
   `host_firewall`, `host_tailscale` (instala via dnf/apt se preciso e oferece anunciar a rede local),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto.
+- `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.

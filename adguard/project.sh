@@ -6,6 +6,7 @@ ASTRO_PROJECT=adguard
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
+source ../lib/proxy.sh
 
 CONTAINER=astro-adguard
 IMAGE=localhost/astro-adguard:latest
@@ -34,10 +35,21 @@ normalize_domain() {
     printf '%s' "$domain"
 }
 
+panel_host_default() {
+    local domain
+    domain="$(proxy_domain)"
+    [[ -n $domain ]] || domain="${1:-$(env_get ADGUARD_REWRITES | cut -d, -f1)}"
+    [[ -z $domain ]] || printf 'adguard.%s' "$domain"
+}
+
 configure() {
     ui_step "Configuração"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em adguard/.env?" y; then
         ui_ok "configuração existente mantida"
+        if ! grep -q '^PANEL_HOST=' .env; then
+            printf "PANEL_HOST='%s'\n" "$(panel_host_default)" >> .env
+            ui_ok "endereço do painel no Caddy definido: $(env_get PANEL_HOST)"
+        fi
         return
     fi
 
@@ -64,10 +76,21 @@ configure() {
         ui_info "sem reescritas"
     fi
 
+    ui_step "Caddy"
+    local panel_host="" default_host
+    default_host="$(env_get PANEL_HOST "$(panel_host_default "${domains[0]:-}")")"
+    if [[ -n $default_host ]]; then
+        ui_input panel_host "endereço do painel no Caddy" "$default_host"
+        panel_host="${panel_host,,}"
+    else
+        ui_info "nenhum domínio conhecido, o painel não será publicado no Caddy"
+    fi
+
     (
         umask 077
         cat > .env <<EOF
 ADGUARD_USERNAME='$username'
+PANEL_HOST='$panel_host'
 ADGUARD_LANGUAGE='$language'
 TZ='$timezone'
 DNS_BIND_IP='$dns_ip'
@@ -199,9 +222,17 @@ cmd_install() {
     ui_step "DNS"
     setup_host_dns "$lan_ip"
     check_tailscale_split_dns "$lan_ip"
+
+    local panel_host
+    panel_host="$(env_get PANEL_HOST)"
+    if [[ -n $panel_host ]]; then
+        ui_step "Caddy"
+        proxy_publish "$panel_host" "http://host.containers.internal:$web_port"
+    fi
+
     ui_step "Acesso"
     ui_ok "DNS:    $lan_ip"
-    ui_ok "Painel: http://$lan_ip:$web_port"
+    ui_ok "Painel: http://$lan_ip:$web_port${panel_host:+  |  https://$panel_host}"
 }
 
 cmd_remove() {
@@ -226,6 +257,7 @@ cmd_remove() {
     else
         ui_info "dados mantidos em adguard/data"
     fi
+    proxy_unpublish
 }
 
 case "${1:-}" in

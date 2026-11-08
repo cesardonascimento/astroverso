@@ -65,7 +65,7 @@ project_route_lines() {
 }
 
 all_route_lines() {
-    { route_lines; project_route_lines; } | awk '!seen[$1]++ { print $1, $2 }'
+    { project_route_lines; route_lines; } | awk '!seen[$1]++ { print $1, $2 }'
 }
 
 cloudflare_get() {
@@ -138,11 +138,6 @@ configure() {
     )
     mv .env.new .env
     ui_ok "configuração salva em caddy/.env"
-
-    if [[ ! -f $ROUTES && -x ../adguard/project.sh ]]; then
-        echo "adguard.$domain http://astro-adguard:80" > "$ROUTES"
-        ui_ok "rota padrão criada: adguard.$domain → astro-adguard:80"
-    fi
 }
 
 render_caddyfile() {
@@ -220,7 +215,7 @@ print_routes() {
     while read -r host upstream owner; do
         ui_info "https://$host → $upstream${owner:+  (do projeto $owner)}"
         count=$((count + 1))
-    done < <({ route_lines; project_route_lines; } | awk '!seen[$1]++')
+    done < <({ project_route_lines; route_lines; } | awk '!seen[$1]++')
     ((count)) || ui_info "nenhuma rota cadastrada"
 }
 

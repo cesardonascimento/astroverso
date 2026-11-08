@@ -9,7 +9,7 @@ http:
       - GET /dns-query/{ClientID}
       - POST /dns-query/{ClientID}
     insecure_enabled: false
-  address: 0.0.0.0:80
+  address: 0.0.0.0:${WEB_PORT}
   session_ttl: 720h
 users:
   - name: '${ADGUARD_USERNAME}'
@@ -21,7 +21,7 @@ language: '${ADGUARD_LANGUAGE}'
 theme: auto
 dns:
   bind_hosts:
-    - 0.0.0.0
+    - ${DNS_BIND_IP}
   port: 53
   anonymize_client_ip: false
   ratelimit: 0

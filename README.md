@@ -58,6 +58,8 @@ Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o 
   de casa, então use o mesmo domínio base do Caddy.
   - **IP de destino:** para onde os nomes apontam. Por padrão, o IP do servidor.
   - **Domínios:** um por vez; Enter vazio termina.
+- **Endereço do painel no Caddy:** o nome pelo qual o painel do AdGuard é aberto com HTTPS. Por padrão,
+  `adguard.<domínio>`.
 - **Usar só o AdGuard como DNS desta máquina?** Impede que o servidor fique preso no DNS secundário do
   roteador depois que o AdGuard reinicia, o que faria os nomes internos pararem de funcionar. Recomendado.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro

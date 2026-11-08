@@ -65,21 +65,22 @@ setup.sh             assistente: descobre */project.sh e chama o contrato; não 
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
 lib/host.sh          host_base (compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão]
+lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 <projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]
 ```
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
 - Compose de todo projeto: `name: astro` + `x-podman: in_pod: false` (agrupados, mas independentes).
 - Configuração por prompts, gravada em `<projeto>/.env` (permissão 600, fora do git). "Usar a configuração já salva?" reaproveita.
-- Um projeto publica um endereço no Caddy escrevendo `<projeto>/.proxy` (`host destino`) e chamando
-  `../caddy/project.sh action reload`. Rotas manuais ficam em `caddy/.routes`.
+- Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `<projeto>/.proxy` e recarrega o Caddy).
+  Rotas manuais ficam em `caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.
 - Versões fixadas: AdGuard na 1ª linha de `adguard/Dockerfile`; Caddy e `caddy-dns/cloudflare` em `caddy/Dockerfile`.
 
 ### Projetos
 
 | Projeto | Resumo |
 |---|---|
-| adguard | Imagem customizada; o entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina e confere o Split DNS do Tailscale. Painel publicado na porta perguntada (padrão `8080`). |
+| adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir e, a cada início, sincroniza porta do painel e IP do DNS com o `.env`. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
 
@@ -87,6 +88,9 @@ lib/env.sh           env_get CHAVE [padrão]
 
 - O podman-compose interpola `${...}` em valores do `.env`, **mesmo entre aspas simples**. Por isso a senha vira hash antes de ir para o `.env`.
 - Chamar uma função em contexto `cmd || funcao` desliga o `set -e` dentro dela. Usar `if ! cmd; then funcao; fi`.
+- Portas publicadas no Podman rootless passam pelo `rootlessport`, um repassador em espaço de usuário: o serviço
+  vê todos os clientes como `10.89.0.x`, e respostas **UDP** a quem chega pelo Tailscale saem com o endereço de
+  origem errado (o cliente descarta). Serviços UDP que atendem a rede, como DNS, usam `network_mode: host`.
 - Container → serviço do sistema: `host.containers.internal`, com o serviço escutando em `0.0.0.0`. O IP da
   máquina só funciona para portas publicadas por outros containers. Do lado do serviço, a conexão chega como local.
 - Rootless + porta < 1024: `net.ipv4.ip_unprivileged_port_start` (`host_unprivileged_ports`, arquivo `99-astro.conf`).

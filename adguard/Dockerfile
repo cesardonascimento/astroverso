@@ -8,7 +8,9 @@ ENV TZ=UTC \
     ADGUARD_PASSWORD_HASH="" \
     ADGUARD_LANGUAGE=pt-br \
     ADGUARD_REWRITES="" \
-    ADGUARD_REWRITE_ANSWER=""
+    ADGUARD_REWRITE_ANSWER="" \
+    WEB_PORT=8080 \
+    DNS_BIND_IP=0.0.0.0
 
 COPY config/AdGuardHome.yaml.template /opt/adguardhome/
 COPY --chmod=0755 scripts/docker-entrypoint.sh /usr/local/bin/

@@ -9,16 +9,13 @@ services:
     image: localhost/astro-adguard:latest
     container_name: astro-adguard
     restart: unless-stopped
+    network_mode: host
     env_file: .env
-    ports:
-      - "${DNS_BIND_IP:-0.0.0.0}:53:53/tcp"
-      - "${DNS_BIND_IP:-0.0.0.0}:53:53/udp"
-      - "${WEB_PORT:-8080}:80/tcp"
     volumes:
       - ./data/conf:/opt/adguardhome/conf:Z
       - ./data/work:/opt/adguardhome/work:Z
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/login.html && nslookup -timeout=3 adguard.com 127.0.0.1 >/dev/null"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:${WEB_PORT:-8080}/login.html && nslookup -timeout=3 adguard.com 127.0.0.1 >/dev/null"]
       interval: 30s
       timeout: 5s
       start_period: 30s

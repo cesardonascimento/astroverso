@@ -1,7 +1,7 @@
 # caddy
 
 Proxy reverso com HTTPS válido (Let's Encrypt) para os serviços da rede, por exemplo
-`https://adguard.<domínio> → astro-adguard:80`.
+`https://app.<domínio> → <ip>:3000`.
 
 ```bash
 ./project.sh install           # pergunta a configuração, prepara o host e sobe o container
@@ -42,13 +42,15 @@ O token fica em `.env` (permissão `600`, fora do git).
 
 ## Rotas
 
-Ficam em `.routes` (fora do git), uma por linha: `endereço destino`. Rotas declaradas por outros projetos
-(arquivos `<projeto>/.proxy`) também são publicadas; a ação **Recarregar rotas** aplica mudanças nelas. Ao adicionar, basta informar o
+As rotas manuais ficam em `.routes` (fora do git), uma por linha: `endereço destino`. Rotas declaradas por
+outros projetos (arquivos `<projeto>/.proxy`, como o painel do adguard e o cockpit) também são publicadas e
+têm prioridade sobre uma rota manual com o mesmo endereço; a ação **Recarregar rotas** aplica mudanças nelas.
+Ao adicionar, basta informar o
 subdomínio (`grafana` vira `grafana.<domínio base>`) ou um endereço completo, e o destino
 (`<ip>:3000`, `http://...` ou `https://...`). As mudanças são aplicadas sem reiniciar o Caddy.
 
-Se o projeto `adguard` existir, a rota `adguard.<domínio base> → astro-adguard:80` é criada
-na primeira instalação. Containers do grupo `astro` são acessíveis pelo nome.
+Containers do grupo `astro` são acessíveis pelo nome; serviços do próprio sistema e containers na rede
+do host, por `host.containers.internal`.
 
 Os nomes não existem no DNS público: eles resolvem para esta máquina só dentro da rede, pela reescrita
 `*.<domínio base>` do adguard.

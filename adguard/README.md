@@ -34,12 +34,25 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 | Adicionar reescritas DNS? | não |
 | IP de destino das reescritas | o IP onde o DNS escuta (ou o IP da máquina na rede) |
 | Domínios | um por vez, Enter vazio termina |
+| Endereço do painel no Caddy | `adguard.<domínio do caddy>` (ou do primeiro domínio de reescrita) |
 
 Cada domínio informado (`dominio.com` ou `*.dominio.com`) vira a reescrita `*.dominio.com → IP`,
 que cobre todos os subdomínios mas não o domínio puro.
 
 As respostas ficam em `.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
 a config do AdGuard é regerada, e a anterior fica em `data/conf/AdGuardHome.yaml.bak`.
+
+## Rede do host
+
+O container usa `network_mode: host`, sem repassador de portas do Podman no meio. Com isso:
+
+- as respostas UDP saem pelo endereço em que a consulta chegou. Com o repassador do Podman rootless
+  (`rootlessport`), quem consultava pelo Tailscale recebia a resposta com o endereço de origem errado e
+  a descartava;
+- o registro de consultas mostra o IP real de cada aparelho.
+
+A porta do painel e o IP do DNS ficam na própria configuração do AdGuard. O entrypoint sincroniza esses
+dois valores com o `.env` a cada inicialização, o que também migra instalações antigas.
 
 ## Preparação do host
 
@@ -57,6 +70,7 @@ Depois que o container sobe:
   e os nomes das reescritas param de resolver
 - Confere se o Split DNS do Tailscale desvia algum domínio das reescritas para outro servidor
   (ex: um AdGuard antigo). Se desviar, mostra o que trocar no painel do Tailscale e verifica de novo
+- Publica o painel no Caddy (`.proxy`) no endereço respondido na instalação
 
 ## Mudando a configuração padrão
 

@@ -6,6 +6,7 @@ ASTRO_PROJECT=cockpit
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
+source ../lib/proxy.sh
 
 CONF=/etc/cockpit/cockpit.conf
 PORT=9090
@@ -17,11 +18,6 @@ cmd_describe() {
 
 cmd_status() {
     systemctl is-enabled -q cockpit.socket 2>/dev/null
-}
-
-proxy_domain() {
-    [[ -f ../caddy/.env ]] && (cd ../caddy && env_get CADDY_DOMAIN)
-    return 0
 }
 
 configure() {
@@ -78,14 +74,6 @@ block_lan_access() {
     ui_ok "porta $PORT bloqueada para a rede local (acesso só pelo Caddy)"
 }
 
-reload_caddy() {
-    if [[ -x ../caddy/project.sh ]] && ../caddy/project.sh status; then
-        ../caddy/project.sh action reload
-    else
-        ui_warn "Caddy não instalado; instale o caddy para acessar https://$(env_get COCKPIT_HOST)"
-    fi
-}
-
 cmd_install() {
     configure
     local host
@@ -104,9 +92,7 @@ cmd_install() {
     ui_ok "containers do usuário $USER visíveis no Cockpit"
 
     ui_step "Caddy"
-    echo "$host http://host.containers.internal:$PORT" > .proxy
-    ui_ok "rota declarada: https://$host → Cockpit"
-    reload_caddy
+    proxy_publish "$host" "http://host.containers.internal:$PORT"
 
     ui_step "Acesso"
     ui_ok "https://$host (login com o usuário e a senha do sistema)"
@@ -123,11 +109,7 @@ cmd_remove() {
     else
         ui_info "Cockpit já estava desativado"
     fi
-    if [[ -f .proxy ]]; then
-        rm -f .proxy
-        ui_ok "rota removida do Caddy"
-        reload_caddy
-    fi
+    proxy_unpublish
     if $purge && [[ -f $CONF ]]; then
         sudo rm -f "$CONF"
         ui_ok "configuração de proxy do Cockpit apagada"
