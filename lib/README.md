@@ -10,7 +10,7 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
-| `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <caminho>` (entra junto com o `~/.astro`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
+| `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <nome> <caminho>` (entra no arquivo do serviço como `<serviço>/<nome>`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
 
 **Estado fora do repositório.** Tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`): o `.env`
 (`$ENV_FILE`), o `.proxy`, dados e certificados. O `cmd_install` começa com `state_setup <função que para o

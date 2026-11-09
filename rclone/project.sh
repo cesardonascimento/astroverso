@@ -341,12 +341,12 @@ config_backup_setup() {
         default="$(env_get SOURCE "/srv")/Astro/Configurações"
     fi
     if $RECONFIGURE || ! grep -q '^CONFIG_BACKUP=' "$ENV_FILE"; then
-        ui_info "toda noite, à 01:00, o ~/.astro de cada usuário vira um arquivo criptografado nesta pasta"
+        ui_info "toda noite, à 01:00, a configuração de cada serviço vira um arquivo criptografado nesta pasta (uma subpasta por serviço)"
         ui_input dest "pasta do backup das configurações" "$(env_get CONFIG_BACKUP "$default")" is_path
         sed -i '/^CONFIG_BACKUP=/d' "$ENV_FILE"
         printf "CONFIG_BACKUP='%s'\n" "$dest" >> "$ENV_FILE"
     fi
-    ui_ok "backup das configurações em $(env_get CONFIG_BACKUP)/astro-config.tar.gpg"
+    ui_ok "backup das configurações em $(env_get CONFIG_BACKUP)/<serviço>/<serviço>.tar.zst.gpg"
     if [[ -s $CONFIG_KEY ]] && ui_confirm "manter a senha atual do backup das configurações?" y; then
         ui_ok "senha mantida"
         return

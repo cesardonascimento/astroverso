@@ -366,7 +366,7 @@ cmd_backup() {
     done
     files="$(env_get FILES_DIR)"
     if [[ -n $files && -d $files ]]; then
-        printf 'include %s\nexclude %s\n' "$files" "$files/appdata_*/preview"
+        printf 'include arquivos %s\nexclude %s\n' "$files" "$files/appdata_*/preview"
     fi
 }
 

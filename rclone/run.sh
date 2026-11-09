@@ -136,36 +136,63 @@ local_mirror() {
     ui_ok "espelho local concluído; versões com mais de $days dias apagadas"
 }
 
-config_parts() {
-    local project kind path output
-    CONFIG_EXCLUDES=()
-    CONFIG_INCLUDES=()
-    CONFIG_ADDS=()
-    for project in ../*/project.sh; do
-        grep -q '^    backup)' "$project" || continue
-        if ! output="$("$project" backup)"; then
-            ui_error "falha ao preparar o backup de $(basename "$(dirname "$project")")"
-            return 1
-        fi
-        while read -r kind path; do
-            case $kind in
-                exclude) CONFIG_EXCLUDES+=("--exclude=${path#/}") ;;
-                include) CONFIG_INCLUDES+=("${path#/}") ;;
-                add)     CONFIG_ADDS+=("${path#/}") ;;
-            esac
-        done <<< "$output"
-    done
+regex_escape() {
+    sed -e 's/[][\\.*^$]/\\&/g' <<< "$1"
 }
 
-config_tar() {
-    local archive=$1 rc=0
-    shift
-    "$@" tar -cf "$archive" -C / "${CONFIG_EXCLUDES[@]}" "${HOME#/}/.astro" "${CONFIG_INCLUDES[@]}" || rc=$?
-    if ((rc == 0 || rc == 1)) && ((${#CONFIG_ADDS[@]})); then
-        "$@" tar -rf "$archive" -C / "${CONFIG_ADDS[@]}" || rc=$?
+service_parts() {
+    local project="../$1/project.sh" output kind rest
+    PART_EXCLUDES=()
+    PART_ADDS=()
+    PART_INCLUDES=()
+    [[ -f $project ]] && grep -q '^    backup)' "$project" || return 0
+    if ! output="$("$project" backup)"; then
+        ui_error "$1: falha ao preparar o backup (dump do banco ou cópia consistente)"
+        return 1
     fi
-    ((rc <= 1)) || return 1
+    while read -r kind rest; do
+        case $kind in
+            exclude) PART_EXCLUDES+=("--exclude=${rest#/}") ;;
+            add)     PART_ADDS+=("${rest#/}") ;;
+            include) PART_INCLUDES+=("$rest") ;;
+        esac
+    done <<< "$output"
+}
+
+tar_ok() {
+    local rc=0
+    "$@" || rc=$?
+    ((rc <= 1))
+}
+
+service_archive() {
+    local service=$1 archive=$2 source=$3 entry name path runner=() target=$1
+    [[ -f /$source ]] && target="$service/${source##*/}"
+    local transform="s|^$(regex_escape "$source")|$target|"
+    tar_ok podman unshare tar -cf "$archive" -C / "${PART_EXCLUDES[@]}" --transform="$transform" "$source" || return 1
+    if ((${#PART_ADDS[@]})); then
+        tar_ok podman unshare tar -rf "$archive" -C / --transform="$transform" "${PART_ADDS[@]}" || return 1
+    fi
+    for entry in "${PART_INCLUDES[@]}"; do
+        name="${entry%% *}"
+        path="${entry#* }"
+        path="${path#/}"
+        runner=()
+        [[ /$path == "$HOME"/* ]] && runner=(podman unshare)
+        tar_ok "${runner[@]}" tar -rf "$archive" -C / "${PART_EXCLUDES[@]}" \
+            --transform="s|^$(regex_escape "$path")|$service/$name|" "$path" || return 1
+    done
     zstd -q --rm -f "$archive" -o "$archive.zst"
+}
+
+service_publish() {
+    local service=$1 work=$2 dest=$3 file
+    file="$service.tar.zst.gpg"
+    gpg --batch --yes --quiet --homedir "$work/gnupg" --pinentry-mode loopback --passphrase-file "$CONFIG_KEY" \
+        --symmetric --cipher-algo AES256 -o "$work/$file" "$work/$service.tar.zst" || return 1
+    mkdir -p "$dest/$service"
+    cp "$work/$file" "$dest/$service/.$file.partial"
+    mv "$dest/$service/.$file.partial" "$dest/$service/$file"
 }
 
 config_backup() {
@@ -183,35 +210,36 @@ config_backup() {
     if [[ $disk == /srv/* ]]; then
         disk_ready "$disk" || return 1
     fi
-    config_parts || return 1
     work="$(mktemp -d -p /var/tmp astro-config.XXXXXX)"
-    ui_step "backup das configurações → $dest/astro-config.tar.gpg"
-    if ! config_tar "$work/$USER.tar" podman unshare; then
-        ui_error "falha ao empacotar $HOME/.astro"
-        podman unshare rm -rf "$work"
-        return 1
-    fi
-    for home in /home/*/; do
-        home="${home%/}"
-        user="${home##*/}"
-        [[ $home != "$HOME" && -r $home/.astro ]] || continue
-        if ! tar --zstd -cf "$work/$user.tar.zst" -C / "${home#/}/.astro"; then
-            ui_warn "não foi possível ler tudo em $home/.astro"
+    mkdir -p "$work/gnupg"
+    chmod 700 "$work/gnupg"
+    ui_step "backup das configurações → $dest/<serviço>/<serviço>.tar.zst.gpg"
+    local dir service saved=() failed=0
+    for dir in "$ASTRO_HOME"/*/; do
+        service="$(basename "$dir")"
+        if service_parts "$service" \
+                && service_archive "$service" "$work/$service.tar" "${ASTRO_HOME#/}/$service" \
+                && service_publish "$service" "$work" "$dest"; then
+            saved+=("$service")
+        else
+            ui_error "$service: backup das configurações falhou"
+            failed=1
         fi
     done
-    (cd "$work" && tar -cf astro-config.tar ./*.tar.zst)
-    mkdir -p "$work/gnupg" "$dest"
-    chmod 700 "$work/gnupg"
-    if ! gpg --batch --yes --quiet --homedir "$work/gnupg" --pinentry-mode loopback --passphrase-file "$CONFIG_KEY" \
-            --symmetric --cipher-algo AES256 -o "$work/astro-config.tar.gpg" "$work/astro-config.tar"; then
-        ui_error "falha ao criptografar o backup das configurações"
-        podman unshare rm -rf "$work"
-        return 1
+    if [[ -f $ASTRO_HOME/host.env ]]; then
+        PART_EXCLUDES=()
+        PART_ADDS=()
+        PART_INCLUDES=()
+        if service_archive host "$work/host.tar" "${ASTRO_HOME#/}/host.env" && service_publish host "$work" "$dest"; then
+            saved+=(host)
+        else
+            ui_error "host: backup das configurações falhou"
+            failed=1
+        fi
     fi
-    cp "$work/astro-config.tar.gpg" "$dest/.astro-config.tar.gpg.partial"
-    mv "$dest/.astro-config.tar.gpg.partial" "$dest/astro-config.tar.gpg"
-    ui_ok "configurações salvas ($(du -h "$dest/astro-config.tar.gpg" | cut -f1), criptografadas): $(cd "$work" && ls ./*.tar.zst | sed 's|^\./||; s|\.tar\.zst$||' | paste -sd' ')"
     podman unshare rm -rf "$work"
+    ((${#saved[@]})) && ui_ok "configurações salvas e criptografadas: ${saved[*]}"
+    return "$failed"
 }
 
 case "${1:-}" in

@@ -650,11 +650,24 @@ cmd_remove() {
     ui_info "mantidos: pacote do Sunshine, driver da NVIDIA, o grupo $GAMES_GROUP e o usuário${user:+ $user} com os jogos"
 }
 
+cmd_backup() {
+    local user home
+    user="$(env_get GAMES_USER)"
+    [[ -n $user ]] || return 0
+    home="$(getent passwd "$user" | cut -d: -f6)"
+    if [[ -n $home && -r $home/.astro/sunshine ]]; then
+        printf 'include usuario %s\n' "$home/.astro/sunshine"
+    else
+        ui_warn "sem leitura em ~$user/.astro/sunshine: rode a instalação do sunshine" >&2
+    fi
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
+    backup)   cmd_backup ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
 esac

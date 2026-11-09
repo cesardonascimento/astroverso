@@ -154,8 +154,10 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
     agora, um horário (por exemplo de madrugada) ou depois, pelo menu. Se ela for interrompida (internet,
     reboot, falta de luz), continua sozinha de onde parou.
 
-- **Pasta do backup das configurações:** toda noite, à 01:00, o `~/.astro` de cada usuário (respostas,
-  certificados, logins, bancos de dados) vira um único arquivo criptografado, `astro-config.tar.gpg`, nesta pasta.
+- **Pasta do backup das configurações:** toda noite, à 01:00, a configuração de cada serviço (respostas,
+  certificados, logins, bancos de dados) vira um arquivo criptografado numa subpasta com o nome do serviço
+  (ex.: `nextcloud/nextcloud.tar.zst.gpg`). Dentro dele fica só a pasta do serviço, sem o nome do usuário: dá para
+  restaurar em outra máquina, com outro usuário.
   Por padrão, `Astro/Configurações` dentro da pasta do primeiro armazenamento em nuvem: assim ele segue para a
   nuvem e para o disco de backup nas rodadas seguintes.
 - **Senha do backup das configurações:** criptografa esse arquivo. **Guarde-a fora da máquina** (num gerenciador

@@ -80,9 +80,10 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
   roda com outro usuário guarda a configuração no `~/.astro` dele (sunshine), legível por ACL a quem instala.
   Estado da máquina em `~/.astro/host.env`.
-- Backup das configurações (rclone, 01:00): `~/.astro` de cada usuário num `astro-config.tar.gpg` (gpg simétrico,
-  senha em `~/.astro/rclone/data/config-backup.key`). Cada projeto pode ter o comando `backup` (dumps e
-  `exclude`/`include`/`add`).
+- Backup das configurações (rclone, 01:00): cada `~/.astro/<serviço>` em `<destino>/<serviço>/<serviço>.tar.zst.gpg`
+  (gpg simétrico, senha em `~/.astro/rclone/data/config-backup.key`), com caminhos relativos ao serviço (`tar
+  --transform`), sem home nem usuário. Cada projeto pode ter o comando `backup` (dumps e `exclude <caminho>`,
+  `include <nome> <caminho>`, `add <caminho>`).
 - Configuração por prompts, gravada em `~/.astro/<projeto>/.env` (permissão 600). "Usar a configuração já salva?" reaproveita.
   Toda resposta passa por um validador de `lib/env.sh` (`is_port`, `is_ipv4`, `is_hostname`...), porque vai parar
   em `.env`, YAML, `sed` ou Caddyfile.

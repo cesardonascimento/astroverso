@@ -34,7 +34,7 @@ Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 | Unidade | Quando | O que faz |
 |---|---|---|
 | `astro-rclone-tick` | a cada 15 minutos | Envia à nuvem os arquivos criados ou alterados desde o último envio bem-sucedido (`find -newerct` + `rclone copy --files-from-raw --no-traverse`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar do envio |
-| `astro-rclone-config` | 01:00 | Backup das configurações: o `~/.astro` de cada usuário (com os ajustes de cada projeto, como dumps de banco) num `astro-config.tar.gpg` criptografado (AES-256, senha da instalação) na pasta escolhida |
+| `astro-rclone-config` | 01:00 | Backup das configurações: cada `~/.astro/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
 | `astro-rclone-nightly` | 02:00 | Espelho com exclusões de cada armazenamento (`rclone sync --max-delete 1000`) |
 | `astro-rclone-local` | 03:00 | Espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
 
@@ -63,14 +63,24 @@ noturno: mexa nos arquivos pelo Nextcloud (ou direto no disco), não pelo app da
 
 1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud,
    cópia do SQLite do Home Assistant) e o que deixar de fora (bancos em uso, código, caches);
-2. empacota o `~/.astro` de quem instala com `podman unshare tar` (guarda os donos dos arquivos dos containers),
-   e o `~/.astro` de outros usuários (ex.: o de jogos), que ele lê por ACL;
-3. junta tudo em `astro-config.tar`, criptografa com `gpg --symmetric` (AES-256) e grava
-   `astro-config.tar.gpg` na pasta escolhida. Na pasta do armazenamento em nuvem, ele vai para a nuvem e para o
-   disco de backup nas rodadas seguintes.
+2. empacota cada `~/.astro/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
+   com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O que o projeto
+   inclui de fora vai para uma subpasta com nome fixo (`nextcloud/arquivos` com a pasta dos arquivos,
+   `sunshine/usuario` com o `~/.astro/sunshine` do usuário de jogos, lido por ACL). O `host.env` vira `host/`;
+3. compacta (`zstd`), criptografa com `gpg --symmetric` (AES-256) e grava
+   `<pasta escolhida>/<serviço>/<serviço>.tar.zst.gpg`. Na pasta do armazenamento em nuvem, isso segue para a nuvem
+   e para o disco de backup nas rodadas seguintes.
 
-Para abrir: `gpg -d astro-config.tar.gpg > astro-config.tar` (pede a senha) e `tar -xf astro-config.tar`. Dentro,
-há um `<usuário>.tar.zst` por usuário.
+```
+Astro/Configurações/
+  caddy/caddy.tar.zst.gpg
+  nextcloud/nextcloud.tar.zst.gpg
+  ...
+  host/host.tar.zst.gpg
+```
+
+Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos
+arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-owner`.
 
 ## Ações (Configurar um projeto instalado)
 
