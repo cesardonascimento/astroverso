@@ -36,6 +36,8 @@ installed() {
 
 configure() {
     ui_step "Configuração"
+    local current_disks
+    current_disks="$(env_get DISKS)"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em nextcloud/.env?" y; then
         ui_ok "configuração existente mantida"
     else
@@ -63,7 +65,7 @@ configure() {
     fi
     if ! grep -q '^DISKS=' .env; then
         local disks=()
-        disk_choose disks nextcloud "Quais discos guardam arquivos do Nextcloud? (só $USER e o Nextcloud acessam)"
+        disk_choose disks nextcloud "Quais discos guardam arquivos do Nextcloud? (só $USER e o Nextcloud acessam)" "$current_disks"
         printf "DISKS='%s'\n" "${disks[*]}" >> .env
         ui_ok "${#disks[@]} disco(s) escolhido(s) para o Nextcloud"
     fi

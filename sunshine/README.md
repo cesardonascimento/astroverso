@@ -36,7 +36,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Discos de jogos:** cria o grupo `jogos` com o usuário de jogos e monta cada disco escolhido em
   `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh` (nada pede senha no boot). NTFS usa o driver do
   kernel (`ntfs3`). Dono `$USER`, grupo `jogos`, `umask=007`: os dois leem e escrevem, os outros usuários não
-  entram. O disco aparece no Arquivos (`x-gvfs-show`) e monta antes da sessão do usuário de jogos. Um NTFS
+  entram. A pasta principal de cada disco recebe `chmod 770`, porque o `ntfs3` usa a permissão gravada no disco
+  (atributos do WSL) no lugar do `umask`; a permissão fica gravada no disco. O disco aparece no Arquivos (`x-gvfs-show`) e monta antes da sessão do usuário de jogos. Um NTFS
   marcado como sujo (desligado sem fechar no Windows) não monta: a instalação mostra o `ntfsfix` para corrigir.
 - **Login automático:** configura o GDM (`custom.conf`) para entrar com o usuário de jogos.
 - **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev

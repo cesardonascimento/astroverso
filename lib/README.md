@@ -30,7 +30,8 @@ alcançados pelo nome; serviços do próprio sistema e containers na rede do hos
 Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
-  prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist`. Defina `ASTRO_PROJECT` antes do `source`.
+  prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (`--selected "0 2"` antes
+  dos itens deixa esses índices já marcados). Defina `ASTRO_PROJECT` antes do `source`.
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
@@ -48,8 +49,8 @@ Bibliotecas compartilhadas:
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
 - `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
-  - `disk_choose VAR projeto título` lista os discos (sem o do sistema e sem os de outro projeto) e devolve os UUIDs
-    marcados, que o projeto grava no `.env`.
+  - `disk_choose VAR projeto título [uuids atuais]` lista os discos (sem o do sistema e sem os de outro projeto),
+    com os atuais já marcados, e devolve os UUIDs marcados, que o projeto grava no `.env`.
   - `disk_setup projeto opções uuid...` cadastra o TPM nos discos LUKS (pede a senha só se o TPM ainda não
     destravar), escreve as linhas do projeto no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um comentário
     `# astro:<projeto> <uuid>`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Deixa os

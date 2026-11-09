@@ -135,11 +135,18 @@ ui_menu() {
 
 ui_checklist() {
     local -n __ui_out=$1
-    local title=$2
+    local title=$2 preset=""
     shift 2
+    if [[ ${1:-} == --selected ]]; then
+        preset=" $2 "
+        shift 2
+    fi
     local items=("$@") count=$# cursor=0 i key mark
     local -a selected=()
-    for ((i = 0; i < count; i++)); do selected[i]=0; done
+    for ((i = 0; i < count; i++)); do
+        selected[i]=0
+        [[ $preset == *" $i "* ]] && selected[i]=1
+    done
 
     printf '%s     \033[35m?\033[0m %s \033[2m(↑/↓, Espaço marca, a = todos, Enter confirma)\033[0m\n' "$(_ui_tag)" "$title" >/dev/tty
     _ui_cursor_hide

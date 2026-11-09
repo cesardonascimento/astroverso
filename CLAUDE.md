@@ -139,6 +139,8 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   `files_external:option <id> filesystem_check_changes 1`.
 - Com ACL padrão, o `umask` é ignorado e a máscara vem do modo de criação: quem cria arquivos `0644` corta a
   escrita do outro lado. A maioria dos programas cria `0666` (ok).
+- O `ntfs3` usa a permissão gravada no disco (atributos `$LXMOD` do WSL) no lugar do `umask`/`dmask`: a pasta
+  principal pode aparecer `777`. Um `chmod` fica gravado no disco e vale nas próximas montagens.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).

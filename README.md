@@ -107,6 +107,7 @@ respostas ficam em `<projeto>/.env`, fora do git.
   dentro do projeto. Se ela mudar depois de instalado, o assistente pergunta se pode **mover os arquivos** para a
   pasta nova.
 - **Quais discos guardam arquivos do Nextcloud?** Marque com Espaço os discos de dados que o Nextcloud vai usar.
+  Ao reconfigurar, os discos atuais já vêm marcados: marque um novo para adicionar, desmarque para tirar.
   Cada um é montado sozinho a cada boot, só o seu usuário e o Nextcloud acessam, e ele aparece no Nextcloud
   como uma pasta com o nome do disco. Arquivos copiados para o disco por fora também aparecem lá. A escolha
   fica gravada pelo identificador do disco, então numa máquina nova os mesmos discos são reconhecidos.
@@ -129,7 +130,8 @@ respostas ficam em `<projeto>/.env`, fora do git.
   estiver jogando não tenha acesso ao homelab. Por padrão, `jogos`.
 - **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
   aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
-- **Quais discos são de jogos?** Marque com Espaço os discos com jogos, ROMs e emuladores. Eles são montados
+- **Quais discos são de jogos?** Marque com Espaço os discos com jogos, ROMs e emuladores (ao reconfigurar, os
+  atuais já vêm marcados). Eles são montados
   sozinhos a cada boot e ficam acessíveis ao seu usuário e ao usuário de jogos, e a nenhum outro. Os discos
   já escolhidos pelo Nextcloud não aparecem na lista.
 

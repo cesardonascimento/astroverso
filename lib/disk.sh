@@ -44,7 +44,8 @@ disk_owner() {
 
 disk_choose() {
     local -n __disk_out=$1
-    local project=$2 title=$3 uuid path fstype label size model inner owner kind lines=() uuids=() chosen=() i
+    local project=$2 title=$3 current=" ${4:-} " uuid path fstype label size model inner owner kind preset=""
+    local lines=() uuids=() chosen=() i
     __disk_out=()
     while IFS=$'\t' read -r uuid path fstype label size model inner; do
         owner="$(disk_owner "$uuid")"
@@ -56,13 +57,14 @@ disk_choose() {
             kind="criptografado, $inner"
         fi
         lines+=("$(printf '%-20s %8s  %-24s %s' "$label" "$size" "$kind" "$model")")
+        [[ $current == *" $uuid "* ]] && preset+="${#uuids[@]} "
         uuids+=("$uuid")
     done < <(disk_scan)
     if ((${#uuids[@]} == 0)); then
         ui_info "nenhum disco disponível além do disco do sistema"
         return 0
     fi
-    ui_checklist chosen "$title" "${lines[@]}"
+    ui_checklist chosen "$title" --selected "$preset" "${lines[@]}"
     for i in "${chosen[@]}"; do __disk_out+=("${uuids[i]}"); done
     return 0
 }

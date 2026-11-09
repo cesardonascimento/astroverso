@@ -80,13 +80,15 @@ check_games_user() {
 
 choose_disks() {
     local disks=()
-    disk_choose disks sunshine "Quais discos são de jogos? (o usuário de jogos e $USER acessam)"
+    disk_choose disks sunshine "Quais discos são de jogos? (o usuário de jogos e $USER acessam)" "${1:-}"
     printf "GAMES_DISKS='%s'\n" "${disks[*]}" >> .env
     ui_ok "${#disks[@]} disco(s) de jogos escolhido(s)"
 }
 
 configure() {
     ui_step "Configuração"
+    local current_disks
+    current_disks="$(env_get GAMES_DISKS)"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em sunshine/.env?" y; then
         ui_ok "configuração existente mantida"
         grep -q '^GAMES_DISKS=' .env || choose_disks
@@ -104,7 +106,7 @@ configure() {
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > .env.new
     )
     mv .env.new .env
-    choose_disks
+    choose_disks "$current_disks"
     ui_ok "configuração salva em sunshine/.env"
 }
 
@@ -124,6 +126,13 @@ games_disks() {
         gid="$(getent group "$GAMES_GROUP" | cut -d: -f3)"
     fi
     disk_setup sunshine "uid=$(id -u),gid=${gid:-0},umask=007,x-gvfs-show,x-systemd.before=user@$(id -u "$user").service" "${uuids[@]}"
+    local path
+    for path in "${DISK_MOUNTS[@]}"; do
+        if mountpoint -q "$path" && [[ $(stat -c %a "$path") != 770 ]]; then
+            sudo chmod 770 "$path"
+            ui_ok "pasta principal de $path fechada para quem não é do grupo $GAMES_GROUP"
+        fi
+    done
     ((${#uuids[@]})) && ui_ok "discos de jogos: só $USER e o grupo $GAMES_GROUP acessam"
     return 0
 }
