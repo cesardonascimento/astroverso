@@ -94,6 +94,7 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
 | Projeto | Resumo |
 |---|---|
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
+| backup | Sem container: timers do systemd do usuário rodando `backup/run.sh` (`tick` a cada 15min, `nightly` 01:30, `local` 02:30) com `ASTRO_PLAIN=1`. Disco de backup por `disk_setup` (`atual/` + `versoes/<data>`, `podman unshare rclone sync --metadata --backup-dir`). Nuvem pelo rclone, um destino por `data/targets/<nome>.env` e seção no `data/rclone.conf`; serviços em `providers/*.sh` (`provider_describe`, `provider_default_name`, `provider_options`, `provider_configure`). Envio: `find -newerct @<último envio>` + `copy --files-from-raw --no-traverse`; espelho com `sync --max-delete 1000`. Primeira cópia nuvem → disco agendável, retomada pelo `tick` até `IMPORT_DONE=yes`; antes disso nada vai para a nuvem. Nada roda sem o disco montado; `flock` entre rodadas. |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
 | nextcloud | Imagem oficial `nextcloud:<versão>-apache` + PostgreSQL + Valkey + container de cron (mesma imagem, `/cron.sh`). Sem porta no host: o Caddy chega em `astro-nextcloud:80` pela `astro_default`. Senha do banco em `data/secrets` (lida pelos `*_FILE`; arquivo `644` em pasta `700`, porque o Postgres lê como o usuário `postgres`). A imagem instala com uma senha aleatória, trocada pela digitada com `occ user:resetpassword --password-from-env`. `trusted_proxies`, `overwriteprotocol`, fuso, região e cron aplicados pelo `occ` a cada instalação. Discos: dono `$USER` `770` (o `group::---` da ACL fecha o grupo) + ACL (também padrão) para o UID do `www-data` no host, `context=container_file_t` na montagem, `x-systemd.before=user@<uid>.service`; volumes em `docker-compose.override.yml` gerado e pasta no Nextcloud pelo `files_external` (`filesystem_check_changes 1`). `apache.conf` substitui o `000-default.conf` da imagem: `ServerName https://${NEXTCLOUD_HOST}:443` + `UseCanonicalName On` (redirecionamentos do `.well-known` em `https`) e HSTS. |
@@ -145,6 +146,9 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   principal pode aparecer `777`. Um `chmod` fica gravado no disco e vale nas próximas montagens.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
+- `journalctl --user -u <padrão>` sai com 1 quando nenhuma unidade tem mensagens: em pipeline com `pipefail`, `|| true`.
+- `find -cmin`/`-newerct` usa a data de mudança no disco: pega também arquivos copiados com data antiga (o
+  `--max-age` do rclone, que olha a data do arquivo, não pegaria).
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
 - O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
@@ -156,7 +160,7 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   - revisar as ACLs do Tailscale (hoje "todos acessam tudo" e a rede inteira está anunciada);
   - avaliar o modo paralelo do DoH (três provedores veem todas as consultas);
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.
-- Projeto de backup: `armazenamento-b` como espelho noturno do `armazenamento-a`; `armazenamento-c` a definir
-  (`disk_setup` já serve). Até lá, a sessão do usuário de jogos ainda monta os dois pelo GNOME (com a senha do LUKS).
+- `armazenamento-c` a definir. Até lá, a sessão do usuário de jogos ainda o monta pelo GNOME (com a senha do LUKS).
+- Backup: aviso (e-mail ou notificação) quando uma rodada falhar; hoje só fica no journal.
 - Ação "verificar atualizações" para as versões fixadas.
 - Ações de pós-configuração no adguard (ex.: gerenciar reescritas).

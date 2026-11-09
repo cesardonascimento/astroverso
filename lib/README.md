@@ -31,7 +31,8 @@ Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (`--selected "0 2"` antes
-  dos itens deixa esses índices já marcados). Defina `ASTRO_PROJECT` antes do `source`.
+  dos itens deixa esses índices já marcados). Com `ASTRO_PLAIN=1` (serviços do systemd), as mensagens saem sem
+  cores, para o journal. Defina `ASTRO_PROJECT` antes do `source`.
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
@@ -45,7 +46,8 @@ Bibliotecas compartilhadas:
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
-  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto).
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto),
+  `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
 - `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
@@ -60,5 +62,6 @@ Bibliotecas compartilhadas:
     levar quase um minuto no boot; disco ausente falha em 10s pelo `crypttab`). Nada
     pede senha no boot: um disco ausente ou que o TPM não destrava fica de fora e a máquina sobe.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
+  - `disk_mounts [projeto a ignorar]` lista as montagens do astro (`/srv/<rótulo> projeto`), lidas do `fstab`.
   - Discos tirados da lista são desmontados e saem dos dois arquivos. `disk_release projeto` libera todos.
     Os dados nunca são apagados.

@@ -280,3 +280,9 @@ disk_release() {
     sudo systemctl daemon-reload
     ui_ok "discos liberados do $DISK_FSTAB (os dados continuam nos discos)"
 }
+
+disk_mounts() {
+    awk -v skip="${1:-}" '
+        /^# astro:/ { split($2, tag, ":"); project = tag[2]; getline; if (project != skip) print $2, project }
+    ' "$DISK_FSTAB"
+}

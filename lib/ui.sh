@@ -180,3 +180,12 @@ ui_checklist() {
     done
     return 0
 }
+
+if [[ ${ASTRO_PLAIN:-} == 1 ]]; then
+    _ui_tag()  { printf '[%s]' "$ASTRO_PROJECT"; }
+    ui_step()  { printf '%s ==> %s\n' "$(_ui_tag)" "$*"; }
+    ui_info()  { printf '%s     %s\n' "$(_ui_tag)" "$*"; }
+    ui_ok()    { printf '%s     ok: %s\n' "$(_ui_tag)" "$*"; }
+    ui_warn()  { printf '%s     aviso: %s\n' "$(_ui_tag)" "$*"; }
+    ui_error() { printf '%s     erro: %s\n' "$(_ui_tag)" "$*" >&2; }
+fi
