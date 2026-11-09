@@ -9,6 +9,7 @@ instalação.
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
+| [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), atualizada a cada 15 minutos. |
 | [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que pode entrar sozinho no boot, separado do usuário que cuida do homelab. |
@@ -97,6 +98,18 @@ respostas ficam em `<projeto>/.env`, fora do git.
 
 - **Endereço no Caddy:** o nome pelo qual o painel é acessado. Por padrão,
   `<nome-da-máquina>.<domínio do Caddy>`.
+
+### homeassistant
+
+- **Endereço do Home Assistant no Caddy:** o nome pelo qual o painel é aberto no navegador e no app do Home
+  Assistant. Por padrão, `homeassistant.<domínio>`. De fora de casa, funciona pelo Tailscale.
+- **Pasta da configuração:** onde ficam a configuração, as integrações, os usuários e o histórico. Por padrão,
+  a pasta oculta `.homeassistant` no home do seu usuário.
+- **Porta do Home Assistant no host:** a porta em que ele escuta na máquina. Ela é bloqueada para a rede: o
+  acesso passa só pelo Caddy. Mude só se `8123` estiver ocupada.
+
+Depois de instalar, abra o endereço logo: o primeiro acesso cria o usuário administrador. Os aparelhos entram
+pelas integrações, no próprio painel (Tuya, LG, Samsung...).
 
 ### nextcloud
 
