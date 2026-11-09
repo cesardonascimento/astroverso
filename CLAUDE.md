@@ -130,6 +130,10 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   permissão na tela e fica parado sem abrir o painel (porta 47990), ou trava.
 - O painel do Sunshine só aceita alterações de `https://localhost`: atrás do Caddy, a origem precisa estar em
   `csrf_allowed_origins` (lista separada por vírgula, cada item com `https://`).
+- O GNOME escolhe a placa principal ao iniciar; o `nvidia-drm` aparece ~2s depois do GDM no boot, e o GNOME fica
+  com a Intel (log "selected primary from builtin panel presence"). Sem tela na NVIDIA, o NVENC falha e o
+  Sunshine cai no Vulkan, que codifica na NVIDIA a tela capturada da Intel: imagem corrompida. O GDM espera o
+  `/dev/dri/by-path/pci-<placa>-card` (`udevadm wait`, drop-in `astro-nvidia.conf`).
 - O pacote do Sunshine não aplica o `setcap`, e uma atualização do pacote apaga a permissão.
 - Com Secure Boot, o IMA do kernel registra no TPM cada módulo carregado no boot, e o desbloqueio pelo TPM recebe
   `TPM_RC_PCR_CHANGED` (0x128) e tenta de novo até o boot acalmar (~1 min). Por isso a montagem de disco LUKS

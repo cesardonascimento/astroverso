@@ -50,7 +50,10 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   nele (ex.: navegador) pedem a senha do usuário na primeira vez.
 - **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev
   (`61-astro-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
-  e rodar os aplicativos na NVIDIA, sem copiar cada quadro da Intel.
+  e rodar os aplicativos na NVIDIA, sem copiar cada quadro da Intel. O GNOME escolhe a placa principal assim
+  que começa, e no boot a NVIDIA aparece alguns segundos depois da Intel: por isso o GDM espera por ela
+  (`gdm.service.d/astro-nvidia.conf`, `udevadm wait` de até 30s no `/dev/dri/by-path/pci-<placa>-card`). Se ela
+  não aparecer, o GDM sobe mesmo assim.
 - **Sunshine:** baixa o pacote `.rpm` ou `.deb` da versão mais recente em
   [github.com/LizardByte/Sunshine/releases](https://github.com/LizardByte/Sunshine/releases), confere o
   SHA-256 publicado pelo GitHub e instala. Se a versão instalada já for a mais recente, não baixa nada.

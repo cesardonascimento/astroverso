@@ -16,6 +16,7 @@ GDM_CONFS=(/etc/gdm/custom.conf /etc/gdm3/custom.conf /etc/gdm3/daemon.conf)
 UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/systemd/user/sunshine.service)
 NVIDIA_VENDOR=0x10de
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
+GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
 GAMES_GROUP=jogos
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
@@ -380,13 +381,28 @@ primary_gpu() {
     rule="SUBSYSTEM==\"drm\", KERNEL==\"card*\", KERNELS==\"$pci\", TAG+=\"mutter-device-preferred-primary\""
     if [[ $(cat "$MUTTER_RULE" 2>/dev/null) == "$rule" ]]; then
         ui_ok "NVIDIA já é a placa principal do GNOME"
+    else
+        printf '%s\n' "$rule" | sudo tee "$MUTTER_RULE" >/dev/null
+        sudo udevadm control --reload
+        sudo udevadm trigger --subsystem-match=drm
+        HOST_REBOOT=true
+        ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os jogos)"
+    fi
+    gdm_wait "$pci"
+}
+
+gdm_wait() {
+    local wanted
+    wanted="$(printf '[Service]\nExecStartPre=-/usr/bin/udevadm wait --timeout=30 /dev/dri/by-path/pci-%s-card\n' "$1")"
+    if [[ $(cat "$GDM_WAIT" 2>/dev/null) == "$wanted" ]]; then
+        ui_ok "a tela de login já espera a NVIDIA no boot"
         return
     fi
-    printf '%s\n' "$rule" | sudo tee "$MUTTER_RULE" >/dev/null
-    sudo udevadm control --reload
-    sudo udevadm trigger --subsystem-match=drm
+    sudo mkdir -p "${GDM_WAIT%/*}"
+    printf '%s\n' "$wanted" | sudo tee "$GDM_WAIT" >/dev/null
+    sudo systemctl daemon-reload
     HOST_REBOOT=true
-    ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os jogos)"
+    ui_ok "a tela de login espera a NVIDIA aparecer no boot (até 30s), para o GNOME escolhê-la como principal"
 }
 
 sunshine_conf() {
@@ -586,6 +602,12 @@ cmd_remove() {
         sudo rm -f "$MUTTER_RULE"
         sudo udevadm control --reload
         ui_ok "a Intel volta a ser a placa principal do GNOME no próximo login"
+    fi
+    if [[ -f $GDM_WAIT ]]; then
+        sudo rm -f "$GDM_WAIT"
+        sudo rmdir "${GDM_WAIT%/*}" 2>/dev/null || true
+        sudo systemctl daemon-reload
+        ui_ok "a tela de login não espera mais a NVIDIA"
     fi
     proxy_unpublish
     ui_info "mantidos: pacote do Sunshine, driver da NVIDIA, o grupo $GAMES_GROUP e o usuário${user:+ $user} com os jogos"
