@@ -39,8 +39,8 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 Cada domínio informado (`dominio.com` ou `*.dominio.com`) vira a reescrita `*.dominio.com → IP`,
 que cobre todos os subdomínios mas não o domínio puro.
 
-As respostas ficam em `.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
-a config do AdGuard é regerada, e a anterior fica em `data/conf/AdGuardHome.yaml.bak`.
+As respostas ficam em `~/.astro/adguard/.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
+a config do AdGuard é regerada, e a anterior fica em `~/.astro/adguard/data/conf/AdGuardHome.yaml.bak`.
 
 ## Rede do host
 
@@ -66,7 +66,7 @@ primeira execução ou quando a configuração é respondida de novo.
 - Oferece anunciar a rede local (detectada automaticamente, ex: `<rede>/24`) no Tailscale para acesso remoto,
   ativando o encaminhamento de pacotes e o masquerade do firewalld; lembra de aprovar a rota no painel
 - Pede o redirecionamento da porta UDP do Tailscale no roteador para esta máquina (conexões diretas de fora
-  de casa, sem relay) e só continua após a confirmação, guardada em `~/.config/astro/host.env`
+  de casa, sem relay) e só continua após a confirmação, guardada em `~/.astro/host.env`
 
 Depois que o container sobe:
 
@@ -84,7 +84,8 @@ Depois que o container sobe:
 
 ## Mudando a configuração padrão
 
-- **Pelo painel**: as alterações ficam em `data/conf/AdGuardHome.yaml` (só nessa máquina).
+- **Pelo painel**: as alterações ficam em `~/.astro/adguard/data/conf/AdGuardHome.yaml` (entram no backup das
+  configurações; a pasta `data/work`, com estatísticas e cache, fica de fora).
 - **Para todas as máquinas**: edite `config/AdGuardHome.yaml.template`, faça commit e reinstale
   respondendo a configuração de novo.
 

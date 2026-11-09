@@ -38,12 +38,12 @@ Os subdomínios diretos (`grafana.<domínio>`) usam um único certificado curing
 evita expor os nomes dos serviços nos registros públicos de certificados. Outros endereços ganham
 certificados próprios.
 
-O token fica em `.env` (permissão `600`, fora do git).
+O token fica em `~/.astro/caddy/.env` (permissão `600`), e os certificados em `~/.astro/caddy/data`.
 
 ## Rotas
 
-As rotas manuais ficam em `.routes` (fora do git), uma por linha: `endereço destino`. Rotas declaradas por
-outros projetos (arquivos `<projeto>/.proxy`, como o painel do adguard e o cockpit) também são publicadas e
+As rotas manuais ficam em `~/.astro/caddy/.routes`, uma por linha: `endereço destino`. Rotas declaradas por
+outros projetos (arquivos `~/.astro/<projeto>/.proxy`, como o painel do adguard e o cockpit) também são publicadas e
 têm prioridade sobre uma rota manual com o mesmo endereço; a ação **Recarregar rotas** aplica mudanças nelas.
 Ao adicionar, basta informar o
 subdomínio (`grafana` vira `grafana.<domínio base>`) ou um endereço completo, e o destino

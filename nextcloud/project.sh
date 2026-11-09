@@ -12,9 +12,9 @@ source ../lib/disk.sh
 CONTAINER=astro-nextcloud
 CONTAINERS=(astro-nextcloud-cron astro-nextcloud astro-nextcloud-redis astro-nextcloud-db)
 NETWORK=astro_default
-SECRETS=data/secrets
-CONFIG=data/html/config/config.php
-OVERRIDE=docker-compose.override.yml
+SECRETS="$STATE/data/secrets"
+CONFIG="$STATE/data/html/config/config.php"
+OVERRIDE="$STATE/docker-compose.override.yml"
 MOVE_FROM=""
 DISK_OPTIONS="x-gvfs-hide,x-systemd.before=user@$(id -u).service,context=system_u:object_r:container_file_t:s0"
 
@@ -24,6 +24,12 @@ cmd_describe() {
 
 cmd_status() {
     podman container exists "$CONTAINER"
+}
+
+compose() {
+    local files=(-f docker-compose.yml)
+    [[ -f $OVERRIDE ]] && files+=(-f "$OVERRIDE")
+    podman compose --env-file "$ENV_FILE" "${files[@]}" "$@"
 }
 
 occ() {
@@ -38,7 +44,7 @@ configure() {
     ui_step "Configuração"
     local current_disks
     current_disks="$(env_get DISKS)"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em nextcloud/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
     else
         local host admin files domain old_files
@@ -58,15 +64,15 @@ configure() {
         fi
         (
             umask 077
-            printf "NEXTCLOUD_HOST='%s'\nADMIN_USER='%s'\nFILES_DIR='%s'\n" "$host" "$admin" "$files" > .env.new
+            printf "NEXTCLOUD_HOST='%s'\nADMIN_USER='%s'\nFILES_DIR='%s'\n" "$host" "$admin" "$files" > "$ENV_FILE.new"
         )
-        mv .env.new .env
-        ui_ok "configuração salva em nextcloud/.env"
+        mv "$ENV_FILE.new" "$ENV_FILE"
+        ui_ok "configuração salva em $ENV_FILE"
     fi
-    if ! grep -q '^DISKS=' .env; then
+    if ! grep -q '^DISKS=' "$ENV_FILE"; then
         local disks=()
         disk_choose disks nextcloud "Quais discos guardam arquivos do Nextcloud? (só $USER e o Nextcloud acessam)" "$current_disks"
-        printf "DISKS='%s'\n" "${disks[*]}" >> .env
+        printf "DISKS='%s'\n" "${disks[*]}" >> "$ENV_FILE"
         ui_ok "${#disks[@]} disco(s) escolhido(s) para o Nextcloud"
     fi
 }
@@ -154,7 +160,7 @@ prepare_secrets() {
         ui_ok "senha do banco já gerada"
     else
         (umask 022 && openssl rand -hex 32 > "$SECRETS/db_password")
-        ui_ok "senha do banco gerada em nextcloud/$SECRETS (só os containers a usam)"
+        ui_ok "senha do banco gerada em $SECRETS (só os containers a usam)"
     fi
     if ! installed; then
         (umask 022 && openssl rand -hex 32 > "$SECRETS/admin_password")
@@ -186,19 +192,19 @@ prepare_files() {
 }
 
 remove_containers() {
-    podman compose down >/dev/null 2>&1 || true
+    compose down >/dev/null 2>&1 || true
     podman rm -f "${CONTAINERS[@]}" >/dev/null 2>&1 || true
 }
 
 start_containers() {
     local log
     ui_info "baixando as imagens (alguns minutos na primeira vez)..."
-    if ! log="$(podman compose pull 2>&1)"; then
+    if ! log="$(compose pull 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao baixar as imagens"
     fi
     remove_containers
-    if ! log="$(podman compose up -d 2>&1)"; then
+    if ! log="$(compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir os containers"
     fi
@@ -275,6 +281,7 @@ tune() {
 }
 
 cmd_install() {
+    state_setup remove_containers .env .proxy data docker-compose.override.yml
     configure
     local host admin files
     host="$(env_get NEXTCLOUD_HOST)"
@@ -310,7 +317,7 @@ cmd_remove() {
     local purge=false files
     [[ ${1:-} == --purge ]] && purge=true
     files="$(env_get FILES_DIR)"
-    [[ $files == "$PWD/data/"* ]] && files=""
+    [[ $files == "$STATE/data/"* ]] && files=""
 
     ui_step "Remoção"
     if cmd_status; then
@@ -326,17 +333,40 @@ cmd_remove() {
     rm -f "$OVERRIDE"
 
     if ! $purge; then
-        ui_info "dados mantidos em nextcloud/data${files:+ e $files}"
+        ui_info "dados mantidos em $STATE/data${files:+ e $files}"
         return
     fi
     if [[ -n $files && -d $files ]]; then
-        ui_info "pasta dos arquivos fora do projeto, mantida: $files"
+        ui_info "pasta dos arquivos fora de $STATE, mantida: $files"
     fi
-    if [[ -d data ]]; then
-        podman unshare rm -rf data
-        ui_ok "dados apagados (nextcloud/data: banco, configuração e arquivos)"
+    if [[ -d $STATE/data ]]; then
+        podman unshare rm -rf "$STATE/data" "$STATE/backup"
+        ui_ok "dados apagados ($STATE/data: banco, configuração e arquivos)"
     else
         ui_info "nenhum dado para apagar"
+    fi
+}
+
+cmd_backup() {
+    local dump="$STATE/backup" files
+    mkdir -p "$dump"
+    if cmd_status; then
+        if ! podman exec -u postgres astro-nextcloud-db pg_dump -d nextcloud -Fc > "$dump/nextcloud.pgdump.new"; then
+            rm -f "$dump/nextcloud.pgdump.new"
+            ui_error "falha no dump do banco do Nextcloud"
+            return 1
+        fi
+        mv "$dump/nextcloud.pgdump.new" "$dump/nextcloud.pgdump"
+        ui_ok "dump do banco do Nextcloud em $dump" >&2
+    fi
+    printf 'exclude %s\n' "$STATE/data/db" "$STATE/data/html"
+    local dir
+    for dir in config custom_apps themes version.php; do
+        [[ -e $STATE/data/html/$dir ]] && printf 'add %s\n' "$STATE/data/html/$dir"
+    done
+    files="$(env_get FILES_DIR)"
+    if [[ -n $files && -d $files ]]; then
+        printf 'include %s\nexclude %s\n' "$files" "$files/appdata_*/preview"
     fi
 }
 
@@ -346,5 +376,6 @@ case "${1:-}" in
     actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
+    backup)   cmd_backup ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
 esac

@@ -51,7 +51,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   O disco entra nos containers em `/mnt/<rótulo>` por um `docker-compose.override.yml` gerado, e no Nextcloud do
   administrador como a pasta `<rótulo>` (app Armazenamento externo, verificação de mudanças a cada acesso). Assim,
   arquivos gravados por fora, por exemplo pela sincronização com outra nuvem, aparecem no Nextcloud.
-- Gera a senha do banco em `data/secrets/db_password` (pasta `700`). Os containers a leem pelas variáveis
+- Gera a senha do banco em `~/.astro/nextcloud/data/secrets/db_password` (pasta `700`). Os containers a leem pelas variáveis
   `*_FILE`, então ela nunca vai para o `.env`.
 - Prepara a pasta dos arquivos para o usuário `www-data` do container (`podman unshare chown 33:33`,
   permissão `770`).
@@ -78,15 +78,23 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 | Caminho | Conteúdo |
 |---|---|
-| `.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo UUID) |
-| `docker-compose.override.yml` | Volumes dos discos |
-| `data/secrets/` | Senha do banco |
-| `data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
-| `data/db/` | Banco de dados |
+| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo UUID) |
+| `~/.astro/nextcloud/docker-compose.override.yml` | Volumes dos discos |
+| `~/.astro/nextcloud/data/secrets/` | Senha do banco |
+| `~/.astro/nextcloud/data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
+| `~/.astro/nextcloud/data/db/` | Banco de dados |
+| `~/.astro/nextcloud/backup/` | Dump do banco (`pg_dump`), gerado à 01:00 para o backup das configurações |
 | `~/.nextcloud/` | Arquivos dos usuários (pasta padrão) |
+
+## Backup das configurações
+
+À 01:00, o rclone pede ao projeto um dump do banco (`pg_dump -Fc`, em `~/.astro/nextcloud/backup`). No arquivo
+do backup entram o `.env`, a senha do banco, o dump, `config/`, `custom_apps/`, `themes/` e `version.php`; o
+banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) entra sem as
+miniaturas (`appdata_*/preview`).
 
 ## Remoção
 
 `remove` derruba os containers, tira a rota do Caddy e libera os discos (saem do `fstab` e do `crypttab` e são
-desmontados), mantendo tudo em `data/`. `--purge` apaga `data/`. Uma pasta dos arquivos fora do projeto e os
+desmontados), mantendo tudo em `~/.astro/nextcloud`. `--purge` apaga `~/.astro/nextcloud/data`. Uma pasta dos arquivos fora do projeto e os
 arquivos dos discos nunca são apagados.

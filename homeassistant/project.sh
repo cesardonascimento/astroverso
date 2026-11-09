@@ -10,6 +10,7 @@ source ../lib/proxy.sh
 
 CONTAINER=astro-homeassistant
 NETWORK=astro_default
+CONFIG="$STATE/config"
 
 cmd_describe() {
     echo "Home Assistant: automação da casa (Tuya, LG, Samsung e outros) num painel só"
@@ -21,39 +22,38 @@ cmd_status() {
 
 configure() {
     ui_step "Configuração"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em homeassistant/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
         return
     fi
-    local host config port tz domain
+    local host port tz domain
     domain="$(proxy_domain)"
-    ui_input host   "endereço do Home Assistant no Caddy" "$(env_get HA_HOST "homeassistant${domain:+.$domain}")" is_hostname
-    ui_input config "pasta da configuração" "$(env_get CONFIG_DIR "$HOME/.homeassistant")" is_path
-    ui_input port   "porta do Home Assistant no host" "$(env_get HA_PORT 8123)" is_port
+    ui_input host "endereço do Home Assistant no Caddy" "$(env_get HA_HOST "homeassistant${domain:+.$domain}")" is_hostname
+    ui_input port "porta do Home Assistant no host" "$(env_get HA_PORT 8123)" is_port
     tz="$(timedatectl show -P Timezone 2>/dev/null || true)"
     tz="$(is_timezone "${tz:-UTC}" || printf 'UTC')"
     (
         umask 077
-        printf "HA_HOST='%s'\nCONFIG_DIR='%s'\nHA_PORT='%s'\nTZ='%s'\n" "$host" "$config" "$port" "$tz" > .env.new
+        printf "HA_HOST='%s'\nHA_PORT='%s'\nTZ='%s'\n" "$host" "$port" "$tz" > "$ENV_FILE.new"
     )
-    mv .env.new .env
-    ui_ok "configuração salva em homeassistant/.env"
+    mv "$ENV_FILE.new" "$ENV_FILE"
+    ui_ok "configuração salva em $ENV_FILE"
 }
 
 remove_container() {
-    podman compose down >/dev/null 2>&1 || true
+    compose down >/dev/null 2>&1 || true
     podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
 start_container() {
     local log
     ui_info "baixando a imagem (alguns minutos na primeira vez)..."
-    if ! log="$(podman compose pull 2>&1)"; then
+    if ! log="$(compose pull 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao baixar a imagem"
     fi
     remove_container
-    if ! log="$(podman compose up -d 2>&1)"; then
+    if ! log="$(compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir o container"
     fi
@@ -110,10 +110,10 @@ proxy_settings() {
 }
 
 cmd_install() {
+    state_setup remove_container .env .proxy
     configure
-    local host config port
+    local host config="$CONFIG" port
     host="$(env_get HA_HOST)"
-    config="$(env_get CONFIG_DIR)"
     port="$(env_get HA_PORT)"
 
     ui_step "Host"
@@ -136,9 +136,8 @@ cmd_install() {
 }
 
 cmd_remove() {
-    local purge=false config
+    local purge=false config="$CONFIG"
     [[ ${1:-} == --purge ]] && purge=true
-    config="$(env_get CONFIG_DIR)"
 
     ui_step "Remoção"
     if cmd_status; then
@@ -150,12 +149,31 @@ cmd_remove() {
     proxy_unpublish
     host_firewall_unblock_lan "$(env_get HA_PORT 8123)"
 
-    if $purge && [[ -n $config && -d $config ]]; then
-        rm -rf "$config"
+    if $purge && [[ -d $config ]]; then
+        podman unshare rm -rf "$config"
         ui_ok "configuração apagada ($config)"
     else
-        ui_info "configuração mantida${config:+ em $config}"
+        ui_info "configuração mantida em $config"
     fi
+}
+
+cmd_backup() {
+    local copy="$CONFIG/home-assistant_v2.backup.db"
+    if cmd_status && [[ -f $CONFIG/home-assistant_v2.db ]]; then
+        if ! podman exec "$CONTAINER" python3 -c '
+import sqlite3
+source = sqlite3.connect("/config/home-assistant_v2.db")
+target = sqlite3.connect("/config/home-assistant_v2.backup.db")
+source.backup(target)
+target.close()
+source.close()
+'; then
+            ui_error "falha na cópia do banco do Home Assistant"
+            return 1
+        fi
+        ui_ok "cópia consistente do banco do Home Assistant em $copy" >&2
+    fi
+    printf 'exclude %s\n' "$CONFIG/home-assistant_v2.db" "$CONFIG/home-assistant_v2.db-wal" "$CONFIG/home-assistant_v2.db-shm"
 }
 
 case "${1:-}" in
@@ -164,5 +182,6 @@ case "${1:-}" in
     actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
+    backup)   cmd_backup ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
 esac

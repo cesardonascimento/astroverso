@@ -1,5 +1,5 @@
 proxy_domain() {
-    [[ -f ../caddy/.env ]] && (cd ../caddy && env_get CADDY_DOMAIN)
+    env_get CADDY_DOMAIN "" "$ASTRO_HOME/caddy/.env"
     return 0
 }
 
@@ -12,14 +12,15 @@ proxy_reload() {
 }
 
 proxy_publish() {
-    echo "$1 $2" > .proxy
+    mkdir -p "$STATE"
+    echo "$1 $2" > "$STATE/.proxy"
     ui_ok "rota declarada no Caddy: https://$1 → $2"
     proxy_reload
 }
 
 proxy_unpublish() {
-    [[ -f .proxy ]] || return 0
-    rm -f .proxy
+    [[ -f $STATE/.proxy ]] || return 0
+    rm -f "$STATE/.proxy"
     ui_ok "rota removida do Caddy"
     proxy_reload
 }

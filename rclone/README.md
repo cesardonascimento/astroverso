@@ -34,8 +34,9 @@ Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 | Unidade | Quando | O que faz |
 |---|---|---|
 | `astro-rclone-tick` | a cada 15 minutos | Envia à nuvem os arquivos criados ou alterados desde o último envio bem-sucedido (`find -newerct` + `rclone copy --files-from-raw --no-traverse`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar do envio |
-| `astro-rclone-nightly` | 01:30 | Espelho com exclusões de cada armazenamento (`rclone sync --max-delete 1000`) |
-| `astro-rclone-local` | 02:30 | Espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
+| `astro-rclone-config` | 01:00 | Backup das configurações: o `~/.astro` de cada usuário (com os ajustes de cada projeto, como dumps de banco) num `astro-config.tar.gpg` criptografado (AES-256, senha da instalação) na pasta escolhida |
+| `astro-rclone-nightly` | 02:00 | Espelho com exclusões de cada armazenamento (`rclone sync --max-delete 1000`) |
+| `astro-rclone-local` | 03:00 | Espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
 
 Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo depois de ligar.
 
@@ -55,6 +56,21 @@ noturno: mexa nos arquivos pelo Nextcloud (ou direto no disco), não pelo app da
 - Uma rodada por vez (`flock`): o envio de 15 minutos pula a vez se outra estiver rodando; os noturnos
   esperam.
 - O espelho noturno para depois de 1.000 exclusões.
+
+## Backup das configurações
+
+À 01:00, antes dos espelhos, o `astro-rclone-config`:
+
+1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud,
+   cópia do SQLite do Home Assistant) e o que deixar de fora (bancos em uso, código, caches);
+2. empacota o `~/.astro` de quem instala com `podman unshare tar` (guarda os donos dos arquivos dos containers),
+   e o `~/.astro` de outros usuários (ex.: o de jogos), que ele lê por ACL;
+3. junta tudo em `astro-config.tar`, criptografa com `gpg --symmetric` (AES-256) e grava
+   `astro-config.tar.gpg` na pasta escolhida. Na pasta do armazenamento em nuvem, ele vai para a nuvem e para o
+   disco de backup nas rodadas seguintes.
+
+Para abrir: `gpg -d astro-config.tar.gpg > astro-config.tar` (pede a senha) e `tar -xf astro-config.tar`. Dentro,
+há um `<usuário>.tar.zst` por usuário.
 
 ## Ações (Configurar um projeto instalado)
 
@@ -84,9 +100,10 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 
 | Caminho | Conteúdo |
 |---|---|
-| `.env` | Disco de backup (UUID e onde montou), disco copiado e dias de versões |
-| `data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
-| `data/targets/<nome>.env` | Serviço, disco, pasta e o estado da primeira cópia e do último envio |
+| `~/.astro/rclone/.env` | Disco de backup (UUID e onde montou), disco copiado, dias de versões e a pasta do backup das configurações |
+| `~/.astro/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
+| `~/.astro/rclone/data/targets/<nome>.env` | Serviço, disco, pasta e o estado da primeira cópia e do último envio |
+| `~/.astro/rclone/data/config-backup.key` | Senha do backup das configurações (`600`) |
 | `~/.config/systemd/user/astro-rclone-*` | Os três serviços e seus timers |
 
 Para acompanhar ao vivo: `journalctl --user -fu astro-rclone-tick`.

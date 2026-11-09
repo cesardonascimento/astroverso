@@ -227,7 +227,15 @@ host_lan_subnet() {
     ip -4 route show dev "$device" scope link proto kernel | awk '{ print $1; exit }'
 }
 
-HOST_STATE="${XDG_CONFIG_HOME:-$HOME/.config}/astro/host.env"
+HOST_STATE="$HOME/.astro/host.env"
+HOST_STATE_OLD="${XDG_CONFIG_HOME:-$HOME/.config}/astro/host.env"
+
+host_state_migrate() {
+    [[ -f $HOST_STATE_OLD && ! -f $HOST_STATE ]] || return 0
+    mkdir -p "${HOST_STATE%/*}"
+    mv "$HOST_STATE_OLD" "$HOST_STATE"
+    rmdir "${HOST_STATE_OLD%/*}" 2>/dev/null || true
+}
 
 host_tailscale_port() {
     local port
@@ -238,6 +246,7 @@ host_tailscale_port() {
 host_tailscale_port_forward() {
     local forward
     forward="$(host_lan_ip):$(host_tailscale_port)"
+    host_state_migrate
     if grep -qx "TAILSCALE_PORT_FORWARD=$forward" "$HOST_STATE" 2>/dev/null; then
         ui_ok "porta UDP ${forward#*:} redirecionada no roteador para ${forward%:*}"
         return

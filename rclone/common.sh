@@ -1,5 +1,6 @@
 BACKUP_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-DATA="$BACKUP_DIR/data"
+DATA="$STATE/data"
+CONFIG_KEY="$DATA/config-backup.key"
 RCLONE_CONF="$DATA/rclone.conf"
 TARGETS="$DATA/targets"
 PROVIDERS="$BACKUP_DIR/providers"

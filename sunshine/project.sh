@@ -83,14 +83,14 @@ choose_autologin() {
     local answer=n
     ui_confirm "entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?" "$(env_get AUTOLOGIN yes | sed 's/yes/y/;s/no/n/')" && answer=yes
     [[ $answer == yes ]] || answer=no
-    sed -i '/^AUTOLOGIN=/d' .env
-    printf "AUTOLOGIN='%s'\n" "$answer" >> .env
+    sed -i '/^AUTOLOGIN=/d' "$ENV_FILE"
+    printf "AUTOLOGIN='%s'\n" "$answer" >> "$ENV_FILE"
 }
 
 choose_disks() {
     local disks=()
     disk_choose disks sunshine "Quais discos são de jogos? (o usuário de jogos e $USER acessam)" "${1:-}"
-    printf "GAMES_DISKS='%s'\n" "${disks[*]}" >> .env
+    printf "GAMES_DISKS='%s'\n" "${disks[*]}" >> "$ENV_FILE"
     ui_ok "${#disks[@]} disco(s) de jogos escolhido(s)"
 }
 
@@ -98,10 +98,10 @@ configure() {
     ui_step "Configuração"
     local current_disks
     current_disks="$(env_get GAMES_DISKS)"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em sunshine/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
-        grep -q '^GAMES_DISKS=' .env || choose_disks
-        grep -q '^AUTOLOGIN=' .env || choose_autologin
+        grep -q '^GAMES_DISKS=' "$ENV_FILE" || choose_disks
+        grep -q '^AUTOLOGIN=' "$ENV_FILE" || choose_autologin
         return
     fi
     local user host domain autologin_current
@@ -114,13 +114,13 @@ configure() {
     ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine.$(hostname -s)${domain:+.$domain}")" is_hostname
     (
         umask 077
-        printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > .env.new
+        printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > "$ENV_FILE.new"
     )
-    mv .env.new .env
-    printf "AUTOLOGIN='%s'\n" "$autologin_current" >> .env
+    mv "$ENV_FILE.new" "$ENV_FILE"
+    printf "AUTOLOGIN='%s'\n" "$autologin_current" >> "$ENV_FILE"
     choose_autologin
     choose_disks "$current_disks"
-    ui_ok "configuração salva em sunshine/.env"
+    ui_ok "configuração salva em $ENV_FILE"
 }
 
 games_disks() {
@@ -159,6 +159,41 @@ create_user() {
         ui_ok "usuário $user criado, sem sudo"
     fi
     as_user "$user" sh -c 'mkdir -p "$HOME/.config" && printf "yes\n" > "$HOME/.config/gnome-initial-setup-done"'
+}
+
+games_state() {
+    local user=$1 home unit result
+    home="$(getent passwd "$user" | cut -d: -f6)"
+    for unit in "${UNITS[@]}"; do
+        if [[ -f $unit ]] && user_manager_running "$user"; then
+            sudo systemctl --user -M "$user@" stop "${unit##*/}" 2>/dev/null || true
+        fi
+    done
+    result="$(as_user "$user" sh -c '
+        new="$HOME/.astro/sunshine"
+        old="$HOME/.config/sunshine"
+        mkdir -p "$HOME/.astro" "$HOME/.config"
+        chmod 700 "$HOME/.astro"
+        if [ -d "$old" ] && [ ! -L "$old" ]; then
+            if [ -e "$new" ]; then
+                echo conflict
+                exit 0
+            fi
+            mv "$old" "$new"
+            echo moved
+        fi
+        mkdir -p "$new"
+        ln -sfn "$new" "$old"
+    ')"
+    case $result in
+        moved)    ui_ok "configuração do Sunshine movida para $home/.astro/sunshine (pareamentos mantidos)" ;;
+        conflict) ui_warn "$home/.config/sunshine e $home/.astro/sunshine existem: mantido o primeiro, confira à mão" ;;
+        *)        ui_ok "configuração do Sunshine em $home/.astro/sunshine" ;;
+    esac
+    sudo setfacl -m "u:$USER:x" "$home"
+    sudo setfacl -R -m "u:$USER:rX" "$home/.astro"
+    sudo find "$home/.astro" -type d -exec setfacl -m "d:u:$USER:rX" {} +
+    ui_ok "$USER pode ler $home/.astro (só leitura, para o backup das configurações)"
 }
 
 games_password() {
@@ -523,6 +558,7 @@ display_check() {
 }
 
 cmd_install() {
+    state_setup true .env .proxy
     configure
     local user host autologin_mode
     user="$(env_get GAMES_USER)"
@@ -536,6 +572,7 @@ cmd_install() {
 
     ui_step "Usuário de jogos"
     create_user "$user"
+    games_state "$user"
     games_password "$user"
     desktop_settings "$user" "$autologin_mode"
     if [[ $autologin_mode == yes ]]; then
@@ -590,7 +627,7 @@ cmd_remove() {
         display_switch_off "$user"
         speakers_mute "$user" 0
         if $purge; then
-            as_user "$user" sh -c 'rm -rf "$HOME/.config/sunshine"'
+            as_user "$user" sh -c 'rm -rf "$HOME/.astro/sunshine" "$HOME/.config/sunshine"'
             ui_ok "configuração do Sunshine apagada (credenciais e aparelhos pareados)"
         fi
     fi

@@ -10,10 +10,10 @@ services:
     container_name: astro-adguard
     restart: always
     network_mode: host
-    env_file: .env
+    env_file: ${ASTRO_STATE}/.env
     volumes:
-      - ./data/conf:/opt/adguardhome/conf:Z
-      - ./data/work:/opt/adguardhome/work:Z
+      - ${ASTRO_STATE}/data/conf:/opt/adguardhome/conf:Z
+      - ${ASTRO_STATE}/data/work:/opt/adguardhome/work:Z
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:${WEB_PORT:-8080}/login.html && nslookup -timeout=3 adguard.com 127.0.0.1 >/dev/null"]
       interval: 30s

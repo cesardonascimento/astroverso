@@ -10,7 +10,7 @@ source ../lib/proxy.sh
 
 CONTAINER=astro-adguard
 IMAGE=localhost/astro-adguard:latest
-CONF_FILE=data/conf/AdGuardHome.yaml
+CONF_FILE="$STATE/data/conf/AdGuardHome.yaml"
 DNS_CHECK_BIN=/usr/local/bin/astro-dns-check
 DNS_CHECK_UNIT=/etc/systemd/system/astro-dns-check.service
 DNS_CHECK_HOOK=/etc/NetworkManager/dispatcher.d/90-astro-dns-check
@@ -24,7 +24,7 @@ cmd_status() {
 }
 
 remove_container() {
-    podman compose down >/dev/null 2>&1 || true
+    compose down >/dev/null 2>&1 || true
     podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
@@ -43,7 +43,7 @@ panel_host_default() {
 
 configure() {
     ui_step "Configuração"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em adguard/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
         return
     fi
@@ -82,7 +82,7 @@ configure() {
 
     (
         umask 077
-        cat > .env <<EOF
+        cat > "$ENV_FILE" <<EOF
 ADGUARD_USERNAME='$username'
 PANEL_HOST='$panel_host'
 ADGUARD_LANGUAGE='$language'
@@ -96,7 +96,7 @@ EOF
 
     if [[ -f $CONF_FILE ]]; then
         mv "$CONF_FILE" "$CONF_FILE.bak"
-        ui_info "config anterior do AdGuard salva em adguard/$CONF_FILE.bak"
+        ui_info "config anterior do AdGuard salva em $CONF_FILE.bak"
     fi
 }
 
@@ -104,8 +104,8 @@ save_password_hash() {
     local hash
     hash="$(printf '%s' "$NEW_PASSWORD" \
         | podman run --rm -i --entrypoint htpasswd "$IMAGE" -niBC 10 "" | tr -d ':\n')"
-    printf "ADGUARD_PASSWORD_HASH='%s'\n" "$hash" >> .env
-    ui_ok "configuração salva em adguard/.env (senha guardada como hash bcrypt)"
+    printf "ADGUARD_PASSWORD_HASH='%s'\n" "$hash" >> "$ENV_FILE"
+    ui_ok "configuração salva em $ENV_FILE (senha guardada como hash bcrypt)"
 }
 
 setup_port53() {
@@ -226,6 +226,7 @@ check_tailscale_split_dns() {
 }
 
 cmd_install() {
+    state_setup remove_container .env .proxy data
     configure
     local web_port
     web_port="$(env_get WEB_PORT 8080)"
@@ -244,7 +245,7 @@ cmd_install() {
     ui_step "Container"
     local log
     ui_info "construindo a imagem..."
-    if ! log="$(podman compose build 2>&1)"; then
+    if ! log="$(compose build 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao construir a imagem"
     fi
@@ -252,12 +253,12 @@ cmd_install() {
 
     ui_info "subindo o container..."
     remove_container
-    if ! log="$(podman compose up -d 2>&1)"; then
+    if ! log="$(compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir o container"
     fi
     if ! timeout 60 bash -c "until curl -sf http://127.0.0.1:$web_port/login.html >/dev/null; do sleep 1; done"; then
-        podman compose logs --tail 20 2>&1 | ui_prefix >&2
+        compose logs --tail 20 2>&1 | ui_prefix >&2
         ui_fail "o AdGuard não respondeu em 60s"
     fi
     ui_ok "container $CONTAINER rodando"
@@ -299,14 +300,14 @@ cmd_remove() {
     fi
 
     if $purge; then
-        if [[ -d data ]]; then
-            podman unshare rm -rf data
-            ui_ok "dados apagados (adguard/data)"
+        if [[ -d $STATE/data ]]; then
+            podman unshare rm -rf "$STATE/data"
+            ui_ok "dados apagados ($STATE/data)"
         else
             ui_info "nenhum dado para apagar"
         fi
     else
-        ui_info "dados mantidos em adguard/data"
+        ui_info "dados mantidos em $STATE/data"
     fi
     remove_dns_check
     proxy_unpublish
@@ -318,5 +319,6 @@ case "${1:-}" in
     actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
+    backup)   printf 'exclude %s\n' "$STATE/data/work" ;;
     *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
 esac

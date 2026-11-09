@@ -12,8 +12,16 @@ source common.sh
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT_PREFIX=astro-rclone
 TICK_CALENDAR="*:0/15"
-NIGHTLY_CALENDAR="*-*-* 01:30:00"
-LOCAL_CALENDAR="*-*-* 02:30:00"
+CONFIG_CALENDAR="*-*-* 01:00:00"
+NIGHTLY_CALENDAR="*-*-* 02:00:00"
+LOCAL_CALENDAR="*-*-* 03:00:00"
+RECONFIGURE=false
+
+stop_runs() {
+    systemctl --user stop "$UNIT_PREFIX-tick.service" "$UNIT_PREFIX-nightly.service" \
+        "$UNIT_PREFIX-local.service" "$UNIT_PREFIX-config.service" 2>/dev/null || true
+    ui_ok "rodadas em andamento paradas (a primeira cópia continua de onde parou)"
+}
 
 cmd_describe() {
     echo "rclone: backup dos discos em outro disco e em armazenamentos em nuvem"
@@ -59,11 +67,13 @@ configure() {
     ui_step "Configuração"
     local current_disks
     current_disks="$(env_get BACKUP_DISKS)"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em rclone/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
         return
     fi
-    local disks=() source="" days
+    RECONFIGURE=true
+    local disks=() source="" days backup
+    backup="$(env_get CONFIG_BACKUP)"
     disk_choose disks rclone "Qual disco recebe o espelho noturno? (deixe vazio para só nuvem)" "$current_disks"
     if ((${#disks[@]} > 1)); then
         ui_warn "use um disco só; ficou o primeiro marcado"
@@ -77,10 +87,10 @@ configure() {
     fi
     (
         umask 077
-        printf "BACKUP_DISKS='%s'\nSOURCE='%s'\nKEEP_DAYS='%s'\n" "${disks[*]}" "$source" "$days" > .env.new
+        printf "BACKUP_DISKS='%s'\nSOURCE='%s'\nKEEP_DAYS='%s'\nCONFIG_BACKUP='%s'\n" "${disks[*]}" "$source" "$days" "$backup" > "$ENV_FILE.new"
     )
-    mv .env.new .env
-    ui_ok "configuração salva em rclone/.env"
+    mv "$ENV_FILE.new" "$ENV_FILE"
+    ui_ok "configuração salva em $ENV_FILE"
 }
 
 install_rclone() {
@@ -102,8 +112,8 @@ backup_disk() {
     read -ra uuids <<< "$(env_get BACKUP_DISKS)"
     disk_setup rclone "x-gvfs-hide,x-systemd.before=user@$(id -u).service" "${uuids[@]}"
     mount="${DISK_MOUNTS[0]:-}"
-    sed -i '/^BACKUP_MOUNT=/d' .env
-    printf "BACKUP_MOUNT='%s'\n" "$mount" >> .env
+    sed -i '/^BACKUP_MOUNT=/d' "$ENV_FILE"
+    printf "BACKUP_MOUNT='%s'\n" "$mount" >> "$ENV_FILE"
     [[ -n $mount ]] || return 0
     if mountpoint -q "$mount"; then
         sudo chown "$USER:" "$mount"
@@ -138,12 +148,20 @@ schedules() {
     write_unit "$UNIT_PREFIX-nightly.timer" "$(timer_unit "espelho noturno na nuvem" "$NIGHTLY_CALENDAR")"
     write_unit "$UNIT_PREFIX-local.service" "$(service_unit "espelho noturno no disco de backup" local)"
     write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "espelho noturno no disco de backup" "$LOCAL_CALENDAR")"
+    write_unit "$UNIT_PREFIX-config.service" "$(service_unit "backup das configurações" config)"
+    write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "backup das configurações" "$CONFIG_CALENDAR")"
     systemctl --user daemon-reload
     systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer" "$UNIT_PREFIX-nightly.timer"
-    ui_ok "nuvem: envio a cada 15 minutos e espelho com exclusões às 01:30"
+    ui_ok "nuvem: envio a cada 15 minutos e espelho com exclusões às 02:00"
+    if [[ -n $(env_get CONFIG_BACKUP) ]]; then
+        systemctl --user enable -q --now "$UNIT_PREFIX-config.timer"
+        ui_ok "configurações: backup criptografado à 01:00 em $(env_get CONFIG_BACKUP)"
+    else
+        systemctl --user disable -q --now "$UNIT_PREFIX-config.timer" 2>/dev/null || true
+    fi
     if [[ -n $(env_get BACKUP_MOUNT) ]]; then
         systemctl --user enable -q --now "$UNIT_PREFIX-local.timer"
-        ui_ok "disco de backup: espelho às 02:30, com $(env_get KEEP_DAYS 30) dias de versões"
+        ui_ok "disco de backup: espelho às 03:00, com $(env_get KEEP_DAYS 30) dias de versões"
     else
         systemctl --user disable -q --now "$UNIT_PREFIX-local.timer" 2>/dev/null || true
     fi
@@ -285,6 +303,7 @@ action_now() {
 }
 
 cmd_install() {
+    state_setup stop_runs .env data
     configure
 
     ui_step "Host"
@@ -293,9 +312,6 @@ cmd_install() {
 
     ui_step "Disco de backup"
     backup_disk
-
-    ui_step "Agendamentos"
-    schedules
 
     ui_step "Armazenamentos em nuvem"
     if [[ -n $(target_names) ]]; then
@@ -308,6 +324,38 @@ cmd_install() {
     else
         ui_info "adicione depois em \"Configurar um projeto instalado\""
     fi
+
+    ui_step "Backup das configurações"
+    config_backup_setup
+
+    ui_step "Agendamentos"
+    schedules
+}
+
+config_backup_setup() {
+    local dest default name password
+    name="$(target_names | head -1)"
+    if [[ -n $name ]]; then
+        default="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)/Astro/Configurações"
+    else
+        default="$(env_get SOURCE "/srv")/Astro/Configurações"
+    fi
+    if $RECONFIGURE || ! grep -q '^CONFIG_BACKUP=' "$ENV_FILE"; then
+        ui_info "toda noite, à 01:00, o ~/.astro de cada usuário vira um arquivo criptografado nesta pasta"
+        ui_input dest "pasta do backup das configurações" "$(env_get CONFIG_BACKUP "$default")" is_path
+        sed -i '/^CONFIG_BACKUP=/d' "$ENV_FILE"
+        printf "CONFIG_BACKUP='%s'\n" "$dest" >> "$ENV_FILE"
+    fi
+    ui_ok "backup das configurações em $(env_get CONFIG_BACKUP)/astro-config.tar.gpg"
+    if [[ -s $CONFIG_KEY ]] && ui_confirm "manter a senha atual do backup das configurações?" y; then
+        ui_ok "senha mantida"
+        return
+    fi
+    ui_warn "guarde esta senha fora da máquina (ex.: gerenciador de senhas): sem ela, o backup não abre"
+    ui_secret password "senha do backup das configurações"
+    mkdir -p "$DATA"
+    (umask 077 && printf '%s' "$password" > "$CONFIG_KEY")
+    ui_ok "senha guardada em $CONFIG_KEY (só $USER lê)"
 }
 
 cmd_action() {
@@ -326,7 +374,7 @@ cmd_remove() {
     [[ ${1:-} == --purge ]] && purge=true
 
     ui_step "Remoção"
-    for unit in tick nightly local; do
+    for unit in tick nightly local config; do
         systemctl --user disable -q --now "$UNIT_PREFIX-$unit.timer" 2>/dev/null || true
         rm -f "$UNIT_DIR/$UNIT_PREFIX-$unit.timer" "$UNIT_DIR/$UNIT_PREFIX-$unit.service"
     done

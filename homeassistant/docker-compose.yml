@@ -12,7 +12,7 @@ services:
     environment:
       TZ: ${TZ}
     volumes:
-      - ${CONFIG_DIR}:/config:Z
+      - ${ASTRO_STATE}/config:/config:Z
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:${HA_PORT}/manifest.json"]
       interval: 30s

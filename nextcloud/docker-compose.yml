@@ -13,8 +13,8 @@ services:
       POSTGRES_USER: nextcloud
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
     volumes:
-      - ./data/db:/var/lib/postgresql:Z
-      - ./data/secrets/db_password:/run/secrets/db_password:ro,z
+      - ${ASTRO_STATE}/data/db:/var/lib/postgresql:Z
+      - ${ASTRO_STATE}/data/secrets/db_password:/run/secrets/db_password:ro,z
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "nextcloud", "-d", "nextcloud"]
       interval: 30s
@@ -53,9 +53,9 @@ services:
       PHP_UPLOAD_LIMIT: 16G
       APACHE_DISABLE_REWRITE_IP: 1
     volumes: &nextcloud-volumes
-      - ./data/html:/var/www/html:z
+      - ${ASTRO_STATE}/data/html:/var/www/html:z
       - ${FILES_DIR}:/var/www/html/data:z
-      - ./data/secrets:/run/secrets:ro,z
+      - ${ASTRO_STATE}/data/secrets:/run/secrets:ro,z
       - ./apache.conf:/etc/apache2/sites-enabled/000-default.conf:ro,z
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/status.php"]

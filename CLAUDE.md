@@ -21,7 +21,7 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Nada pessoal no código nem na documentação
 
 - Domínio, IPs, nomes de máquina, fuso, contas e e-mails **não podem aparecer** no código, nos READMEs
-  nem neste arquivo. Eles vêm das perguntas da instalação (gravadas em `<projeto>/.env`) ou são detectados
+  nem neste arquivo. Eles vêm das perguntas da instalação (gravadas em `~/.astro/<projeto>/.env`) ou são detectados
   (`host_lan_ip`, `host_lan_subnet`, `hostname`, `timedatectl`).
 - Exemplos usam marcadores: `<seu-domínio>`, `<domínio>`, `<ip>`, `<rede>`, `<nome-da-máquina>`.
 - Valores padrão neutros quando nada é detectado (ex.: fuso `UTC`).
@@ -53,7 +53,9 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 - **Nunca testar na pasta real nem no container real.** Copiar para o scratchpad e trocar `name:` do compose,
   `container_name`, imagem, portas (`15353`, `18080`, `18081`, `18443`) e a constante `CONTAINER` do `project.sh`.
   Um teste antigo recriou o container real e apagou um `.env` real.
-- Nunca apagar `.env`, `.routes`, `.proxy` ou `data/` reais. Eles contêm segredos e não estão no git.
+- Nunca apagar nada em `~/.astro` (nem os `.env`, `.routes`, `.proxy` ou `data/` antigos dentro das pastas dos
+  projetos, que a instalação migra). Contêm segredos e não estão no git. Para testar, usar outro `HOME` (o
+  `ASTRO_HOME` vem de `$HOME/.astro`).
 - `sudo` não funciona na sessão do Claude (sem TTY). `systemctl` e `pkexec` disparam uma janela gráfica do
   polkit para o usuário digitar a senha. Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
@@ -73,15 +75,21 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
 - Compose de todo projeto: `name: astro` + `x-podman: in_pod: false` (agrupados, mas independentes).
-- Estado da máquina (respostas que valem para todos os projetos, ex.: redirecionamento de porta confirmado) fica em
-  `~/.config/astro/host.env`, fora do repositório.
-- Configuração por prompts, gravada em `<projeto>/.env` (permissão 600, fora do git). "Usar a configuração já salva?" reaproveita.
+- **Estado fora do repositório:** tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`, `$ENV_FILE`),
+  o repositório só tem código. `state_setup` (início do `cmd_install`) migra o lugar antigo com `podman unshare mv`.
+  Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
+  roda com outro usuário guarda a configuração no `~/.astro` dele (sunshine), legível por ACL a quem instala.
+  Estado da máquina em `~/.astro/host.env`.
+- Backup das configurações (rclone, 01:00): `~/.astro` de cada usuário num `astro-config.tar.gpg` (gpg simétrico,
+  senha em `~/.astro/rclone/data/config-backup.key`). Cada projeto pode ter o comando `backup` (dumps e
+  `exclude`/`include`/`add`).
+- Configuração por prompts, gravada em `~/.astro/<projeto>/.env` (permissão 600). "Usar a configuração já salva?" reaproveita.
   Toda resposta passa por um validador de `lib/env.sh` (`is_port`, `is_ipv4`, `is_hostname`...), porque vai parar
   em `.env`, YAML, `sed` ou Caddyfile.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): senha para o `htpasswd` e token para o `curl`
   vão pela entrada padrão.
-- Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `<projeto>/.proxy` e recarrega o Caddy).
-  Rotas manuais ficam em `caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.
+- Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `~/.astro/<projeto>/.proxy` e recarrega o
+  Caddy). Rotas manuais ficam em `~/.astro/caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.
 - Discos de dados: cada projeto escolhe os seus (`disk_choose`, UUIDs no `.env`) e os monta com `disk_setup` em
   `/srv/<rótulo>`. As linhas do projeto no `fstab`/`crypttab` vêm depois de `# astro:<projeto> <uuid>`, que também
   diz de quem é cada disco. **Nada pode pedir senha no boot** (a máquina é reiniciada de longe): LUKS só pelo TPM
@@ -97,10 +105,10 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
-| homeassistant | Imagem oficial `home-assistant` (Container, sem add-ons) em **`network_mode: host`** (descoberta por multicast). Configuração em `CONFIG_DIR` (padrão `~/.homeassistant`) montada em `/config`. Proxy em `.storage/http` (porta, `use_x_forwarded_for`, `trusted_proxies` = host + `astro_default` + IP da máquina), editado com o container parado. Porta bloqueada na rede, rota `http://host.containers.internal:<porta>`. Integrações (Tuya, LG, SmartThings) pelo painel. |
-| nextcloud | Imagem oficial `nextcloud:<versão>-apache` + PostgreSQL + Valkey + container de cron (mesma imagem, `/cron.sh`). Sem porta no host: o Caddy chega em `astro-nextcloud:80` pela `astro_default`. Senha do banco em `data/secrets` (lida pelos `*_FILE`; arquivo `644` em pasta `700`, porque o Postgres lê como o usuário `postgres`). A imagem instala com uma senha aleatória, trocada pela digitada com `occ user:resetpassword --password-from-env`. `trusted_proxies`, `overwriteprotocol`, fuso, região e cron aplicados pelo `occ` a cada instalação. Discos: dono `$USER` `770` (o `group::---` da ACL fecha o grupo) + ACL (também padrão) para o UID do `www-data` no host, `context=container_file_t` na montagem, `x-systemd.before=user@<uid>.service`; volumes em `docker-compose.override.yml` gerado e pasta no Nextcloud pelo `files_external` (`filesystem_check_changes 1`). `apache.conf` substitui o `000-default.conf` da imagem: `ServerName https://${NEXTCLOUD_HOST}:443` + `UseCanonicalName On` (redirecionamentos do `.well-known` em `https`) e HSTS. |
-| rclone | Sem container: timers do systemd do usuário rodando `rclone/run.sh` (`tick` a cada 15min, `nightly` 01:30, `local` 02:30) com `ASTRO_PLAIN=1`. Disco de backup por `disk_setup` (`atual/` + `versoes/<data>`, `podman unshare rclone sync --metadata --backup-dir`). Nuvem pelo rclone, um destino por `data/targets/<nome>.env` e seção no `data/rclone.conf`; serviços em `providers/*.sh` (`provider_describe`, `provider_default_name`, `provider_options`, `provider_configure`). Envio: `find -newerct @<último envio>` + `copy --files-from-raw --no-traverse`; espelho com `sync --max-delete 1000`. Primeira cópia nuvem → disco agendável, retomada pelo `tick` até `IMPORT_DONE=yes`; antes disso nada vai para a nuvem. Nada roda sem o disco montado; `flock` entre rodadas. |
-| sunshine | Pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com senha (`chpasswd` pela entrada padrão); login automático no GDM e sem bloqueio automático de tela opcionais (`AUTOLOGIN`), bloqueio manual e troca de usuário sempre permitidos; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot), torna a NVIDIA a placa principal do GNOME (udev `mutter-device-preferred-primary`). O codificador não é fixado: o Sunshine testa (NVENC primeiro) a cada stream; a instalação só avisa se não houver tela na saída da NVIDIA. Padrão: tampa fechada e tela externa (TV ou plugue HDMI fantasma) no HDMI, que sai pela NVIDIA. `astro-sunshine-display` (Python + DBus do Mutter) no `global_prep_cmd` troca a tela, temporariamente, para a resolução exata do aparelho e volta no `undo`; nunca sai com erro. Alto-falantes internos mudos para o usuário de jogos (`pw-dump` + `wpctl`; o Fedora não traz `pactl`). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. Discos de jogos: grupo `jogos` (usuário de jogos), `ntfs3` com `uid=$USER,gid=jogos,umask=007`, `x-gvfs-show`. |
+| homeassistant | Imagem oficial `home-assistant` (Container, sem add-ons) em **`network_mode: host`** (descoberta por multicast). Configuração em `~/.astro/homeassistant/config` montada em `/config`; backup com cópia do SQLite (`backup.db`). Proxy em `.storage/http` (porta, `use_x_forwarded_for`, `trusted_proxies` = host + `astro_default` + IP da máquina), editado com o container parado. Porta bloqueada na rede, rota `http://host.containers.internal:<porta>`. Integrações (Tuya, LG, SmartThings) pelo painel. |
+| nextcloud | Imagem oficial `nextcloud:<versão>-apache` + PostgreSQL + Valkey + container de cron (mesma imagem, `/cron.sh`). Sem porta no host: o Caddy chega em `astro-nextcloud:80` pela `astro_default`. Senha do banco em `~/.astro/nextcloud/data/secrets` (lida pelos `*_FILE`; arquivo `644` em pasta `700`, porque o Postgres lê como o usuário `postgres`). A imagem instala com uma senha aleatória, trocada pela digitada com `occ user:resetpassword --password-from-env`. `trusted_proxies`, `overwriteprotocol`, fuso, região e cron aplicados pelo `occ` a cada instalação. Discos: dono `$USER` `770` (o `group::---` da ACL fecha o grupo) + ACL (também padrão) para o UID do `www-data` no host, `context=container_file_t` na montagem, `x-systemd.before=user@<uid>.service`; volumes em `docker-compose.override.yml` gerado e pasta no Nextcloud pelo `files_external` (`filesystem_check_changes 1`). `apache.conf` substitui o `000-default.conf` da imagem: `ServerName https://${NEXTCLOUD_HOST}:443` + `UseCanonicalName On` (redirecionamentos do `.well-known` em `https`) e HSTS. |
+| rclone | Sem container: timers do systemd do usuário rodando `rclone/run.sh` (`tick` a cada 15min, `config` 01:00, `nightly` 02:00, `local` 03:00) com `ASTRO_PLAIN=1`. Disco de backup por `disk_setup` (`atual/` + `versoes/<data>`, `podman unshare rclone sync --metadata --backup-dir`). Nuvem pelo rclone, um destino por `data/targets/<nome>.env` e seção no `data/rclone.conf`; serviços em `providers/*.sh` (`provider_describe`, `provider_default_name`, `provider_options`, `provider_configure`). Envio: `find -newerct @<último envio>` + `copy --files-from-raw --no-traverse`; espelho com `sync --max-delete 1000`. Primeira cópia nuvem → disco agendável, retomada pelo `tick` até `IMPORT_DONE=yes`; antes disso nada vai para a nuvem. Nada roda sem o disco montado; `flock` entre rodadas. |
+| sunshine | Pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com senha (`chpasswd` pela entrada padrão); login automático no GDM e sem bloqueio automático de tela opcionais (`AUTOLOGIN`), bloqueio manual e troca de usuário sempre permitidos; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot), torna a NVIDIA a placa principal do GNOME (udev `mutter-device-preferred-primary`). O codificador não é fixado: o Sunshine testa (NVENC primeiro) a cada stream; a instalação só avisa se não houver tela na saída da NVIDIA. Padrão: tampa fechada e tela externa (TV ou plugue HDMI fantasma) no HDMI, que sai pela NVIDIA. `astro-sunshine-display` (Python + DBus do Mutter) no `global_prep_cmd` troca a tela, temporariamente, para a resolução exata do aparelho e volta no `undo`; nunca sai com erro. Alto-falantes internos mudos para o usuário de jogos (`pw-dump` + `wpctl`; o Fedora não traz `pactl`). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. Configuração do Sunshine em `~<jogos>/.astro/sunshine` (`~/.config/sunshine` é atalho; ACL `u:<quem instala>:rX` para o backup). Discos de jogos: grupo `jogos` (usuário de jogos), `ntfs3` com `uid=$USER,gid=jogos,umask=007`, `x-gvfs-show`. |
 
 ## Armadilhas conhecidas
 
@@ -157,6 +165,10 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
 - `x-systemd.wanted-by=` no `fstab` tira a montagem do `local-fs.target` (anula o `nofail` e a ordem do boot).
   Para remontar ao religar, o `disk_setup` cria links em `/etc/systemd/system/<dispositivo>.device.wants/`.
 - `find -name` usa glob: nomes de unidade com `\x2d` precisam da barra escapada (`${nome//\\/\\\\}`).
+- `tar` aplica os `--exclude` também aos caminhos da linha de comando: para incluir algo dentro de uma pasta
+  excluída (ex.: `data/html/config` do Nextcloud), anexar numa segunda passada (`tar -rf`).
+- Num comando do Bash, um texto com "rm -rf" (mesmo dentro de um heredoc de edição) é barrado pela proteção do
+  Claude Code: editar esses trechos com a ferramenta de edição.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
 - `journalctl --user -u <padrão>` sai com 1 quando nenhuma unidade tem mensagens: em pipeline com `pipefail`, `|| true`.

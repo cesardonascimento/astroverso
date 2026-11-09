@@ -37,7 +37,10 @@ tampa de um notebook, para não perder o acesso remoto.
 
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
-respostas ficam em `<projeto>/.env`, fora do git.
+respostas e tudo o que a instalação gera (dados, certificados, logins) ficam em `~/.astro/<projeto>`, fora do
+repositório: o repositório tem só o código. Instalações antigas são migradas sozinhas na próxima instalação,
+sem perder nada. Serviços que rodam com outro usuário (ex.: o de jogos) guardam a configuração no `~/.astro`
+desse usuário.
 
 ### Em todos os projetos
 
@@ -103,8 +106,6 @@ respostas ficam em `<projeto>/.env`, fora do git.
 
 - **Endereço do Home Assistant no Caddy:** o nome pelo qual o painel é aberto no navegador e no app do Home
   Assistant. Por padrão, `homeassistant.<domínio>`. De fora de casa, funciona pelo Tailscale.
-- **Pasta da configuração:** onde ficam a configuração, as integrações, os usuários e o histórico. Por padrão,
-  a pasta oculta `.homeassistant` no home do seu usuário.
 - **Porta do Home Assistant no host:** a porta em que ele escuta na máquina. Ela é bloqueada para a rede: o
   acesso passa só pelo Caddy. Mude só se `8123` estiver ocupada.
 
@@ -152,6 +153,15 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
   - **Quando fazer a primeira cópia?** Traz tudo o que já está na nuvem para o disco. Pode levar horas: escolha
     agora, um horário (por exemplo de madrugada) ou depois, pelo menu. Se ela for interrompida (internet,
     reboot, falta de luz), continua sozinha de onde parou.
+
+- **Pasta do backup das configurações:** toda noite, à 01:00, o `~/.astro` de cada usuário (respostas,
+  certificados, logins, bancos de dados) vira um único arquivo criptografado, `astro-config.tar.gpg`, nesta pasta.
+  Por padrão, `Astro/Configurações` dentro da pasta do primeiro armazenamento em nuvem: assim ele segue para a
+  nuvem e para o disco de backup nas rodadas seguintes.
+- **Senha do backup das configurações:** criptografa esse arquivo. **Guarde-a fora da máquina** (num gerenciador
+  de senhas): sem ela, o backup não abre. Na reinstalação, o assistente pergunta se mantém a atual.
+
+Os horários: 01:00 backup das configurações, 02:00 espelho na nuvem, 03:00 espelho no disco de backup.
 
 Depois da primeira cópia, **o disco manda**: o que você criar ou mudar chega à nuvem em até 15 minutos, e o
 que apagar é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem: o que for criado

@@ -23,6 +23,6 @@ Diferente dos outros projetos, o Cockpit não roda em container: são pacotes do
 - Ativa o `podman.socket` do usuário, para os containers rootless aparecerem no painel
 - Configura `/etc/cockpit/cockpit.conf` para funcionar atrás do proxy (`Origins`, `ProtocolHeader`)
 - Bloqueia a porta `9090` para a rede local no firewalld: o acesso passa só pelo Caddy
-- Declara a rota em `.proxy` e pede ao Caddy para recarregar
+- Declara a rota em `~/.astro/cockpit/.proxy` e pede ao Caddy para recarregar
 
 O login usa o usuário e a senha do sistema.

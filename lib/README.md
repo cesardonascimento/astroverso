@@ -10,6 +10,15 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
+| `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <caminho>` (entra junto com o `~/.astro`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
+
+**Estado fora do repositório.** Tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`): o `.env`
+(`$ENV_FILE`), o `.proxy`, dados e certificados. O `cmd_install` começa com `state_setup <função que para o
+projeto> <itens>`, que cria a pasta e move para ela o que ainda estiver no lugar antigo (`<projeto>/<item>`),
+mantendo donos e permissões (`podman unshare mv`). O compose usa `${ASTRO_STATE}` nos volumes e no `env_file`,
+e roda pela função `compose` (`podman compose --env-file "$ENV_FILE"`). Um serviço que roda com outro usuário
+guarda a configuração no `~/.astro/<projeto>` desse usuário, legível pelo usuário que instala (ACL) para o
+backup.
 
 Todo `docker-compose.yml` de subprojeto deve começar com o grupo `astro` e sem pod, para que os
 containers fiquem agrupados mas independentes (remover um não afeta os outros):
@@ -22,7 +31,7 @@ x-podman:
 ```
 
 Para publicar um endereço no Caddy, o projeto chama `proxy_publish <endereço> <destino>` (de `lib/proxy.sh`),
-que escreve `<projeto>/.proxy` (fora do git) e recarrega o Caddy se ele estiver instalado. O Caddy junta essas
+que escreve `~/.astro/<projeto>/.proxy` e recarrega o Caddy se ele estiver instalado. O Caddy junta essas
 rotas com as cadastradas manualmente, e as do projeto têm prioridade. Containers do grupo `astro` são
 alcançados pelo nome; serviços do próprio sistema e containers na rede do host, por `host.containers.internal`. Um destino
 `https+insecure://<host>:<porta>` aceita um certificado autoassinado (ex.: painéis que só abrem em HTTPS).
@@ -45,7 +54,8 @@ Bibliotecas compartilhadas:
   `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, atualizando o kernel no Fedora e
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
-- `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
+- `lib/env.sh`: `ASTRO_HOME`, `STATE`, `ENV_FILE`, `compose` e `state_setup` (acima). `env_get CHAVE [padrão]
+  [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.

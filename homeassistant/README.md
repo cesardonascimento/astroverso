@@ -17,7 +17,6 @@ preciso (Mosquitto, Zigbee2MQTT, ESPHome...) entra como outro container deste pr
 | Pergunta | Padrão |
 |---|---|
 | Endereço do Home Assistant no Caddy | `homeassistant.<domínio do caddy>` |
-| Pasta da configuração | `~/.homeassistant` |
 | Porta do Home Assistant no host | `8123` |
 
 O fuso vem da máquina (`timedatectl`).
@@ -26,7 +25,7 @@ O fuso vem da máquina (`timedatectl`).
 
 - Sobe o container `astro-homeassistant` em **`network_mode: host`**: a descoberta de aparelhos (mDNS, SSDP,
   DHCP) depende de broadcast e multicast na rede da casa, que não passam pela rede do Podman.
-- Monta a pasta da configuração em `/config` (`configuration.yaml`, banco, integrações e usuários).
+- Monta `~/.astro/homeassistant/config` em `/config` (`configuration.yaml`, banco, integrações e usuários).
 - Configura o proxy em **`.storage/http`** (com o container parado): porta, `use_x_forwarded_for` e
   `trusted_proxies` (o host, a rede `astro_default` e o IP da máquina). Desde a migração da seção `http:` para a
   interface, o Home Assistant ignora essa seção do `configuration.yaml` depois da primeira inicialização.
@@ -52,8 +51,11 @@ máquina. Não afeta as integrações acima.
 
 | Caminho | Conteúdo |
 |---|---|
-| `.env` | Respostas da instalação e o fuso |
-| `~/.homeassistant/` | Toda a configuração do Home Assistant |
+| `~/.astro/homeassistant/.env` | Respostas da instalação e o fuso |
+| `~/.astro/homeassistant/config/` | Toda a configuração do Home Assistant (montada em `/config`) |
+
+No backup das configurações (rclone), o banco em uso (`home-assistant_v2.db`) fica de fora: entra uma cópia
+consistente, `home-assistant_v2.backup.db`, feita pelo próprio SQLite logo antes.
 
 ## Remoção
 

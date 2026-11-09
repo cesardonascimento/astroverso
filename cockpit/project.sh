@@ -21,15 +21,15 @@ cmd_status() {
 
 configure() {
     ui_step "Configuração"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em cockpit/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
         return
     fi
     local host domain
     domain="$(proxy_domain)"
     ui_input host "endereço do Cockpit no Caddy" "$(env_get COCKPIT_HOST "$(hostname -s)${domain:+.$domain}")" is_hostname
-    printf "COCKPIT_HOST='%s'\n" "$host" > .env
-    ui_ok "configuração salva em cockpit/.env"
+    printf "COCKPIT_HOST='%s'\n" "$host" > "$ENV_FILE"
+    ui_ok "configuração salva em $ENV_FILE"
 }
 
 install_packages() {
@@ -59,6 +59,7 @@ configure_proxy_mode() {
 }
 
 cmd_install() {
+    state_setup true .env .proxy
     configure
     local host
     host="$(env_get COCKPIT_HOST)"

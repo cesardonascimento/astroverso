@@ -1,7 +1,37 @@
+ASTRO_HOME="$HOME/.astro"
+STATE="$ASTRO_HOME/${ASTRO_PROJECT:-astro}"
+ENV_FILE="$STATE/.env"
+export ASTRO_STATE="$STATE"
+
 env_get() {
     local value
-    value="$(grep -m1 "^$1=" .env 2>/dev/null | cut -d= -f2- | tr -d "'")" || true
+    value="$(grep -m1 "^$1=" "${3:-$ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d "'")" || true
     printf '%s' "${value:-${2:-}}"
+}
+
+compose() {
+    podman compose --env-file "$ENV_FILE" "$@"
+}
+
+state_setup() {
+    local stop=$1 item pending=()
+    shift
+    mkdir -p "$STATE"
+    chmod 700 "$ASTRO_HOME" "$STATE"
+    for item in "$@"; do
+        [[ -e $item ]] && pending+=("$item")
+    done
+    ((${#pending[@]})) || return 0
+    ui_step "Migração para $STATE"
+    "$stop"
+    for item in "${pending[@]}"; do
+        if [[ -e $STATE/$item ]]; then
+            ui_warn "$item existe nos dois lugares: mantido o de $STATE, o antigo ficou em $PWD/$item"
+            continue
+        fi
+        podman unshare mv "$item" "$STATE/$item"
+        ui_ok "$item movido para $STATE (donos e permissões mantidos)"
+    done
 }
 
 is_port() {
@@ -35,7 +65,7 @@ is_username() {
 
 is_path() {
     local path="${1%/}"
-    [[ $path =~ ^/[A-Za-z0-9._/-]+$ && $path != *..* ]] && printf '%s' "$path"
+    [[ $path =~ ^/[[:alnum:]\ ._/-]+$ && $path != *..* ]] && printf '%s' "$path"
 }
 
 is_folder() {

@@ -136,9 +136,88 @@ local_mirror() {
     ui_ok "espelho local concluído; versões com mais de $days dias apagadas"
 }
 
+config_parts() {
+    local project kind path output
+    CONFIG_EXCLUDES=()
+    CONFIG_INCLUDES=()
+    CONFIG_ADDS=()
+    for project in ../*/project.sh; do
+        grep -q '^    backup)' "$project" || continue
+        if ! output="$("$project" backup)"; then
+            ui_error "falha ao preparar o backup de $(basename "$(dirname "$project")")"
+            return 1
+        fi
+        while read -r kind path; do
+            case $kind in
+                exclude) CONFIG_EXCLUDES+=("--exclude=${path#/}") ;;
+                include) CONFIG_INCLUDES+=("${path#/}") ;;
+                add)     CONFIG_ADDS+=("${path#/}") ;;
+            esac
+        done <<< "$output"
+    done
+}
+
+config_tar() {
+    local archive=$1 rc=0
+    shift
+    "$@" tar -cf "$archive" -C / "${CONFIG_EXCLUDES[@]}" "${HOME#/}/.astro" "${CONFIG_INCLUDES[@]}" || rc=$?
+    if ((rc == 0 || rc == 1)) && ((${#CONFIG_ADDS[@]})); then
+        "$@" tar -rf "$archive" -C / "${CONFIG_ADDS[@]}" || rc=$?
+    fi
+    ((rc <= 1)) || return 1
+    zstd -q --rm -f "$archive" -o "$archive.zst"
+}
+
+config_backup() {
+    local dest work home user disk
+    dest="$(env_get CONFIG_BACKUP)"
+    if [[ -z $dest ]]; then
+        ui_info "backup das configurações não configurado"
+        return 0
+    fi
+    if [[ ! -s $CONFIG_KEY ]]; then
+        ui_error "senha do backup das configurações não encontrada em $CONFIG_KEY: rode a instalação do rclone"
+        return 1
+    fi
+    disk="$(cut -d/ -f1-3 <<< "$dest")"
+    if [[ $disk == /srv/* ]]; then
+        disk_ready "$disk" || return 1
+    fi
+    config_parts || return 1
+    work="$(mktemp -d -p /var/tmp astro-config.XXXXXX)"
+    ui_step "backup das configurações → $dest/astro-config.tar.gpg"
+    if ! config_tar "$work/$USER.tar" podman unshare; then
+        ui_error "falha ao empacotar $HOME/.astro"
+        podman unshare rm -rf "$work"
+        return 1
+    fi
+    for home in /home/*/; do
+        home="${home%/}"
+        user="${home##*/}"
+        [[ $home != "$HOME" && -r $home/.astro ]] || continue
+        if ! tar --zstd -cf "$work/$user.tar.zst" -C / "${home#/}/.astro"; then
+            ui_warn "não foi possível ler tudo em $home/.astro"
+        fi
+    done
+    (cd "$work" && tar -cf astro-config.tar ./*.tar.zst)
+    mkdir -p "$work/gnupg" "$dest"
+    chmod 700 "$work/gnupg"
+    if ! gpg --batch --yes --quiet --homedir "$work/gnupg" --pinentry-mode loopback --passphrase-file "$CONFIG_KEY" \
+            --symmetric --cipher-algo AES256 -o "$work/astro-config.tar.gpg" "$work/astro-config.tar"; then
+        ui_error "falha ao criptografar o backup das configurações"
+        podman unshare rm -rf "$work"
+        return 1
+    fi
+    cp "$work/astro-config.tar.gpg" "$dest/.astro-config.tar.gpg.partial"
+    mv "$dest/.astro-config.tar.gpg.partial" "$dest/astro-config.tar.gpg"
+    ui_ok "configurações salvas ($(du -h "$dest/astro-config.tar.gpg" | cut -f1), criptografadas): $(cd "$work" && ls ./*.tar.zst | sed 's|^\./||; s|\.tar\.zst$||' | paste -sd' ')"
+    podman unshare rm -rf "$work"
+}
+
 case "${1:-}" in
     tick)    lock skip; run_targets tick ;;
     nightly) lock wait; run_targets nightly ;;
     local)   lock wait; local_mirror ;;
-    *)       ui_fail "uso: $0 tick | nightly | local" ;;
+    config)  lock wait; config_backup ;;
+    *)       ui_fail "uso: $0 tick | nightly | local | config" ;;
 esac

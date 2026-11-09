@@ -33,6 +33,11 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
 - **Usuário de jogos:** cria o usuário sem `sudo` e pula a tela de boas-vindas do GNOME.
+- **Configuração no `~/.astro` do usuário de jogos:** o Sunshine guarda a configuração (painel, aparelhos
+  pareados, apps) em `~<usuário de jogos>/.astro/sunshine`, e `~/.config/sunshine` vira um atalho para lá
+  (uma configuração antiga é movida, sem perder os pareamentos). As respostas da instalação ficam no
+  `~/.astro/sunshine` de quem instala. Uma ACL dá a quem instala só leitura no `~/.astro` do usuário de jogos,
+  para o backup das configurações (rclone).
 - **Senha do usuário de jogos:** pedida na instalação (com `chpasswd`, pela entrada padrão). Se ele já tiver
   senha, pergunta se mantém. Ela serve para entrar na tela, trocar de usuário e desbloquear.
 - **Tela do usuário de jogos:** desativa o escurecimento e a suspensão. Com login automático, desativa também o

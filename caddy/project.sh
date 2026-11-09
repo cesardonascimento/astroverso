@@ -8,8 +8,8 @@ source ../lib/host.sh
 source ../lib/env.sh
 
 CONTAINER=astro-caddy
-ROUTES=.routes
-CADDYFILE=data/etc/Caddyfile
+ROUTES="$STATE/.routes"
+CADDYFILE="$STATE/data/etc/Caddyfile"
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
 
 cmd_describe() {
@@ -29,7 +29,7 @@ cmd_actions() {
 }
 
 remove_container() {
-    podman compose down >/dev/null 2>&1 || true
+    compose down >/dev/null 2>&1 || true
     podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
@@ -51,10 +51,14 @@ route_lines() {
 }
 
 project_route_lines() {
-    local file
-    for file in ../*/.proxy; do
-        [[ -f $file && $file != ../caddy/.proxy ]] || continue
-        grep -v '^\s*$' "$file" | sed "s|\$| ${file#../}|; s|/\.proxy\$||"
+    local file owner
+    local -A seen=()
+    for file in "$ASTRO_HOME"/*/.proxy ../*/.proxy; do
+        [[ -f $file ]] || continue
+        owner="$(basename "$(dirname "$(readlink -f "$file")")")"
+        [[ $owner != caddy && -z ${seen[$owner]:-} ]] || continue
+        seen[$owner]=1
+        grep -v '^\s*$' "$file" | sed "s|\$| $owner|"
     done
 }
 
@@ -98,7 +102,7 @@ token_instructions() {
 configure() {
     ui_step "Configuração"
     local domain http_port https_port token
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em caddy/.env?" y; then
+    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         domain="$(env_get CADDY_DOMAIN)"
         http_port="$(env_get HTTP_PORT 80)"
         https_port="$(env_get HTTPS_PORT 443)"
@@ -124,10 +128,10 @@ configure() {
     (
         umask 077
         printf "CADDY_DOMAIN='%s'\nHTTP_PORT='%s'\nHTTPS_PORT='%s'\nCLOUDFLARE_API_TOKEN='%s'\n" \
-            "$domain" "$http_port" "$https_port" "$token" > .env.new
+            "$domain" "$http_port" "$https_port" "$token" > "$ENV_FILE.new"
     )
-    mv .env.new .env
-    ui_ok "configuração salva em caddy/.env"
+    mv "$ENV_FILE.new" "$ENV_FILE"
+    ui_ok "configuração salva em $ENV_FILE"
 }
 
 render_upstream() {
@@ -200,6 +204,7 @@ print_routes() {
 }
 
 cmd_install() {
+    state_setup remove_container .env .routes data
     configure
 
     ui_step "Host"
@@ -213,19 +218,19 @@ cmd_install() {
     ui_step "Container"
     local log
     ui_info "construindo a imagem com o módulo da Cloudflare (alguns minutos na primeira vez)..."
-    if ! log="$(podman compose build 2>&1)"; then
+    if ! log="$(compose build 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao construir a imagem"
     fi
-    mkdir -p data/caddy data/config
+    mkdir -p "$STATE/data/caddy" "$STATE/data/config"
     render_caddyfile
     remove_container
-    if ! log="$(podman compose up -d 2>&1)"; then
+    if ! log="$(compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_fail "falha ao subir o container"
     fi
     if ! timeout 60 bash -c "until podman exec $CONTAINER wget -q --spider http://127.0.0.1:2019/config/ 2>/dev/null; do sleep 1; done"; then
-        podman compose logs --tail 20 2>&1 | ui_prefix >&2
+        compose logs --tail 20 2>&1 | ui_prefix >&2
         ui_fail "o Caddy não respondeu em 60s"
     fi
     ui_ok "container $CONTAINER rodando"
@@ -305,16 +310,16 @@ cmd_remove() {
     fi
 
     if $purge; then
-        if [[ -d data ]]; then
-            podman unshare rm -rf data
-            ui_ok "dados apagados (caddy/data); o certificado será emitido de novo na próxima instalação"
+        if [[ -d $STATE/data ]]; then
+            podman unshare rm -rf "$STATE/data"
+            ui_ok "dados apagados ($STATE/data); o certificado será emitido de novo na próxima instalação"
         else
             ui_info "nenhum dado para apagar"
         fi
     else
-        ui_info "dados mantidos em caddy/data"
+        ui_info "dados mantidos em $STATE/data"
     fi
-    ui_info "rotas e token mantidos em caddy/$ROUTES e caddy/.env"
+    ui_info "rotas e token mantidos em $ROUTES e $ENV_FILE"
 }
 
 case "${1:-}" in
