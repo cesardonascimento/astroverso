@@ -3,3 +3,4 @@ data/
 .routes
 .proxy
 CLAUDE.local.md
+docker-compose.override.yml

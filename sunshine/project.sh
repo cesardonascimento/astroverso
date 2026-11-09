@@ -7,6 +7,7 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
+source ../lib/disk.sh
 
 REPO=LizardByte/Sunshine
 WEB_PORT=47990
@@ -16,6 +17,7 @@ UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/sy
 NVIDIA_VENDOR=0x10de
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
+GAMES_GROUP=jogos
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 
 cmd_describe() {
@@ -76,10 +78,18 @@ check_games_user() {
     fi
 }
 
+choose_disks() {
+    local disks=()
+    disk_choose disks sunshine "Quais discos são de jogos? (o usuário de jogos e $USER acessam)"
+    printf "GAMES_DISKS='%s'\n" "${disks[*]}" >> .env
+    ui_ok "${#disks[@]} disco(s) de jogos escolhido(s)"
+}
+
 configure() {
     ui_step "Configuração"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em sunshine/.env?" y; then
         ui_ok "configuração existente mantida"
+        grep -q '^GAMES_DISKS=' .env || choose_disks
         return
     fi
     local user host domain
@@ -94,7 +104,28 @@ configure() {
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > .env.new
     )
     mv .env.new .env
+    choose_disks
     ui_ok "configuração salva em sunshine/.env"
+}
+
+games_disks() {
+    local user=$1 uuids=() gid
+    read -ra uuids <<< "$(env_get GAMES_DISKS)"
+    if ((${#uuids[@]})); then
+        if ! getent group "$GAMES_GROUP" >/dev/null; then
+            sudo groupadd "$GAMES_GROUP"
+            ui_ok "grupo $GAMES_GROUP criado"
+        fi
+        if ! id -nG "$user" | grep -qw "$GAMES_GROUP"; then
+            sudo usermod -aG "$GAMES_GROUP" "$user"
+            HOST_REBOOT=true
+            ui_ok "$user entra no grupo $GAMES_GROUP (vale a partir do próximo login)"
+        fi
+        gid="$(getent group "$GAMES_GROUP" | cut -d: -f3)"
+    fi
+    disk_setup sunshine "uid=$(id -u),gid=${gid:-0},umask=007,x-gvfs-show,x-systemd.before=user@$(id -u "$user").service" "${uuids[@]}"
+    ((${#uuids[@]})) && ui_ok "discos de jogos: só $USER e o grupo $GAMES_GROUP acessam"
+    return 0
 }
 
 create_user() {
@@ -447,6 +478,7 @@ cmd_install() {
     create_user "$user"
     desktop_settings "$user"
     autologin "$user"
+    games_disks "$user"
     primary_gpu
 
     ui_step "Sunshine"
@@ -493,13 +525,16 @@ cmd_remove() {
         fi
     fi
     autologin_off
+    if [[ -n $(disk_block "$DISK_FSTAB" sunshine) ]]; then
+        disk_release sunshine
+    fi
     if [[ -f $MUTTER_RULE ]]; then
         sudo rm -f "$MUTTER_RULE"
         sudo udevadm control --reload
         ui_ok "a Intel volta a ser a placa principal do GNOME no próximo login"
     fi
     proxy_unpublish
-    ui_info "mantidos: pacote do Sunshine, driver da NVIDIA e o usuário${user:+ $user} com os jogos"
+    ui_info "mantidos: pacote do Sunshine, driver da NVIDIA, o grupo $GAMES_GROUP e o usuário${user:+ $user} com os jogos"
 }
 
 case "${1:-}" in

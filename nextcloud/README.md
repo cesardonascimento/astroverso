@@ -29,6 +29,8 @@ Nenhuma porta é aberta na máquina: o Caddy alcança o `astro-nextcloud` pelo n
 | Endereço do Nextcloud no Caddy | `nextcloud.<domínio do caddy>` |
 | Usuário administrador | `astro` |
 | Pasta dos arquivos | `nextcloud/data/files` |
+| Quais discos guardam arquivos do Nextcloud? | (nenhum marcado) |
+| Senha do LUKS de `<disco>` | (só para um disco criptografado que o TPM ainda não destrava) |
 | Senha do administrador | (sem padrão; só na primeira instalação) |
 
 O usuário administrador só é criado na primeira instalação: trocar a resposta depois não renomeia a conta.
@@ -36,6 +38,18 @@ Trocar a pasta dos arquivos depois de instalado também não move os arquivos.
 
 ## O que a instalação faz
 
+- **Discos:** monta cada disco escolhido em `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh`
+  (TPM nos criptografados, nada pede senha no boot). Em cada um:
+  - dono `$USER`, permissão `700`: outros usuários da máquina não entram;
+  - ACL para o `www-data` do container (o UID dele no host vem do `podman unshare`), também como padrão para o
+    que for criado depois. `$USER` e o Nextcloud leem e escrevem nos mesmos arquivos;
+  - `context=system_u:object_r:container_file_t:s0` na montagem: o SELinux libera o container sem reetiquetar o disco;
+  - `x-systemd.before=user@<uid>.service`: no boot, o disco monta antes de os containers subirem;
+  - `x-gvfs-hide`: não aparece no Arquivos.
+
+  O disco entra nos containers em `/mnt/<rótulo>` por um `docker-compose.override.yml` gerado, e no Nextcloud do
+  administrador como a pasta `<rótulo>` (app Armazenamento externo, verificação de mudanças a cada acesso). Assim,
+  arquivos gravados por fora, por exemplo pela sincronização com outra nuvem, aparecem no Nextcloud.
 - Gera a senha do banco em `data/secrets/db_password` (pasta `700`). Os containers a leem pelas variáveis
   `*_FILE`, então ela nunca vai para o `.env`.
 - Prepara a pasta dos arquivos para o usuário `www-data` do container (`podman unshare chown 33:33`,
@@ -62,7 +76,8 @@ Trocar a pasta dos arquivos depois de instalado também não move os arquivos.
 
 | Caminho | Conteúdo |
 |---|---|
-| `.env` | Respostas da instalação |
+| `.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo UUID) |
+| `docker-compose.override.yml` | Volumes dos discos |
 | `data/secrets/` | Senha do banco |
 | `data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
 | `data/db/` | Banco de dados |
@@ -70,5 +85,6 @@ Trocar a pasta dos arquivos depois de instalado também não move os arquivos.
 
 ## Remoção
 
-`remove` derruba os containers e tira a rota do Caddy, mantendo tudo em `data/`. `--purge` apaga `data/`.
-Uma pasta dos arquivos fora do projeto nunca é apagada.
+`remove` derruba os containers, tira a rota do Caddy e libera os discos (saem do `fstab` e do `crypttab` e são
+desmontados), mantendo tudo em `data/`. `--purge` apaga `data/`. Uma pasta dos arquivos fora do projeto e os
+arquivos dos discos nunca são apagados.

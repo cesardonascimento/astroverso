@@ -47,3 +47,15 @@ Bibliotecas compartilhadas:
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto).
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
+- `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
+  - `disk_choose VAR projeto título` lista os discos (sem o do sistema e sem os de outro projeto) e devolve os UUIDs
+    marcados, que o projeto grava no `.env`.
+  - `disk_setup projeto opções uuid...` cadastra o TPM nos discos LUKS (pede a senha só se o TPM ainda não
+    destravar), escreve as linhas do projeto no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um comentário
+    `# astro:<projeto> <uuid>`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Deixa os
+    caminhos em `DISK_MOUNTS`. As `opções` são acrescentadas às da montagem (ex.: `uid=`, `context=`).
+  - Toda montagem leva `nofail`, espera de 10s pelo disco e `x-udisks-auth`; o LUKS leva `headless=true`. Nada
+    pede senha no boot: um disco ausente ou que o TPM não destrava fica de fora e a máquina sobe.
+  - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
+  - Discos tirados da lista são desmontados e saem dos dois arquivos. `disk_release projeto` libera todos.
+    Os dados nunca são apagados.

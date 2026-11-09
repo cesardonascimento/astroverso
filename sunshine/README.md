@@ -18,6 +18,7 @@ controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 |---|---|
 | Nome do usuário de jogos | `jogos` |
 | Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
+| Quais discos são de jogos? | (nenhum marcado) |
 
 O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`.
 
@@ -32,6 +33,11 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
 - **Usuário de jogos:** cria o usuário sem senha e sem `sudo`, pula a tela de boas-vindas do GNOME e
   desativa o bloqueio de tela, o escurecimento e a suspensão para ele.
+- **Discos de jogos:** cria o grupo `jogos` com o usuário de jogos e monta cada disco escolhido em
+  `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh` (nada pede senha no boot). NTFS usa o driver do
+  kernel (`ntfs3`). Dono `$USER`, grupo `jogos`, `umask=007`: os dois leem e escrevem, os outros usuários não
+  entram. O disco aparece no Arquivos (`x-gvfs-show`) e monta antes da sessão do usuário de jogos. Um NTFS
+  marcado como sujo (desligado sem fechar no Windows) não monta: a instalação mostra o `ntfsfix` para corrigir.
 - **Login automático:** configura o GDM (`custom.conf`) para entrar com o usuário de jogos.
 - **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev
   (`61-astro-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
@@ -105,7 +111,8 @@ No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de
 
 ## Remoção
 
-`remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o papel de placa principal e tira a
-rota do Caddy. O pacote do Sunshine, o driver
-da NVIDIA e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
+`remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o
+papel de placa principal, libera os discos de jogos (saem do `fstab` e são desmontados) e tira a rota do Caddy. O
+pacote do Sunshine, o driver da NVIDIA, o grupo `jogos`, os arquivos dos discos e o usuário de jogos (com os jogos e
+os emuladores) são mantidos. `--purge` apaga também
 `~/.config/sunshine` do usuário de jogos.

@@ -7,12 +7,15 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
+source ../lib/disk.sh
 
 CONTAINER=astro-nextcloud
 CONTAINERS=(astro-nextcloud-cron astro-nextcloud astro-nextcloud-redis astro-nextcloud-db)
 NETWORK=astro_default
 SECRETS=data/secrets
 CONFIG=data/html/config/config.php
+OVERRIDE=docker-compose.override.yml
+DISK_OPTIONS="x-gvfs-hide,x-systemd.before=user@$(id -u).service,context=system_u:object_r:container_file_t:s0"
 
 cmd_describe() {
     echo "Nextcloud: nuvem própria para arquivos, fotos, contatos e agenda"
@@ -34,19 +37,97 @@ configure() {
     ui_step "Configuração"
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em nextcloud/.env?" y; then
         ui_ok "configuração existente mantida"
+    else
+        local host admin files domain
+        domain="$(proxy_domain)"
+        ui_input host  "endereço do Nextcloud no Caddy" "$(env_get NEXTCLOUD_HOST "nextcloud${domain:+.$domain}")" is_hostname
+        ui_input admin "usuário administrador" "$(env_get ADMIN_USER astro)" is_name
+        ui_input files "pasta dos arquivos" "$(env_get FILES_DIR "$PWD/data/files")" is_path
+        (
+            umask 077
+            printf "NEXTCLOUD_HOST='%s'\nADMIN_USER='%s'\nFILES_DIR='%s'\n" "$host" "$admin" "$files" > .env.new
+        )
+        mv .env.new .env
+        ui_ok "configuração salva em nextcloud/.env"
+    fi
+    if ! grep -q '^DISKS=' .env; then
+        local disks=()
+        disk_choose disks nextcloud "Quais discos guardam arquivos do Nextcloud? (só $USER e o Nextcloud acessam)"
+        printf "DISKS='%s'\n" "${disks[*]}" >> .env
+        ui_ok "${#disks[@]} disco(s) escolhido(s) para o Nextcloud"
+    fi
+}
+
+container_uid() {
+    podman unshare cat /proc/self/uid_map | awk -v id="$1" '$1 <= id && id < $1 + $3 { print $2 + id - $1; exit }'
+}
+
+storage() {
+    local uuids=() path wid service
+    read -ra uuids <<< "$(env_get DISKS)"
+    disk_setup nextcloud "$DISK_OPTIONS" "${uuids[@]}"
+    wid="$(container_uid 33)"
+    for path in "${DISK_MOUNTS[@]}"; do
+        mountpoint -q "$path" || continue
+        sudo chown "$USER:" "$path"
+        sudo chmod 700 "$path"
+        if ! getfacl -cp "$path" 2>/dev/null | grep -qx "default:user:$wid:rwx"; then
+            ui_info "liberando $path para o Nextcloud (pode demorar se o disco já tiver muitos arquivos)..."
+            sudo setfacl -R -m "u:$wid:rwX,u:$USER:rwX" "$path"
+            sudo find "$path" -type d -exec setfacl -m "d:u:$wid:rwx,d:u:$USER:rwx" {} +
+        fi
+        ui_ok "$path: só $USER e o Nextcloud acessam"
+    done
+    if ((${#DISK_MOUNTS[@]} == 0)); then
+        rm -f "$OVERRIDE"
         return
     fi
-    local host admin files domain
-    domain="$(proxy_domain)"
-    ui_input host  "endereço do Nextcloud no Caddy" "$(env_get NEXTCLOUD_HOST "nextcloud${domain:+.$domain}")" is_hostname
-    ui_input admin "usuário administrador" "$(env_get ADMIN_USER astro)" is_name
-    ui_input files "pasta dos arquivos" "$(env_get FILES_DIR "$PWD/data/files")" is_path
-    (
-        umask 077
-        printf "NEXTCLOUD_HOST='%s'\nADMIN_USER='%s'\nFILES_DIR='%s'\n" "$host" "$admin" "$files" > .env.new
-    )
-    mv .env.new .env
-    ui_ok "configuração salva em nextcloud/.env"
+    {
+        printf 'services:\n'
+        for service in nextcloud nextcloud-cron; do
+            printf '  %s:\n    volumes:\n' "$service"
+            for path in "${DISK_MOUNTS[@]}"; do
+                printf '      - %s:/mnt/%s\n' "$path" "${path##*/}"
+            done
+        done
+    } > "$OVERRIDE"
+}
+
+external_storage() {
+    local admin=$1 path id datadir wanted=() log
+    for path in "${DISK_MOUNTS[@]}"; do wanted+=("/mnt/${path##*/}"); done
+    if ((${#wanted[@]} == 0)) && ! occ app:list --enabled 2>/dev/null | grep -q 'files_external:'; then
+        return
+    fi
+    occ app:enable files_external >/dev/null
+    while IFS=$'\t' read -r id datadir; do
+        [[ $datadir == /mnt/* ]] || continue
+        if [[ " ${wanted[*]} " == *" $datadir "* ]]; then
+            local rest=() item
+            for item in "${wanted[@]}"; do [[ $item == "$datadir" ]] || rest+=("$item"); done
+            wanted=("${rest[@]}")
+            occ files_external:option "$id" filesystem_check_changes 1 >/dev/null
+            ui_ok "pasta ${datadir#/mnt/} já aparece no Nextcloud de $admin"
+            continue
+        fi
+        occ files_external:delete -y "$id" >/dev/null
+        ui_ok "pasta ${datadir#/mnt/} removida do Nextcloud (os arquivos continuam no disco)"
+    done < <(occ files_external:list --output=json 2>/dev/null | python3 -I -c '
+import json, sys
+for mount in json.load(sys.stdin):
+    print(mount["mount_id"], (mount.get("configuration") or {}).get("datadir", ""), sep="\t")
+')
+    for datadir in "${wanted[@]}"; do
+        [[ -n $datadir ]] || continue
+        if ! log="$(occ files_external:create "/${datadir#/mnt/}" local null::null -c "datadir=$datadir" 2>&1)" \
+                || ! id="$(grep -oE '[0-9]+$' <<< "$log")"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_fail "falha ao criar a pasta ${datadir#/mnt/} no Nextcloud"
+        fi
+        occ files_external:applicable --add-user="$admin" "$id" >/dev/null
+        occ files_external:option "$id" filesystem_check_changes 1 >/dev/null
+        ui_ok "pasta ${datadir#/mnt/} aparece no Nextcloud de $admin (Armazenamento externo)"
+    done
 }
 
 prepare_secrets() {
@@ -168,6 +249,9 @@ cmd_install() {
     ui_step "Host"
     host_base
 
+    ui_step "Discos"
+    storage
+
     ui_step "Containers"
     prepare_secrets
     prepare_files "$files"
@@ -177,6 +261,7 @@ cmd_install() {
 
     ui_step "Ajustes"
     tune "$host"
+    external_storage "$admin"
 
     ui_step "Caddy"
     proxy_publish "$host" "http://$CONTAINER:80"
@@ -200,6 +285,10 @@ cmd_remove() {
         ui_info "nenhum container para remover"
     fi
     proxy_unpublish
+    if [[ -n $(disk_block "$DISK_FSTAB" nextcloud) ]]; then
+        disk_release nextcloud
+    fi
+    rm -f "$OVERRIDE"
 
     if ! $purge; then
         ui_info "dados mantidos em nextcloud/data${files:+ e $files}"

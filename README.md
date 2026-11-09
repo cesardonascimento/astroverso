@@ -105,6 +105,15 @@ respostas ficam em `<projeto>/.env`, fora do git.
   padrão, `astro`. Só vale na primeira instalação.
 - **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, `nextcloud/data/files`,
   dentro do projeto.
+- **Quais discos guardam arquivos do Nextcloud?** Marque com Espaço os discos de dados que o Nextcloud vai usar.
+  Cada um é montado sozinho a cada boot, só o seu usuário e o Nextcloud acessam, e ele aparece no Nextcloud
+  como uma pasta com o nome do disco. Arquivos copiados para o disco por fora também aparecem lá. A escolha
+  fica gravada pelo identificador do disco, então numa máquina nova os mesmos discos são reconhecidos.
+- **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
+  segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca
+  para no boot pedindo senha e pode ser reiniciada de longe. Levado para outro computador, o disco
+  continua travado. Se um dia ele não destravar sozinho (depois de mexer no Secure Boot, por exemplo), rode
+  a instalação de novo: ela pede a senha e cadastra o TPM outra vez.
 - **Senha do administrador:** só aparece na primeira instalação, depois que o Nextcloud termina de instalar
   (alguns minutos). Se o Nextcloud a recusar, por ser curta ou já ter vazado em algum site, ele pede outra.
 
@@ -119,6 +128,9 @@ respostas ficam em `<projeto>/.env`, fora do git.
   estiver jogando não tenha acesso ao homelab. Por padrão, `jogos`.
 - **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
   aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
+- **Quais discos são de jogos?** Marque com Espaço os discos com jogos, ROMs e emuladores. Eles são montados
+  sozinhos a cada boot e ficam acessíveis ao seu usuário e ao usuário de jogos, e a nenhum outro. Os discos
+  já escolhidos pelo Nextcloud não aparecem na lista.
 
 Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
 ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
