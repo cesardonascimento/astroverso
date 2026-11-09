@@ -90,8 +90,8 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 À 01:00, o rclone pede ao projeto um dump do banco (`pg_dump -Fc`, em `~/.astro/nextcloud/backup`). No arquivo
 do backup entram o `.env`, a senha do banco, o dump, `config/`, `custom_apps/`, `themes/` e `version.php`; o
-banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) entra sem as
-miniaturas (`appdata_*/preview`).
+banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) também fica
+de fora: os arquivos do dia a dia ficam nos discos (`armazenamento-a`), que têm o próprio backup.
 
 ## Restauração
 
@@ -99,7 +99,7 @@ miniaturas (`appdata_*/preview`).
 
 - para os containers, troca `~/.astro/nextcloud` pela configuração do backup e **mantém o código** que já está na
   máquina (`cp --update=none`), já que o backup só tem `config/`, `custom_apps/`, `themes/` e `version.php`;
-- devolve `arquivos/` para a pasta dos arquivos;
+- prepara a pasta dos arquivos, se ela não existir (com o `.ncdata`, que o Nextcloud exige);
 - recria o banco do zero: sobe só o Postgres, recria o usuário do banco que o Nextcloud criou na instalação
   (`oc_<admin>`, nome e senha lidos do `config.php`, senha pela entrada padrão), e carrega o dump com
   `pg_restore` mantendo os donos;

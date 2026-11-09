@@ -9,7 +9,13 @@ source ../lib/env.sh
 
 CONTAINER=astro-caddy
 ROUTES="$STATE/.routes"
-CADDYFILE="$STATE/data/etc/Caddyfile"
+caddyfile() {
+    if [[ -d data && ! -d $STATE/data ]]; then
+        printf '%s' "$PWD/data/etc/Caddyfile"
+    else
+        printf '%s' "$STATE/data/etc/Caddyfile"
+    fi
+}
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
 
 cmd_describe() {
@@ -147,7 +153,9 @@ render_upstream() {
 render_caddyfile() {
     local domain host upstream index=0 others=()
     domain="$(env_get CADDY_DOMAIN)"
-    mkdir -p "$(dirname "$CADDYFILE")"
+    local file
+    file="$(caddyfile)"
+    mkdir -p "$(dirname "$file")"
     {
         printf '{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n}\n\n*.%s {\n' "$domain"
         while read -r host upstream; do
@@ -166,7 +174,7 @@ render_caddyfile() {
             render_upstream $'\t' "${host#* }"
             printf '}\n'
         done
-    } > "$CADDYFILE"
+    } > "$file"
 }
 
 apply_routes() {

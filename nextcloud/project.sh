@@ -364,10 +364,6 @@ cmd_backup() {
     for dir in config custom_apps themes version.php; do
         [[ -e $STATE/data/html/$dir ]] && printf 'add %s\n' "$STATE/data/html/$dir"
     done
-    files="$(env_get FILES_DIR)"
-    if [[ -n $files && -d $files ]]; then
-        printf 'include arquivos %s\nexclude %s\n' "$files" "$files/appdata_*/preview"
-    fi
 }
 
 cmd_restore() {
@@ -384,11 +380,15 @@ cmd_restore() {
         podman unshare rm -rf "$code"
         ui_ok "código do Nextcloud mantido; configuração e apps vieram do backup"
     fi
+    files="$(env_get FILES_DIR "$HOME/.nextcloud")"
     if [[ -d $STATE/arquivos ]]; then
-        files="$(env_get FILES_DIR "$HOME/.nextcloud")"
         podman unshare rm -rf "${files:?}"
         podman unshare mv "$STATE/arquivos" "$files"
         ui_ok "pasta dos arquivos restaurada em $files"
+    elif ! podman unshare test -f "$files/.ncdata"; then
+        mkdir -p "$files"
+        podman unshare sh -c 'printf "# Nextcloud data directory\n" > "$1/.ncdata" && chown -R 33:33 "$1" && chmod 770 "$1"' sh "$files"
+        ui_ok "pasta dos arquivos preparada em $files (vazia: os arquivos ficam nos discos)"
     fi
     podman unshare rm -rf "$STATE/data/db"
     if ! log="$(compose up -d nextcloud-db 2>&1)"; then

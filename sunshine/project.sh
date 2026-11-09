@@ -656,7 +656,7 @@ cmd_backup() {
     [[ -n $user ]] || return 0
     home="$(getent passwd "$user" | cut -d: -f6)"
     if [[ -n $home && -r $home/.astro/sunshine ]]; then
-        printf 'include usuario %s\n' "$home/.astro/sunshine"
+        printf 'include usuario %s\nexclude %s\n' "$home/.astro/sunshine" "$home/.astro/sunshine/sunshine.log*"
     else
         ui_warn "sem leitura em ~$user/.astro/sunshine: rode a instalação do sunshine" >&2
     fi
