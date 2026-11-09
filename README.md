@@ -104,8 +104,8 @@ respostas ficam em `<projeto>/.env`, fora do git.
   apps. Por padrão, `nextcloud.<domínio>`.
 - **Usuário administrador:** a conta que administra o Nextcloud e cria as contas das outras pessoas. Por
   padrão, `astro`. Só vale na primeira instalação.
-- **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, `nextcloud/data/files`,
-  dentro do projeto. Se ela mudar depois de instalado, o assistente pergunta se pode **mover os arquivos** para a
+- **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, a pasta oculta `.nextcloud`
+  no home do seu usuário, fora do projeto. Se ela mudar depois de instalado, o assistente pergunta se pode **mover os arquivos** para a
   pasta nova.
 - **Quais discos guardam arquivos do Nextcloud?** Marque com Espaço os discos de dados que o Nextcloud vai usar.
   Ao reconfigurar, os discos atuais já vêm marcados: marque um novo para adicionar, desmarque para tirar.

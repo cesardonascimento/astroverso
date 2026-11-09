@@ -28,7 +28,7 @@ Nenhuma porta é aberta na máquina: o Caddy alcança o `astro-nextcloud` pelo n
 |---|---|
 | Endereço do Nextcloud no Caddy | `nextcloud.<domínio do caddy>` |
 | Usuário administrador | `astro` |
-| Pasta dos arquivos | `nextcloud/data/files` |
+| Pasta dos arquivos | `~/.nextcloud` (no home de quem instala) |
 | Quais discos guardam arquivos do Nextcloud? | (nenhum marcado) |
 | Senha do LUKS de `<disco>` | (só para um disco criptografado que o TPM ainda não destrava) |
 | Senha do administrador | (sem padrão; só na primeira instalação) |
@@ -83,7 +83,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 | `data/secrets/` | Senha do banco |
 | `data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
 | `data/db/` | Banco de dados |
-| `data/files/` | Arquivos dos usuários (se a pasta padrão for mantida) |
+| `~/.nextcloud/` | Arquivos dos usuários (pasta padrão) |
 
 ## Remoção
 

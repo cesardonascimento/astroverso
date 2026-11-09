@@ -46,7 +46,7 @@ configure() {
         old_files="$(env_get FILES_DIR)"
         ui_input host  "endereço do Nextcloud no Caddy" "$(env_get NEXTCLOUD_HOST "nextcloud${domain:+.$domain}")" is_hostname
         ui_input admin "usuário administrador" "$(env_get ADMIN_USER astro)" is_name
-        ui_input files "pasta dos arquivos" "$(env_get FILES_DIR "$PWD/data/files")" is_path
+        ui_input files "pasta dos arquivos" "$(env_get FILES_DIR "$HOME/.nextcloud")" is_path
         if [[ -n $old_files && $files != "$old_files" ]] && podman unshare test -f "$old_files/.ncdata"; then
             ui_warn "o Nextcloud já guarda os arquivos em $old_files"
             if ui_confirm "mover os arquivos para $files?" n; then
