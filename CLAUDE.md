@@ -200,5 +200,14 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.
 - `armazenamento-c` a definir. Até lá, a sessão do usuário de jogos ainda o monta pelo GNOME (com a senha do LUKS).
 - rclone: aviso (e-mail ou notificação) quando uma rodada falhar; hoje só fica no journal.
+- Sunshine independente de usuário (ideia combinada, para depois): Sunshine como serviço do sistema com um
+  usuário de serviço próprio (`sunshine`, configuração em `/var/lib/sunshine`), subindo no boot; imagem (KMS) e
+  controles (`/dev/uinput`, grupo `input`) já valem para qualquer sessão. Som e resolução por um agente em toda
+  sessão gráfica (`systemctl --global enable`), que só age na sessão que está na tela: aplica o modo pedido
+  (`astro-sunshine-display`) e cria uma ponte do PipeWire da sessão para a saída virtual do Sunshine (túnel),
+  desfeita no fim do stream ou na troca de usuário. O Sunshine avisa início/fim do stream por arquivo em
+  `/run/astro-sunshine/` (`global_prep_cmd`). Fazer em duas etapas: imagem, controles e resolução primeiro; som
+  depois, testado pelo Moonlight. Hoje o Sunshine é serviço da sessão do usuário de jogos: sair da sessão
+  derruba o stream (usar "Trocar de usuário").
 - Ação "verificar atualizações" para as versões fixadas.
 - Ações de pós-configuração no adguard (ex.: gerenciar reescritas).
