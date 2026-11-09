@@ -41,7 +41,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 - **Discos:** monta cada disco escolhido em `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh`
   (TPM nos criptografados, nada pede senha no boot). Em cada um:
-  - dono `$USER`, permissão `700`: outros usuários da máquina não entram;
+  - dono `$USER`, permissão `770` com o grupo zerado na ACL (`group::---`): outros usuários da máquina não entram;
   - ACL para o `www-data` do container (o UID dele no host vem do `podman unshare`), também como padrão para o
     que for criado depois. `$USER` e o Nextcloud leem e escrevem nos mesmos arquivos;
   - `context=system_u:object_r:container_file_t:s0` na montagem: o SELinux libera o container sem reetiquetar o disco;

@@ -83,7 +83,7 @@ storage() {
     for path in "${DISK_MOUNTS[@]}"; do
         mountpoint -q "$path" || continue
         sudo chown "$USER:" "$path"
-        sudo chmod 700 "$path"
+        sudo chmod 770 "$path"
         if ! getfacl -cp "$path" 2>/dev/null | grep -qx "default:user:$wid:rwx"; then
             ui_info "liberando $path para o Nextcloud (pode demorar se o disco já tiver muitos arquivos)..."
             sudo setfacl -R -m "u:$wid:rwX,u:$USER:rwX" "$path"
