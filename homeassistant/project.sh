@@ -176,6 +176,22 @@ source.close()
     printf 'exclude %s\n' "$CONFIG/home-assistant_v2.db" "$CONFIG/home-assistant_v2.db-wal" "$CONFIG/home-assistant_v2.db-shm"
 }
 
+cmd_restore() {
+    local log
+    remove_container
+    state_restore "$1"
+    if [[ -f $CONFIG/home-assistant_v2.backup.db ]]; then
+        podman unshare rm -f "$CONFIG/home-assistant_v2.db-wal" "$CONFIG/home-assistant_v2.db-shm"
+        podman unshare mv "$CONFIG/home-assistant_v2.backup.db" "$CONFIG/home-assistant_v2.db"
+        ui_ok "banco do Home Assistant restaurado da cópia do backup"
+    fi
+    if ! log="$(compose up -d 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao subir o container depois de restaurar"
+    fi
+    wait_ready "$(env_get HA_PORT 8123)"
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
@@ -183,5 +199,6 @@ case "${1:-}" in
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     backup)   cmd_backup ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
 esac

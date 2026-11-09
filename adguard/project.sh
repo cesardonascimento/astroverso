@@ -313,6 +313,17 @@ cmd_remove() {
     proxy_unpublish
 }
 
+cmd_restore() {
+    local log
+    remove_container
+    state_restore "$1"
+    if ! log="$(compose up -d 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao subir o container depois de restaurar"
+    fi
+    ui_ok "container $CONTAINER rodando com a configuração restaurada"
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
@@ -320,5 +331,6 @@ case "${1:-}" in
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     backup)   printf 'exclude %s\n' "$STATE/data/work" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
 esac

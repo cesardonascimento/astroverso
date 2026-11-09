@@ -55,7 +55,8 @@ máquina. Não afeta as integrações acima.
 | `~/.astro/homeassistant/config/` | Toda a configuração do Home Assistant (montada em `/config`) |
 
 No backup das configurações (rclone), o banco em uso (`home-assistant_v2.db`) fica de fora: entra uma cópia
-consistente, `home-assistant_v2.backup.db`, feita pelo próprio SQLite logo antes.
+consistente, `home-assistant_v2.backup.db`, feita pelo próprio SQLite logo antes. Na restauração, essa cópia volta
+a ser o `home-assistant_v2.db`.
 
 ## Remoção
 

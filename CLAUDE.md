@@ -64,13 +64,14 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Arquitetura
 
 ```
-setup.sh             assistente: atualiza o sistema (host_upgrade) e descobre */project.sh; não conhece os projetos
+setup.sh             assistente: atualiza o sistema (host_upgrade), descobre */project.sh e mostra as ações globais
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
 lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão]
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no fstab e crypttab, TPM)
 <projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]
+                     opcionais: global-actions | backup | restore <pasta>
 ```
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
@@ -80,7 +81,10 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
   roda com outro usuário guarda a configuração no `~/.astro` dele (sunshine), legível por ACL a quem instala.
   Estado da máquina em `~/.astro/host.env`.
-- Backup das configurações (rclone, 01:00): cada `~/.astro/<serviço>` em `<destino>/<serviço>/<serviço>.tar.zst.gpg`
+- Backup das configurações (rclone, 01:00, e "Fazer backup agora"): cada `~/.astro/<serviço>` em
+  `<destino>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, versões apagadas depois de `CONFIG_KEEP_DAYS` (90).
+  "Restaurar uma versão" (rclone, ação global): para o rclone e segura as travas, salva a situação atual
+  (`_antes-da-restauracao`) e chama `<projeto>/project.sh restore <pasta>`. Formato
   (gpg simétrico, senha em `~/.astro/rclone/data/config-backup.key`), com caminhos relativos ao serviço (`tar
   --transform`), sem home nem usuário. Cada projeto pode ter o comando `backup` (dumps e `exclude <caminho>`,
   `include <nome> <caminho>`, `add <caminho>`).
@@ -170,6 +174,14 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   excluída (ex.: `data/html/config` do Nextcloud), anexar numa segunda passada (`tar -rf`).
 - Num comando do Bash, um texto com "rm -rf" (mesmo dentro de um heredoc de edição) é barrado pela proteção do
   Claude Code: editar esses trechos com a ferramenta de edição.
+- O Nextcloud cria na instalação um usuário próprio no Postgres (`oc_<admin>`, senha no `config.php`). O
+  `pg_dump` de um banco não leva usuários: a restauração recria o usuário antes do `pg_restore` (sem
+  `--no-owner`). O superusuário da imagem é o `POSTGRES_USER` (`nextcloud`); o papel `postgres` não existe.
+- Um `flock` segura enquanto houver um processo com o descritor aberto: comandos que sobem containers não podem
+  herdar a trava (`7>&- 8>&-`), senão o container a segura para sempre.
+- Em teste com outro `HOME`, o Podman rootless passa a usar outro armazenamento de imagens: manter
+  `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e `XDG_RUNTIME_DIR` reais e apontar só o `~/.astro` (e as travas) para o
+  scratchpad. E desativar o Caddy da cópia: o `proxy_reload` acha o container real pelo nome.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
 - `journalctl --user -u <padrão>` sai com 1 quando nenhuma unidade tem mensagens: em pipeline com `pipefail`, `|| true`.

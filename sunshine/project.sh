@@ -662,6 +662,37 @@ cmd_backup() {
     fi
 }
 
+cmd_restore() {
+    local from=$1 user home unit
+    state_restore "$from"
+    user="$(env_get GAMES_USER)"
+    home="$(getent passwd "$user" 2>/dev/null | cut -d: -f6)"
+    if [[ ! -d $STATE/usuario ]]; then
+        return 0
+    fi
+    if [[ -z $home ]]; then
+        ui_warn "usuário de jogos $user não existe: a configuração dele ficou em $STATE/usuario"
+        return 0
+    fi
+    for unit in "${UNITS[@]}"; do
+        if [[ -f $unit ]] && user_manager_running "$user"; then
+            sudo systemctl --user -M "$user@" stop "${unit##*/}" 2>/dev/null || true
+        fi
+    done
+    sudo rm -rf "$home/.astro/sunshine"
+    sudo mkdir -p "$home/.astro"
+    sudo cp -a "$STATE/usuario" "$home/.astro/sunshine"
+    sudo chown -R "$user:" "$home/.astro"
+    podman unshare rm -rf "$STATE/usuario"
+    games_state "$user"
+    for unit in "${UNITS[@]}"; do
+        if [[ -f $unit ]] && user_manager_running "$user"; then
+            sudo systemctl --user -M "$user@" start "${unit##*/}" 2>/dev/null || true
+        fi
+    done
+    ui_ok "configuração do Sunshine de $user restaurada (pareamentos e painel)"
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
@@ -669,5 +700,6 @@ case "${1:-}" in
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     backup)   cmd_backup ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
 esac

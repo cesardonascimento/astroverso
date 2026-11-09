@@ -73,7 +73,7 @@ install_selected() {
         labels+=("$label")
     done
 
-    ui_checklist chosen "Quais projetos instalar?" "${labels[@]}"
+    ui_checklist chosen "Quais projetos instalar?" --all "${labels[@]}"
     ((${#chosen[@]})) || { ui_warn "nenhum projeto selecionado"; return; }
     for name in "${chosen[@]}"; do picked+=("${PROJECTS[name]}"); done
     system_upgrade
@@ -139,16 +139,41 @@ configure_project() {
     project "$name" action "${ids[index]}"
 }
 
+global_actions() {
+    local name id label
+    GLOBAL_IDS=()
+    GLOBAL_LABELS=()
+    for name in "${PROJECTS[@]}"; do
+        grep -q '^    global-actions)' "$name/project.sh" || continue
+        project "$name" status || continue
+        while IFS='|' read -r id label; do
+            [[ -n $id ]] || continue
+            GLOBAL_IDS+=("$name $id")
+            GLOBAL_LABELS+=("$label")
+        done < <(project "$name" global-actions)
+    done
+}
+
 ui_step "Astro: ${#PROJECTS[@]} projeto(s) encontrado(s): ${PROJECTS[*]}"
 while true; do
+    global_actions
     ui_menu choice "O que você quer fazer?" \
         "Instalar todos (pula os já instalados)" \
         "Escolher quais instalar" \
         "Configurar um projeto instalado" \
+        "${GLOBAL_LABELS[@]}" \
         "Reinstalar tudo do zero (apaga os dados)" \
         "Remover todos os containers" \
         "Sair"
 
+    globals=${#GLOBAL_IDS[@]}
+    if ((choice >= 3 && choice < 3 + globals)); then
+        read -r name id <<< "${GLOBAL_IDS[choice - 3]}"
+        project "$name" action "$id" || true
+        echo
+        continue
+    fi
+    ((choice >= 3 + globals)) && choice=$((choice - globals))
     case $choice in
         0) install_all || true ;;
         1) install_selected || true ;;

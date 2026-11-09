@@ -277,7 +277,7 @@ action_remove() {
     local lines=() chosen=() i
     mapfile -t lines < <(route_lines)
     ((${#lines[@]})) || { ui_info "nenhuma rota cadastrada"; return; }
-    ui_checklist chosen "Quais rotas remover?" "${lines[@]}"
+    ui_checklist chosen "Quais rotas remover?" --all "${lines[@]}"
     ((${#chosen[@]})) || { ui_info "nenhuma rota removida"; return; }
     for i in "${chosen[@]}"; do
         ui_ok "removida: ${lines[i]%% *}"
@@ -288,7 +288,18 @@ action_remove() {
 }
 
 cmd_action() {
-    case "${1:-}" in
+    cmd_restore() {
+    local log
+    remove_container
+    state_restore "$1"
+    if ! log="$(compose up -d 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao subir o container depois de restaurar"
+    fi
+    ui_ok "container $CONTAINER rodando com a configuração restaurada"
+}
+
+case "${1:-}" in
         list)   ui_step "Rotas"; print_routes ;;
         add)    action_add ;;
         remove) action_remove ;;
@@ -329,5 +340,6 @@ case "${1:-}" in
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge]" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge] | restore <pasta>" ;;
 esac

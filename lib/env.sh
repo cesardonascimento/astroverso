@@ -34,6 +34,27 @@ state_setup() {
     done
 }
 
+state_restore() {
+    local from=$1 keep
+    shift
+    [[ -d $from && -f $from/.env ]] || ui_fail "backup incompleto: $from não tem a configuração do $ASTRO_PROJECT"
+    mkdir -p "$ASTRO_HOME"
+    if [[ -d $STATE ]]; then
+        podman unshare rm -rf "$STATE.restaurando"
+        podman unshare mv "$STATE" "$STATE.restaurando"
+    fi
+    podman unshare cp -a "$from" "$STATE"
+    for keep in "$@"; do
+        podman unshare rm -rf "${STATE:?}/$keep"
+        if [[ -e $STATE.restaurando/$keep ]]; then
+            podman unshare mv "$STATE.restaurando/$keep" "$STATE/$keep"
+        fi
+    done
+    podman unshare rm -rf "$STATE.restaurando"
+    chmod 700 "$STATE"
+    ui_ok "configuração do $ASTRO_PROJECT restaurada em $STATE"
+}
+
 is_port() {
     [[ $1 =~ ^[0-9]{1,5}$ ]] && (($1 >= 1 && $1 <= 65535)) && printf '%s' "$1"
 }

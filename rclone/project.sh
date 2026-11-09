@@ -38,6 +38,14 @@ cmd_actions() {
         "add|Adicionar armazenamento em nuvem" \
         "login|Reconectar a um armazenamento em nuvem" \
         "remove|Remover armazenamento em nuvem"
+    cmd_global_actions
+}
+
+cmd_global_actions() {
+    [[ -n $(env_get CONFIG_BACKUP) ]] || return 0
+    printf '%s\n' \
+        "backup-now|Fazer backup das configurações agora" \
+        "restore|Restaurar uma versão das configurações"
 }
 
 data_disks() {
@@ -262,7 +270,7 @@ action_remove() {
     local names=() chosen=() i
     mapfile -t names < <(target_names)
     ((${#names[@]})) || { ui_info "nenhum armazenamento em nuvem cadastrado"; return; }
-    ui_checklist chosen "Quais armazenamentos remover? (os arquivos não são apagados em lugar nenhum)" "${names[@]}"
+    ui_checklist chosen "Quais armazenamentos remover? (os arquivos não são apagados em lugar nenhum)" --all "${names[@]}"
     for i in "${chosen[@]}"; do
         rm -f "$TARGETS/${names[i]}.env"
         rclone_section_remove "${names[i]}"
@@ -333,7 +341,7 @@ cmd_install() {
 }
 
 config_backup_setup() {
-    local dest default name password
+    local dest default name password days
     name="$(target_names | head -1)"
     if [[ -n $name ]]; then
         default="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)/Astro/Configurações"
@@ -343,10 +351,11 @@ config_backup_setup() {
     if $RECONFIGURE || ! grep -q '^CONFIG_BACKUP=' "$ENV_FILE"; then
         ui_info "toda noite, à 01:00, a configuração de cada serviço vira um arquivo criptografado nesta pasta (uma subpasta por serviço)"
         ui_input dest "pasta do backup das configurações" "$(env_get CONFIG_BACKUP "$default")" is_path
-        sed -i '/^CONFIG_BACKUP=/d' "$ENV_FILE"
-        printf "CONFIG_BACKUP='%s'\n" "$dest" >> "$ENV_FILE"
+        ui_input days "por quantos dias guardar as versões do backup das configurações" "$(env_get CONFIG_KEEP_DAYS 90)" is_number
+        sed -i '/^CONFIG_BACKUP=/d;/^CONFIG_KEEP_DAYS=/d' "$ENV_FILE"
+        printf "CONFIG_BACKUP='%s'\nCONFIG_KEEP_DAYS='%s'\n" "$dest" "$days" >> "$ENV_FILE"
     fi
-    ui_ok "backup das configurações em $(env_get CONFIG_BACKUP)/<serviço>/<serviço>.tar.zst.gpg"
+    ui_ok "backup das configurações em $(env_get CONFIG_BACKUP)/<data e hora>/<serviço>/, $(env_get CONFIG_KEEP_DAYS 90) dias de histórico"
     if [[ -s $CONFIG_KEY ]] && ui_confirm "manter a senha atual do backup das configurações?" y; then
         ui_ok "senha mantida"
         return
@@ -365,8 +374,153 @@ cmd_action() {
         add)    action_add ;;
         login)  action_login ;;
         remove) action_remove ;;
+        backup-now) action_backup_now ;;
+        restore)    action_restore ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac
+}
+
+action_backup_now() {
+    ui_step "Backup das configurações agora"
+    [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado: rode a instalação do rclone"
+    ./run.sh config
+}
+
+rclone_busy() {
+    local unit
+    for unit in tick nightly local config; do
+        if systemctl --user is-active -q "$UNIT_PREFIX-$unit.service" 2>/dev/null; then
+            printf '%s\n' "$UNIT_PREFIX-$unit"
+        fi
+    done
+    if pgrep -u "$USER" -x rclone >/dev/null; then
+        printf '%s\n' "processo rclone"
+    fi
+    return 0
+}
+
+version_label() {
+    local name=$1 label
+    label="${name:8:2}/${name:5:2}/${name:0:4} ${name:11:2}:${name:13:2}:${name:15:2}"
+    [[ ${#name} -gt 17 ]] && label+=" (${name:18})"
+    label="${label//-/ }"
+    printf "%s" "${label//restauracao/restauração}"
+}
+
+archive_open() {
+    gpg --batch --quiet --homedir "$1/gnupg" --pinentry-mode loopback --passphrase-file "$2" -d "$3"
+}
+
+action_restore() {
+    ui_step "Restaurar uma versão das configurações"
+    local dest version choice name i service file key work password preset log
+    local versions=() labels=() services=() chosen=() picked=() busy=() restored=() failed=()
+    dest="$(env_get CONFIG_BACKUP)"
+    [[ -n $dest && -d $dest ]] || ui_fail "pasta do backup das configurações não encontrada: ${dest:-não configurada}"
+    mapfile -t versions < <(config_versions "$dest")
+    ((${#versions[@]})) || ui_fail "nenhuma versão em $dest"
+    for name in "${versions[@]}"; do
+        labels+=("$(version_label "$name")  [$(cd "$dest/$name" && ls -d -- */ 2>/dev/null | tr -d / | paste -sd' ')]")
+    done
+    ui_menu choice "Qual versão restaurar?" "${labels[@]}" "Voltar"
+    ((choice < ${#versions[@]})) || return 0
+    version="${versions[choice]}"
+
+    for file in "$dest/$version"/*/*.tar.zst.gpg; do
+        [[ -f $file ]] && services+=("$(basename "$(dirname "$file")")")
+    done
+    ((${#services[@]})) || ui_fail "a versão $version não tem nenhum serviço"
+    preset="$(seq -s ' ' 0 $((${#services[@]} - 1)))"
+    ui_checklist chosen "Quais serviços restaurar?" --all --selected "$preset" "${services[@]}"
+    ((${#chosen[@]})) || { ui_info "nenhum serviço escolhido"; return 0; }
+    for i in "${chosen[@]}"; do picked+=("${services[i]}"); done
+    ui_warn "a configuração atual de ${picked[*]} será trocada pela de $(version_label "$version")"
+    ui_info "antes, a situação atual vira uma versão \"antes da restauração\", para poder voltar"
+    ui_confirm "continuar?" n || { ui_info "cancelado"; return 0; }
+
+    mapfile -t busy < <(rclone_busy)
+    if ((${#busy[@]})); then
+        ui_warn "o rclone está trabalhando agora: ${busy[*]}"
+        ui_confirm "parar o que está rodando? (a primeira cópia da nuvem continua de onde parou depois)" y \
+            || { ui_info "cancelado: tente de novo quando terminar"; return 0; }
+        stop_runs
+        if ! timeout 60 bash -c "while pgrep -u '$USER' -x rclone >/dev/null; do sleep 1; done"; then
+            ui_fail "ainda há um processo do rclone rodando; tente de novo em instantes"
+        fi
+    fi
+    exec 8>"$LOCK"
+    flock -n 8 || ui_fail "uma rodada do rclone acabou de começar; tente de novo"
+    exec 7>"$CONFIG_LOCK"
+    flock -n 7 || ui_fail "um backup das configurações está em andamento; tente de novo"
+    ui_ok "rclone parado: nenhuma rodada começa até o fim da restauração"
+
+    work="$(mktemp -d -p /var/tmp astro-restore.XXXXXX)"
+    mkdir -p "$work/gnupg" "$work/extract"
+    chmod 700 "$work" "$work/gnupg"
+    key="$CONFIG_KEY"
+    file="$dest/$version/${picked[0]}/${picked[0]}.tar.zst.gpg"
+    if [[ ! -s $key ]] || ! archive_open "$work" "$key" "$file" >/dev/null 2>&1; then
+        ui_warn "a senha guardada não abre esta versão"
+        key="$work/key"
+        while true; do
+            ui_secret password "senha do backup desta versão"
+            (umask 077 && printf '%s' "$password" > "$key")
+            archive_open "$work" "$key" "$file" >/dev/null 2>&1 && break
+            ui_warn "senha errada"
+        done
+    fi
+
+    ui_step "Backup da situação atual"
+    if ! ASTRO_LOCKED=1 ./run.sh config antes-da-restauracao 7>&- 8>&-; then
+        podman unshare rm -rf "$work"
+        ui_fail "o backup da situação atual falhou: nada foi alterado"
+    fi
+
+    for service in "${picked[@]}"; do
+        file="$dest/$version/$service/$service.tar.zst.gpg"
+        if ! archive_open "$work" "$key" "$file" | podman unshare tar --zstd -x --numeric-owner -C "$work/extract" -f -; then
+            podman unshare rm -rf "$work"
+            ui_fail "não foi possível abrir $file: nada foi alterado"
+        fi
+    done
+
+    for service in "${picked[@]}"; do
+        ui_step "Restaurando $service"
+        if [[ $service == host ]]; then
+            cp "$work/extract/host/host.env" "$ASTRO_HOME/host.env" && restored+=(host) || failed+=(host)
+        elif [[ $service == rclone ]]; then
+            cmd_restore "$work/extract/rclone" && restored+=(rclone) || failed+=(rclone)
+        elif [[ -x ../$service/project.sh ]] && grep -q '^    restore)' "../$service/project.sh"; then
+            if ../"$service"/project.sh restore "$work/extract/$service" 7>&- 8>&-; then
+                restored+=("$service")
+            else
+                failed+=("$service")
+            fi
+        else
+            ui_warn "$service não sabe restaurar a configuração: ficou em $work/extract/$service"
+            failed+=("$service")
+        fi
+    done
+    ((${#failed[@]})) || podman unshare rm -rf "$work"
+
+    ui_step "Resumo"
+    ((${#restored[@]})) && ui_ok "restaurados de $(version_label "$version"): ${restored[*]}"
+    if ((${#failed[@]})); then
+        ui_error "falharam: ${failed[*]} (a situação anterior está na versão \"antes da restauração\")"
+        return 1
+    fi
+    return 0
+}
+
+cmd_restore() {
+    local backup keep
+    backup="$(env_get CONFIG_BACKUP)"
+    keep="$(env_get CONFIG_KEEP_DAYS 90)"
+    stop_runs
+    state_restore "$1" data/config-backup.key
+    sed -i '/^CONFIG_BACKUP=/d;/^CONFIG_KEEP_DAYS=/d' "$ENV_FILE"
+    printf "CONFIG_BACKUP='%s'\nCONFIG_KEEP_DAYS='%s'\n" "$backup" "$keep" >> "$ENV_FILE"
+    ui_ok "pasta do backup das configurações e senha atuais mantidas"
 }
 
 cmd_remove() {
@@ -394,8 +548,10 @@ case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
     actions)  cmd_actions ;;
+    global-actions) cmd_global_actions ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge]" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | global-actions | action <id> | install | remove [--purge] | restore <pasta>" ;;
 esac

@@ -135,43 +135,62 @@ ui_menu() {
 
 ui_checklist() {
     local -n __ui_out=$1
-    local title=$2 preset=""
+    local title=$2 preset="" offset=0
     shift 2
-    if [[ ${1:-} == --selected ]]; then
-        preset=" $2 "
-        shift 2
-    fi
-    local items=("$@") count=$# cursor=0 i key mark
+    while [[ ${1:-} == --selected || ${1:-} == --all ]]; do
+        if [[ $1 == --all ]]; then
+            offset=1
+            shift
+        else
+            preset=" $2 "
+            shift 2
+        fi
+    done
+    local items=("$@") count=$# cursor=0 i key mark all label on total
     local -a selected=()
     for ((i = 0; i < count; i++)); do
         selected[i]=0
         [[ $preset == *" $i "* ]] && selected[i]=1
     done
+    total=$((count + offset))
 
     printf '%s     \033[35m?\033[0m %s \033[2m(↑/↓, Espaço marca, a = todos, Enter confirma)\033[0m\n' "$(_ui_tag)" "$title" >/dev/tty
     _ui_cursor_hide
     while true; do
-        for ((i = 0; i < count; i++)); do
-            ((selected[i])) && mark=$'\033[32m◉\033[0m' || mark='○'
-            if ((i == cursor)); then
-                printf '\r\033[K%s       \033[36m❯\033[0m %s \033[36m%s\033[0m\n' "$(_ui_tag)" "$mark" "${items[i]}"
+        all=1
+        for ((i = 0; i < count; i++)); do ((selected[i])) || all=0; done
+        for ((i = 0; i < total; i++)); do
+            if ((i < offset)); then
+                label="Todos"
+                on=$all
             else
-                printf '\r\033[K%s         %s %s\n' "$(_ui_tag)" "$mark" "${items[i]}"
+                label="${items[i - offset]}"
+                on=${selected[i - offset]}
+            fi
+            ((on)) && mark=$'\033[32m◉\033[0m' || mark='○'
+            if ((i == cursor)); then
+                printf '\r\033[K%s       \033[36m❯\033[0m %s \033[36m%s\033[0m\n' "$(_ui_tag)" "$mark" "$label"
+            else
+                printf '\r\033[K%s         %s %s\n' "$(_ui_tag)" "$mark" "$label"
             fi
         done >/dev/tty
         key="$(_ui_read_key)"
         case $key in
-            up)    cursor=$(((cursor - 1 + count) % count)) ;;
-            down)  cursor=$(((cursor + 1) % count)) ;;
-            space) selected[cursor]=$((1 - selected[cursor])) ;;
+            up)    cursor=$(((cursor - 1 + total) % total)) ;;
+            down)  cursor=$(((cursor + 1) % total)) ;;
+            space)
+                if ((cursor < offset)); then
+                    for ((i = 0; i < count; i++)); do selected[i]=$((1 - all)); done
+                else
+                    selected[cursor - offset]=$((1 - selected[cursor - offset]))
+                fi
+                ;;
             a)
-                local all=1
-                for ((i = 0; i < count; i++)); do ((selected[i])) || all=0; done
                 for ((i = 0; i < count; i++)); do selected[i]=$((1 - all)); done
                 ;;
             enter) break ;;
         esac
-        printf '\033[%dA' "$count" >/dev/tty
+        printf '\033[%dA' "$total" >/dev/tty
     done
     _ui_cursor_show
     __ui_out=()

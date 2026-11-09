@@ -351,7 +351,7 @@ cmd_backup() {
     local dump="$STATE/backup" files
     mkdir -p "$dump"
     if cmd_status; then
-        if ! podman exec -u postgres astro-nextcloud-db pg_dump -d nextcloud -Fc > "$dump/nextcloud.pgdump.new"; then
+        if ! podman exec astro-nextcloud-db pg_dump -U nextcloud -d nextcloud -Fc > "$dump/nextcloud.pgdump.new"; then
             rm -f "$dump/nextcloud.pgdump.new"
             ui_error "falha no dump do banco do Nextcloud"
             return 1
@@ -370,6 +370,61 @@ cmd_backup() {
     fi
 }
 
+cmd_restore() {
+    local from=$1 code="$STATE.codigo" files log
+    [[ -f $from/backup/nextcloud.pgdump ]] || ui_fail "o backup do Nextcloud não tem o dump do banco"
+    remove_containers
+    podman unshare rm -rf "$code"
+    if [[ -d $STATE/data/html ]]; then
+        podman unshare mv "$STATE/data/html" "$code"
+    fi
+    state_restore "$from"
+    if [[ -d $code ]]; then
+        podman unshare cp -a --update=none "$code/." "$STATE/data/html/"
+        podman unshare rm -rf "$code"
+        ui_ok "código do Nextcloud mantido; configuração e apps vieram do backup"
+    fi
+    if [[ -d $STATE/arquivos ]]; then
+        files="$(env_get FILES_DIR "$HOME/.nextcloud")"
+        podman unshare rm -rf "${files:?}"
+        podman unshare mv "$STATE/arquivos" "$files"
+        ui_ok "pasta dos arquivos restaurada em $files"
+    fi
+    podman unshare rm -rf "$STATE/data/db"
+    if ! log="$(compose up -d nextcloud-db 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao subir o banco"
+    fi
+    ui_info "aguardando o banco ficar pronto..."
+    if ! timeout 180 bash -c "until podman exec $CONTAINER-db pg_isready -q -h 127.0.0.1 -U nextcloud -d nextcloud; do sleep 2; done"; then
+        ui_fail "o banco não ficou pronto em 3 minutos"
+    fi
+    local dbuser dbpass
+    dbuser="$(podman unshare sed -n "s/^ *'dbuser' => '\(.*\)',\$/\1/p" "$CONFIG")"
+    dbpass="$(podman unshare sed -n "s/^ *'dbpassword' => '\(.*\)',\$/\1/p" "$CONFIG")"
+    if [[ -n $dbuser && $dbuser != nextcloud ]]; then
+        if ! log="$(printf 'CREATE ROLE "%s" LOGIN PASSWORD '\''%s'\'';\n' "$dbuser" "${dbpass//\'/\'\'}" \
+                | podman exec -i "$CONTAINER-db" psql -q -v ON_ERROR_STOP=1 -U nextcloud -d nextcloud 2>&1)"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_fail "falha ao recriar o usuário $dbuser do banco"
+        fi
+        ui_ok "usuário $dbuser do banco recriado com a senha do config.php"
+    fi
+    if ! log="$(podman exec -i "$CONTAINER-db" pg_restore -U nextcloud -d nextcloud --exit-on-error \
+            < "$STATE/backup/nextcloud.pgdump" 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao restaurar o banco a partir do dump"
+    fi
+    ui_ok "banco restaurado a partir do dump"
+    if ! log="$(compose up -d 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao subir os containers"
+    fi
+    wait_ready
+    occ maintenance:data-fingerprint >/dev/null
+    ui_ok "Nextcloud de volta; os apps vão sincronizar de novo com o servidor"
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
@@ -377,5 +432,6 @@ case "${1:-}" in
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     backup)   cmd_backup ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
 esac

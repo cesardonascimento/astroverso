@@ -68,16 +68,23 @@ noturno: mexa nos arquivos pelo Nextcloud (ou direto no disco), não pelo app da
    inclui de fora vai para uma subpasta com nome fixo (`nextcloud/arquivos` com a pasta dos arquivos,
    `sunshine/usuario` com o `~/.astro/sunshine` do usuário de jogos, lido por ACL). O `host.env` vira `host/`;
 3. compacta (`zstd`), criptografa com `gpg --symmetric` (AES-256) e grava
-   `<pasta escolhida>/<serviço>/<serviço>.tar.zst.gpg`. Na pasta do armazenamento em nuvem, isso segue para a nuvem
+   `<pasta escolhida>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, uma pasta por backup;
+4. apaga as versões com mais de `CONFIG_KEEP_DAYS` dias (padrão 90; só pastas com nome de versão). Na pasta do armazenamento em nuvem, isso segue para a nuvem
    e para o disco de backup nas rodadas seguintes.
 
 ```
 Astro/Configurações/
-  caddy/caddy.tar.zst.gpg
-  nextcloud/nextcloud.tar.zst.gpg
-  ...
-  host/host.tar.zst.gpg
+  2026-11-10_010000/
+    caddy/caddy.tar.zst.gpg
+    nextcloud/nextcloud.tar.zst.gpg
+    ...
+    host/host.tar.zst.gpg
+  2026-11-10_154512_antes-da-restauracao/
+    ...
 ```
+
+A parte de outro usuário (ex.: `sunshine/usuario`) é gravada como do usuário que instala (`--owner=0`): a
+restauração devolve o dono certo.
 
 Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos
 arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-owner`.
@@ -91,6 +98,22 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Adicionar armazenamento em nuvem | As perguntas acima |
 | Reconectar a um armazenamento em nuvem | Refaz o login (ex.: depois de ligar a verificação em duas etapas) |
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
+| Fazer backup das configurações agora | Também no menu principal: roda o backup das configurações na hora |
+| Restaurar uma versão das configurações | Também no menu principal: veja abaixo |
+
+## Restaurar uma versão
+
+1. Lista as versões em `<pasta do backup>` (da mais nova para a mais antiga, com os serviços de cada uma) e
+   pede os serviços a restaurar (todos marcados, com a opção "Todos").
+2. Confere o rclone: rodadas ativas (`astro-rclone-*`) ou processos `rclone` do usuário. Se houver, pergunta e
+   para (a primeira cópia retoma depois). Segura as duas travas (`astro-rclone.lock` e
+   `astro-rclone-config.lock`) até o fim: nenhuma rodada começa durante a restauração. Os comandos dos projetos
+   rodam sem herdar as travas (`7>&- 8>&-`), senão um container iniciado por eles as seguraria para sempre.
+3. Testa a senha guardada na versão escolhida; se não abrir, pede a senha daquela versão.
+4. Faz um backup da situação atual, `<data>_antes-da-restauracao`. Se falhar, para sem mexer em nada.
+5. Abre os arquivos (`podman unshare tar --numeric-owner`, mantendo os donos) e chama
+   `<projeto>/project.sh restore <pasta>` de cada serviço. O `host.env` volta direto; o rclone mantém a pasta do
+   backup e a senha atuais.
 
 ## Adicionar um serviço de nuvem
 

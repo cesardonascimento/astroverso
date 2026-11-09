@@ -102,11 +102,18 @@ cmd_remove() {
     ui_info "pacotes do sistema mantidos (cockpit, cockpit-podman)"
 }
 
+cmd_restore() {
+    state_restore "$1"
+    proxy_reload
+    ui_info "se o endereço do Cockpit mudou, rode a instalação do cockpit para regravar o cockpit.conf"
+}
+
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge]" ;;
+    restore)  shift; cmd_restore "$1" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | restore <pasta>" ;;
 esac

@@ -7,13 +7,13 @@ source ../lib/ui.sh
 source ../lib/env.sh
 source common.sh
 
-LOCK="${XDG_RUNTIME_DIR:-/tmp}/astro-rclone.lock"
 MARGIN=120
 MAX_DELETE=1000
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
 lock() {
-    exec 9>"$LOCK"
+    [[ ${ASTRO_LOCKED:-} == 1 ]] && return 0
+    exec 9>"${2:-$LOCK}"
     if [[ $1 == wait ]]; then
         flock 9
     elif ! flock -n 9; then
@@ -166,7 +166,7 @@ tar_ok() {
 }
 
 service_archive() {
-    local service=$1 archive=$2 source=$3 entry name path runner=() target=$1
+    local service=$1 archive=$2 source=$3 entry name path runner=() owner=() target=$1
     [[ -f /$source ]] && target="$service/${source##*/}"
     local transform="s|^$(regex_escape "$source")|$target|"
     tar_ok podman unshare tar -cf "$archive" -C / "${PART_EXCLUDES[@]}" --transform="$transform" "$source" || return 1
@@ -178,8 +178,12 @@ service_archive() {
         path="${entry#* }"
         path="${path#/}"
         runner=()
-        [[ /$path == "$HOME"/* ]] && runner=(podman unshare)
-        tar_ok "${runner[@]}" tar -rf "$archive" -C / "${PART_EXCLUDES[@]}" \
+        owner=(--owner=0 --group=0 --numeric-owner)
+        if [[ /$path == "$HOME"/* ]]; then
+            runner=(podman unshare)
+            owner=()
+        fi
+        tar_ok "${runner[@]}" tar -rf "$archive" -C / "${owner[@]}" "${PART_EXCLUDES[@]}" \
             --transform="s|^$(regex_escape "$path")|$service/$name|" "$path" || return 1
     done
     zstd -q --rm -f "$archive" -o "$archive.zst"
@@ -195,8 +199,18 @@ service_publish() {
     mv "$dest/$service/.$file.partial" "$dest/$service/$file"
 }
 
+config_prune() {
+    local dest=$1 days=$2 limit name
+    limit="$(date -d "-$days days" +%F)"
+    while read -r name; do
+        [[ -n $name && ${name:0:10} < $limit ]] || continue
+        rm -rf -- "${dest:?}/$name"
+        ui_ok "versão $name apagada (mais de $days dias)"
+    done < <(config_versions "$dest")
+}
+
 config_backup() {
-    local dest work home user disk
+    local dest work disk version label=${1:-}
     dest="$(env_get CONFIG_BACKUP)"
     if [[ -z $dest ]]; then
         ui_info "backup das configurações não configurado"
@@ -213,13 +227,14 @@ config_backup() {
     work="$(mktemp -d -p /var/tmp astro-config.XXXXXX)"
     mkdir -p "$work/gnupg"
     chmod 700 "$work/gnupg"
-    ui_step "backup das configurações → $dest/<serviço>/<serviço>.tar.zst.gpg"
+    version="$(date +%F_%H%M%S)${label:+_$label}"
+    ui_step "backup das configurações → $dest/$version/<serviço>/<serviço>.tar.zst.gpg"
     local dir service saved=() failed=0
     for dir in "$ASTRO_HOME"/*/; do
         service="$(basename "$dir")"
         if service_parts "$service" \
                 && service_archive "$service" "$work/$service.tar" "${ASTRO_HOME#/}/$service" \
-                && service_publish "$service" "$work" "$dest"; then
+                && service_publish "$service" "$work" "$dest/$version"; then
             saved+=("$service")
         else
             ui_error "$service: backup das configurações falhou"
@@ -230,7 +245,7 @@ config_backup() {
         PART_EXCLUDES=()
         PART_ADDS=()
         PART_INCLUDES=()
-        if service_archive host "$work/host.tar" "${ASTRO_HOME#/}/host.env" && service_publish host "$work" "$dest"; then
+        if service_archive host "$work/host.tar" "${ASTRO_HOME#/}/host.env" && service_publish host "$work" "$dest/$version"; then
             saved+=(host)
         else
             ui_error "host: backup das configurações falhou"
@@ -238,7 +253,8 @@ config_backup() {
         fi
     fi
     podman unshare rm -rf "$work"
-    ((${#saved[@]})) && ui_ok "configurações salvas e criptografadas: ${saved[*]}"
+    ((${#saved[@]})) && ui_ok "versão $version salva e criptografada: ${saved[*]}"
+    ((failed)) || config_prune "$dest" "$(env_get CONFIG_KEEP_DAYS 90)"
     return "$failed"
 }
 
@@ -246,6 +262,6 @@ case "${1:-}" in
     tick)    lock skip; run_targets tick ;;
     nightly) lock wait; run_targets nightly ;;
     local)   lock wait; local_mirror ;;
-    config)  lock wait; config_backup ;;
-    *)       ui_fail "uso: $0 tick | nightly | local | config" ;;
+    config)  lock wait "$CONFIG_LOCK"; config_backup "${2:-}" ;;
+    *)       ui_fail "uso: $0 tick | nightly | local | config [rótulo]" ;;
 esac

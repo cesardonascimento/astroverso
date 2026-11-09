@@ -37,7 +37,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   pareados, apps) em `~<usuário de jogos>/.astro/sunshine`, e `~/.config/sunshine` vira um atalho para lá
   (uma configuração antiga é movida, sem perder os pareamentos). As respostas da instalação ficam no
   `~/.astro/sunshine` de quem instala. Uma ACL dá a quem instala só leitura no `~/.astro` do usuário de jogos,
-  para o backup das configurações (rclone), onde ela entra como `sunshine/usuario`.
+  para o backup das configurações (rclone), onde ela entra como `sunshine/usuario`. Na restauração, o Sunshine
+  do usuário de jogos é parado, a pasta volta com o dono certo (`sudo`) e ele sobe de novo.
 - **Senha do usuário de jogos:** pedida na instalação (com `chpasswd`, pela entrada padrão). Se ele já tiver
   senha, pergunta se mantém. Ela serve para entrar na tela, trocar de usuário e desbloquear.
 - **Tela do usuário de jogos:** desativa o escurecimento e a suspensão. Com login automático, desativa também o

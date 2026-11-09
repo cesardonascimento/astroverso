@@ -93,6 +93,18 @@ do backup entram o `.env`, a senha do banco, o dump, `config/`, `custom_apps/`, 
 banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) entra sem as
 miniaturas (`appdata_*/preview`).
 
+## Restauração
+
+`restore` (chamado pela opção "Restaurar uma versão das configurações"):
+
+- para os containers, troca `~/.astro/nextcloud` pela configuração do backup e **mantém o código** que já está na
+  máquina (`cp --update=none`), já que o backup só tem `config/`, `custom_apps/`, `themes/` e `version.php`;
+- devolve `arquivos/` para a pasta dos arquivos;
+- recria o banco do zero: sobe só o Postgres, recria o usuário do banco que o Nextcloud criou na instalação
+  (`oc_<admin>`, nome e senha lidos do `config.php`, senha pela entrada padrão), e carrega o dump com
+  `pg_restore` mantendo os donos;
+- sobe tudo e roda `occ maintenance:data-fingerprint`, para os apps sincronizarem de novo.
+
 ## Remoção
 
 `remove` derruba os containers, tira a rota do Caddy e libera os discos (saem do `fstab` e do `crypttab` e são

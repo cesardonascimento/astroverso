@@ -24,8 +24,10 @@ git clone <url-deste-repositório> ~/Projects/astro
 | Opção | O que faz |
 |---|---|
 | Instalar todos | Instala o que ainda não está instalado |
-| Escolher quais instalar | Marca os projetos com Espaço; os já instalados são recriados |
+| Escolher quais instalar | Marca os projetos com Espaço (ou "Todos"); os já instalados são recriados |
 | Configurar um projeto instalado | Ajustes do dia a dia, como adicionar rotas no Caddy |
+| Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
+| Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
 | Reinstalar tudo do zero | Apaga os dados e instala de novo |
 | Remover todos os containers | Mantendo os dados ou apagando tudo |
 
@@ -163,7 +165,17 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
 - **Senha do backup das configurações:** criptografa esse arquivo. **Guarde-a fora da máquina** (num gerenciador
   de senhas): sem ela, o backup não abre. Na reinstalação, o assistente pergunta se mantém a atual.
 
+- **Por quantos dias guardar as versões do backup das configurações:** cada backup fica numa pasta com a data e
+  a hora (ex.: `2026-11-10_010000/nextcloud/nextcloud.tar.zst.gpg`); as mais antigas que isso são apagadas. Por
+  padrão, `90`.
+
 Os horários: 01:00 backup das configurações, 02:00 espelho na nuvem, 03:00 espelho no disco de backup.
+
+**Restaurar uma versão** (menu principal): mostra as versões da mais nova para a mais antiga e os serviços de
+cada uma. Antes de trocar qualquer coisa, o assistente para o rclone (se estiver copiando algo, pergunta antes) e
+salva a situação atual como uma versão "antes da restauração", para dar para voltar. Depois, para cada serviço
+escolhido: para os containers, troca a configuração pela do backup e sobe de novo. Se a senha atual não abrir a
+versão escolhida, ele pede a senha daquela época.
 
 Depois da primeira cópia, **o disco manda**: o que você criar ou mudar chega à nuvem em até 15 minutos, e o
 que apagar é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem: o que for criado

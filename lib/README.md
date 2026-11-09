@@ -10,6 +10,8 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
+| `global-actions` (opcional) | Como `actions`, mas as ações aparecem no menu principal do `setup.sh` (com o projeto instalado) e rodam com `action <id>` |
+| `restore <pasta>` (opcional) | Troca a configuração pela da pasta extraída do backup (`state_restore`), cuidando do que for do projeto (ex.: carregar o dump do banco), e sobe o serviço de novo |
 | `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <nome> <caminho>` (entra no arquivo do serviço como `<serviço>/<nome>`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
 
 **Estado fora do repositório.** Tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`): o `.env`
@@ -40,7 +42,7 @@ Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (`--selected "0 2"` antes
-  dos itens deixa esses índices já marcados). Com `ASTRO_PLAIN=1` (serviços do systemd), as mensagens saem sem
+  dos itens deixa esses índices já marcados; `--all` põe uma opção "Todos" no topo). Com `ASTRO_PLAIN=1` (serviços do systemd), as mensagens saem sem
   cores, para o journal. Defina `ASTRO_PROJECT` antes do `source`.
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
@@ -54,7 +56,8 @@ Bibliotecas compartilhadas:
   `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, atualizando o kernel no Fedora e
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
-- `lib/env.sh`: `ASTRO_HOME`, `STATE`, `ENV_FILE`, `compose` e `state_setup` (acima). `env_get CHAVE [padrão]
+- `lib/env.sh`: `ASTRO_HOME`, `STATE`, `ENV_FILE`, `compose`, `state_setup` (acima) e `state_restore <pasta> [itens a manter]`,
+  que troca `$STATE` pela pasta do backup, mantendo os itens pedidos da configuração atual. `env_get CHAVE [padrão]
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.

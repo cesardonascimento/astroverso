@@ -1,6 +1,18 @@
 BACKUP_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 DATA="$STATE/data"
 CONFIG_KEY="$DATA/config-backup.key"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/astro-rclone.lock"
+CONFIG_LOCK="${XDG_RUNTIME_DIR:-/tmp}/astro-rclone-config.lock"
+VERSION_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}(_[a-z-]+)?$'
+
+config_versions() {
+    local dest=$1 dir name
+    for dir in "$dest"/*/; do
+        name="$(basename "$dir")"
+        [[ $name =~ $VERSION_PATTERN ]] && printf '%s\n' "$name"
+    done | sort -r
+    return 0
+}
 RCLONE_CONF="$DATA/rclone.conf"
 TARGETS="$DATA/targets"
 PROVIDERS="$BACKUP_DIR/providers"
