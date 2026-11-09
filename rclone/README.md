@@ -1,4 +1,4 @@
-# backup
+# rclone
 
 Espelha os discos de dados em outro disco da máquina e em armazenamentos em nuvem, com o
 [rclone](https://rclone.org). Não usa container: são agendamentos (timers) do systemd do usuário, que rodam
@@ -33,9 +33,9 @@ Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 
 | Unidade | Quando | O que faz |
 |---|---|---|
-| `astro-backup-tick` | a cada 15 minutos | Envia à nuvem os arquivos criados ou alterados desde o último envio bem-sucedido (`find -newerct` + `rclone copy --files-from-raw --no-traverse`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar do envio |
-| `astro-backup-nightly` | 01:30 | Espelho com exclusões de cada armazenamento (`rclone sync --max-delete 1000`) |
-| `astro-backup-local` | 02:30 | Espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
+| `astro-rclone-tick` | a cada 15 minutos | Envia à nuvem os arquivos criados ou alterados desde o último envio bem-sucedido (`find -newerct` + `rclone copy --files-from-raw --no-traverse`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar do envio |
+| `astro-rclone-nightly` | 01:30 | Espelho com exclusões de cada armazenamento (`rclone sync --max-delete 1000`) |
+| `astro-rclone-local` | 02:30 | Espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
 
 Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo depois de ligar.
 
@@ -87,6 +87,6 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 | `.env` | Disco de backup (UUID e onde montou), disco copiado e dias de versões |
 | `data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
 | `data/targets/<nome>.env` | Serviço, disco, pasta e o estado da primeira cópia e do último envio |
-| `~/.config/systemd/user/astro-backup-*` | Os três serviços e seus timers |
+| `~/.config/systemd/user/astro-rclone-*` | Os três serviços e seus timers |
 
-Para acompanhar ao vivo: `journalctl --user -fu astro-backup-tick`.
+Para acompanhar ao vivo: `journalctl --user -fu astro-rclone-tick`.

@@ -7,10 +7,10 @@ instalação.
 | Projeto | Para que serve |
 |---|---|
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
-| [**backup**](backup/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), atualizada a cada 15 minutos. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
+| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), atualizada a cada 15 minutos. |
 | [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
@@ -83,30 +83,6 @@ respostas ficam em `<projeto>/.env`, fora do git.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
   servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
 
-### backup
-
-- **Qual disco recebe o espelho noturno?** Marque com Espaço o disco que guarda a cópia local (um só). Ele é
-  montado sozinho a cada boot e só o seu usuário acessa. Deixe vazio para fazer só a cópia na nuvem.
-- **Qual disco copiar para ele toda noite?** O disco de dados que vai ser protegido, por exemplo o do
-  Nextcloud.
-- **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
-  pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
-- **Adicionar um armazenamento em nuvem agora?** Liga a cópia fora de casa. Dá para adicionar depois, em
-  "Configurar um projeto instalado".
-  - **Qual armazenamento em nuvem?** O serviço. Hoje, o Proton Drive.
-  - **Nome do armazenamento** e **pasta dentro do disco:** onde a cópia da nuvem fica no disco. Por padrão,
-    uma pasta com o nome do serviço (ex.: `proton`). A raiz do disco não é aceita, para caber mais de um
-    serviço.
-  - **E-mail, senha e código da verificação em duas etapas:** o login no serviço. Se você ligar a verificação
-    em duas etapas depois, use "Reconectar a um armazenamento em nuvem".
-  - **Quando fazer a primeira cópia?** Traz tudo o que já está na nuvem para o disco. Pode levar horas: escolha
-    agora, um horário (por exemplo de madrugada) ou depois, pelo menu. Se ela for interrompida (internet,
-    reboot, falta de luz), continua sozinha de onde parou.
-
-Depois da primeira cópia, **o disco manda**: o que você criar ou mudar chega à nuvem em até 15 minutos, e o
-que apagar é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem: o que for criado
-só na nuvem é apagado no espelho noturno.
-
 ### caddy
 
 - **Domínio base:** um domínio seu, com o DNS gerenciado pela Cloudflare. Os serviços ficam em
@@ -143,6 +119,30 @@ só na nuvem é apagado no espelho noturno.
   a instalação de novo: ela pede a senha e cadastra o TPM outra vez.
 - **Senha do administrador:** só aparece na primeira instalação, depois que o Nextcloud termina de instalar
   (alguns minutos). Se o Nextcloud a recusar, por ser curta ou já ter vazado em algum site, ele pede outra.
+
+### rclone
+
+- **Qual disco recebe o espelho noturno?** Marque com Espaço o disco que guarda a cópia local (um só). Ele é
+  montado sozinho a cada boot e só o seu usuário acessa. Deixe vazio para fazer só a cópia na nuvem.
+- **Qual disco copiar para ele toda noite?** O disco de dados que vai ser protegido, por exemplo o do
+  Nextcloud.
+- **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
+  pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
+- **Adicionar um armazenamento em nuvem agora?** Liga a cópia fora de casa. Dá para adicionar depois, em
+  "Configurar um projeto instalado".
+  - **Qual armazenamento em nuvem?** O serviço. Hoje, o Proton Drive.
+  - **Nome do armazenamento** e **pasta dentro do disco:** onde a cópia da nuvem fica no disco. Por padrão,
+    uma pasta com o nome do serviço (ex.: `proton`). A raiz do disco não é aceita, para caber mais de um
+    serviço.
+  - **E-mail, senha e código da verificação em duas etapas:** o login no serviço. Se você ligar a verificação
+    em duas etapas depois, use "Reconectar a um armazenamento em nuvem".
+  - **Quando fazer a primeira cópia?** Traz tudo o que já está na nuvem para o disco. Pode levar horas: escolha
+    agora, um horário (por exemplo de madrugada) ou depois, pelo menu. Se ela for interrompida (internet,
+    reboot, falta de luz), continua sozinha de onde parou.
+
+Depois da primeira cópia, **o disco manda**: o que você criar ou mudar chega à nuvem em até 15 minutos, e o
+que apagar é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem: o que for criado
+só na nuvem é apagado no espelho noturno.
 
 ### sunshine
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=backup
+ASTRO_PROJECT=rclone
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
@@ -10,13 +10,13 @@ source ../lib/disk.sh
 source common.sh
 
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-UNIT_PREFIX=astro-backup
+UNIT_PREFIX=astro-rclone
 TICK_CALENDAR="*:0/15"
 NIGHTLY_CALENDAR="*-*-* 01:30:00"
 LOCAL_CALENDAR="*-*-* 02:30:00"
 
 cmd_describe() {
-    echo "Backup: espelha os discos em outro disco e em armazenamentos em nuvem (rclone)"
+    echo "rclone: backup dos discos em outro disco e em armazenamentos em nuvem"
 }
 
 cmd_status() {
@@ -33,7 +33,7 @@ cmd_actions() {
 }
 
 data_disks() {
-    disk_mounts backup
+    disk_mounts rclone
 }
 
 pick_data_disk() {
@@ -59,12 +59,12 @@ configure() {
     ui_step "Configuração"
     local current_disks
     current_disks="$(env_get BACKUP_DISKS)"
-    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em backup/.env?" y; then
+    if [[ -f .env ]] && ui_confirm "usar a configuração já salva em rclone/.env?" y; then
         ui_ok "configuração existente mantida"
         return
     fi
     local disks=() source="" days
-    disk_choose disks backup "Qual disco recebe o espelho noturno? (deixe vazio para só nuvem)" "$current_disks"
+    disk_choose disks rclone "Qual disco recebe o espelho noturno? (deixe vazio para só nuvem)" "$current_disks"
     if ((${#disks[@]} > 1)); then
         ui_warn "use um disco só; ficou o primeiro marcado"
         disks=("${disks[0]}")
@@ -80,7 +80,7 @@ configure() {
         printf "BACKUP_DISKS='%s'\nSOURCE='%s'\nKEEP_DAYS='%s'\n" "${disks[*]}" "$source" "$days" > .env.new
     )
     mv .env.new .env
-    ui_ok "configuração salva em backup/.env"
+    ui_ok "configuração salva em rclone/.env"
 }
 
 install_rclone() {
@@ -100,7 +100,7 @@ install_rclone() {
 backup_disk() {
     local uuids=() mount
     read -ra uuids <<< "$(env_get BACKUP_DISKS)"
-    disk_setup backup "x-gvfs-hide,x-systemd.before=user@$(id -u).service" "${uuids[@]}"
+    disk_setup rclone "x-gvfs-hide,x-systemd.before=user@$(id -u).service" "${uuids[@]}"
     mount="${DISK_MOUNTS[0]:-}"
     sed -i '/^BACKUP_MOUNT=/d' .env
     printf "BACKUP_MOUNT='%s'\n" "$mount" >> .env
@@ -121,12 +121,12 @@ write_unit() {
 }
 
 service_unit() {
-    printf '[Unit]\nDescription=astro backup: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s %s\n' \
+    printf '[Unit]\nDescription=astro rclone: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s %s\n' \
         "$1" "$PWD/run.sh" "$2"
 }
 
 timer_unit() {
-    printf '[Unit]\nDescription=astro backup: %s\n\n[Timer]\nOnCalendar=%s\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n' \
+    printf '[Unit]\nDescription=astro rclone: %s\n\n[Timer]\nOnCalendar=%s\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n' \
         "$1" "$2"
 }
 
@@ -195,7 +195,7 @@ schedule_import() {
 
 action_add() {
     ui_step "Adicionar armazenamento em nuvem"
-    command -v rclone >/dev/null || ui_fail "instale o projeto backup primeiro"
+    command -v rclone >/dev/null || ui_fail "instale o projeto rclone primeiro"
     local provider name disk folder
     pick_provider provider
     provider_load "$provider"
@@ -332,12 +332,12 @@ cmd_remove() {
     done
     systemctl --user daemon-reload
     ui_ok "agendamentos removidos"
-    if [[ -n $(disk_block "$DISK_FSTAB" backup) ]]; then
-        disk_release backup
+    if [[ -n $(disk_block "$DISK_FSTAB" rclone) ]]; then
+        disk_release rclone
     fi
     if $purge && [[ -d data ]]; then
         rm -rf data
-        ui_ok "configuração da nuvem apagada (backup/data: logins e armazenamentos)"
+        ui_ok "configuração da nuvem apagada (rclone/data: logins e armazenamentos)"
     fi
     ui_info "mantidos: os arquivos nos discos, na nuvem e o rclone"
 }

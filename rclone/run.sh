@@ -2,12 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=backup
+ASTRO_PROJECT=rclone
 source ../lib/ui.sh
 source ../lib/env.sh
 source common.sh
 
-LOCK="${XDG_RUNTIME_DIR:-/tmp}/astro-backup.lock"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/astro-rclone.lock"
 MARGIN=120
 MAX_DELETE=1000
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
