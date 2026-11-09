@@ -295,8 +295,7 @@ action_remove() {
     apply_routes
 }
 
-cmd_action() {
-    cmd_restore() {
+cmd_restore() {
     local log
     remove_container
     state_restore "$1"
@@ -307,7 +306,8 @@ cmd_action() {
     ui_ok "container $CONTAINER rodando com a configuração restaurada"
 }
 
-case "${1:-}" in
+cmd_action() {
+    case "${1:-}" in
         list)   ui_step "Rotas"; print_routes ;;
         add)    action_add ;;
         remove) action_remove ;;

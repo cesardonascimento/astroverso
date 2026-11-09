@@ -182,6 +182,8 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
 - Em teste com outro `HOME`, o Podman rootless passa a usar outro armazenamento de imagens: manter
   `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e `XDG_RUNTIME_DIR` reais e apontar só o `~/.astro` (e as travas) para o
   scratchpad. E desativar o Caddy da cópia: o `proxy_reload` acha o container real pelo nome.
+- Editar vários `project.sh` por substituição de texto: `case "${1:-}" in` aparece também dentro de funções (ex.:
+  `cmd_action`). Ancorar na linha seguinte (`    describe) cmd_describe ;;`), senão a função entra no lugar errado.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
 - `journalctl --user -u <padrão>` sai com 1 quando nenhuma unidade tem mensagens: em pipeline com `pipefail`, `|| true`.

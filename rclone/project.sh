@@ -497,11 +497,11 @@ action_restore() {
                 failed+=("$service")
             fi
         else
-            ui_warn "$service não sabe restaurar a configuração: ficou em $work/extract/$service"
+            ui_warn "$service não sabe restaurar a configuração"
             failed+=("$service")
         fi
     done
-    ((${#failed[@]})) || podman unshare rm -rf "$work"
+    podman unshare rm -rf "$work"
 
     ui_step "Resumo"
     ((${#restored[@]})) && ui_ok "restaurados de $(version_label "$version"): ${restored[*]}"
