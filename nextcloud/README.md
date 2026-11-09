@@ -34,7 +34,8 @@ Nenhuma porta é aberta na máquina: o Caddy alcança o `astro-nextcloud` pelo n
 | Senha do administrador | (sem padrão; só na primeira instalação) |
 
 O usuário administrador só é criado na primeira instalação: trocar a resposta depois não renomeia a conta.
-Trocar a pasta dos arquivos depois de instalado também não move os arquivos.
+Trocar a pasta dos arquivos depois de instalado pede confirmação: com **S**, os containers param e os arquivos
+são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta antiga é mantida.
 
 ## O que a instalação faz
 

@@ -170,7 +170,7 @@ disk_release_unused() {
 disk_setup() {
     local project=$1 options=$2
     shift 2
-    local uuid device fstype label mapper fs_uuid fs_type name target pass fstab=() crypttab=() keep=() mounts=()
+    local uuid device fstype label mapper fs_uuid fs_type name target pass wait_options fstab=() crypttab=() keep=() mounts=()
     local -A seen=()
     DISK_MOUNTS=()
     if (($# == 0)) && [[ -z $(disk_block "$DISK_FSTAB" "$project") ]]; then
@@ -194,6 +194,7 @@ disk_setup() {
             continue
         fi
         fstype="$(lsblk -dno FSTYPE "$device")"
+        wait_options="x-systemd.device-timeout=10s"
         if [[ $fstype == crypto_LUKS ]]; then
             mapper="luks-$uuid"
             label="$(lsblk -no LABEL "$device" | grep -v '^$' | head -1 || true)"
@@ -206,6 +207,7 @@ disk_setup() {
                 "$mapper UUID=$uuid none tpm2-device=auto,headless=true,nofail,x-systemd.device-timeout=10s,x-udisks-auth")
             udevadm settle 2>/dev/null || true
             device="/dev/mapper/$mapper"
+            wait_options="x-systemd.device-timeout=5min,x-systemd.requires=systemd-cryptsetup@$(systemd-escape "$mapper").service"
         fi
         read -r fs_uuid fs_type label < <(lsblk -dno UUID,FSTYPE,LABEL "$device")
         name="${label:-disco-${uuid:0:8}}"
@@ -216,7 +218,7 @@ disk_setup() {
         [[ $fs_type == ntfs ]] && fs_type=ntfs3
         [[ $fs_type == ext4 || $fs_type == xfs || $fs_type == btrfs ]] && pass=2 || pass=0
         fstab+=("# astro:$project $uuid"
-            "UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,x-systemd.device-timeout=10s,x-udisks-auth${options:+,$options} 0 $pass")
+            "UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth${options:+,$options} 0 $pass")
         keep+=("$uuid")
         mounts+=("$device $target $fs_type")
         DISK_MOUNTS+=("$target")

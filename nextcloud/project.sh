@@ -15,6 +15,7 @@ NETWORK=astro_default
 SECRETS=data/secrets
 CONFIG=data/html/config/config.php
 OVERRIDE=docker-compose.override.yml
+MOVE_FROM=""
 DISK_OPTIONS="x-gvfs-hide,x-systemd.before=user@$(id -u).service,context=system_u:object_r:container_file_t:s0"
 
 cmd_describe() {
@@ -38,11 +39,21 @@ configure() {
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em nextcloud/.env?" y; then
         ui_ok "configuração existente mantida"
     else
-        local host admin files domain
+        local host admin files domain old_files
         domain="$(proxy_domain)"
+        old_files="$(env_get FILES_DIR)"
         ui_input host  "endereço do Nextcloud no Caddy" "$(env_get NEXTCLOUD_HOST "nextcloud${domain:+.$domain}")" is_hostname
         ui_input admin "usuário administrador" "$(env_get ADMIN_USER astro)" is_name
         ui_input files "pasta dos arquivos" "$(env_get FILES_DIR "$PWD/data/files")" is_path
+        if [[ -n $old_files && $files != "$old_files" ]] && podman unshare test -f "$old_files/.ncdata"; then
+            ui_warn "o Nextcloud já guarda os arquivos em $old_files"
+            if ui_confirm "mover os arquivos para $files?" n; then
+                MOVE_FROM=$old_files
+            else
+                files=$old_files
+                ui_ok "pasta dos arquivos mantida em $old_files"
+            fi
+        fi
         (
             umask 077
             printf "NEXTCLOUD_HOST='%s'\nADMIN_USER='%s'\nFILES_DIR='%s'\n" "$host" "$admin" "$files" > .env.new
@@ -144,8 +155,24 @@ prepare_secrets() {
     fi
 }
 
+move_files() {
+    local from=$1 to=$2
+    mkdir -p "$to"
+    if [[ -n $(podman unshare find "$to" -mindepth 1 -print -quit) ]]; then
+        ui_fail "$to não está vazia: esvazie a pasta ou escolha outra"
+    fi
+    remove_containers
+    ui_info "movendo os arquivos de $from para $to..."
+    podman unshare cp -a "$from/." "$to/"
+    podman unshare rm -rf "$from"
+    ui_ok "arquivos movidos para $to"
+}
+
 prepare_files() {
     local files=$1
+    if [[ -n $MOVE_FROM ]]; then
+        move_files "$MOVE_FROM" "$files"
+    fi
     mkdir -p "$files"
     podman unshare chown 33:33 "$files"
     podman unshare chmod 770 "$files"

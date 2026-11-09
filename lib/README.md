@@ -54,7 +54,9 @@ Bibliotecas compartilhadas:
     destravar), escreve as linhas do projeto no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um comentário
     `# astro:<projeto> <uuid>`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Deixa os
     caminhos em `DISK_MOUNTS`. As `opções` são acrescentadas às da montagem (ex.: `uid=`, `context=`).
-  - Toda montagem leva `nofail`, espera de 10s pelo disco e `x-udisks-auth`; o LUKS leva `headless=true`. Nada
+  - Toda montagem leva `nofail` e `x-udisks-auth`. Disco comum: espera de 10s. Disco LUKS: `headless=true` no
+    `crypttab` e, no `fstab`, `x-systemd.requires=` do serviço do `cryptsetup` com espera de 5min (o TPM pode
+    levar quase um minuto no boot; disco ausente falha em 10s pelo `crypttab`). Nada
     pede senha no boot: um disco ausente ou que o TPM não destrava fica de fora e a máquina sobe.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
   - Discos tirados da lista são desmontados e saem dos dois arquivos. `disk_release projeto` libera todos.
