@@ -66,6 +66,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   - fuso da máquina e região dos telefones, tirada do fuso (`zone.tab`);
   - janela de manutenção às 3h no fuso da máquina;
   - tarefas em segundo plano pelo cron;
+  - contas novas sem os arquivos de exemplo (`skeletondirectory` vazio);
   - índices que faltam no banco e reparos.
 - Troca o site padrão do Apache por `apache.conf`, que avisa ao Apache que o endereço público é
   `https://<endereço>` (`ServerName` com `https://` e `UseCanonicalName On`). Sem isso, o Apache, que recebe

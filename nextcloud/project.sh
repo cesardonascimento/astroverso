@@ -259,6 +259,8 @@ tune() {
     occ config:system:set maintenance_window_start --type=integer --value="$window" >/dev/null
     occ background:cron >/dev/null
     ui_ok "tarefas em segundo plano pelo cron, as pesadas às 3h da manhã"
+    occ config:system:set skeletondirectory --value="" >/dev/null
+    ui_ok "contas novas começam sem os arquivos de exemplo"
 
     local log
     if ! log="$(occ db:add-missing-indices 2>&1 && occ maintenance:repair --include-expensive 2>&1)"; then
