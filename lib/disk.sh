@@ -51,6 +51,7 @@ disk_choose() {
         owner="$(disk_owner "$uuid")"
         [[ -z $owner || $owner == "$project" ]] || continue
         kind=$fstype
+        [[ $label == - ]] && label="${path##*/} (${uuid:0:8})"
         if [[ $fstype == crypto_LUKS && $inner == - ]]; then
             kind="criptografado, travado"
         elif [[ $fstype == crypto_LUKS ]]; then
@@ -212,6 +213,11 @@ disk_setup() {
             wait_options="x-systemd.device-timeout=5min,x-systemd.requires=systemd-cryptsetup@$(systemd-escape "$mapper").service"
         fi
         read -r fs_uuid fs_type label < <(lsblk -dno UUID,FSTYPE,LABEL "$device")
+        if [[ $fstype == crypto_LUKS && -n $label && -z $(lsblk -dno LABEL "/dev/disk/by-uuid/$uuid") ]] \
+                && [[ $(lsblk -dno FSVER "/dev/disk/by-uuid/$uuid") == 2 ]]; then
+            sudo cryptsetup config --label "$label" "/dev/disk/by-uuid/$uuid"
+            ui_ok "nome $label gravado no cabeçalho da criptografia (aparece mesmo com o disco travado)"
+        fi
         name="${label:-disco-${uuid:0:8}}"
         [[ $name =~ ^[A-Za-z0-9._-]+$ ]] || name="disco-${uuid:0:8}"
         [[ -n ${seen[$name]:-} ]] && name="$name-${uuid:0:8}"

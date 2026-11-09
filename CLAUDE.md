@@ -144,6 +144,8 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   as permissões extras. Pasta com ACL usa `chmod 770` (o `group::---` continua sem acesso).
 - O `ntfs3` usa a permissão gravada no disco (atributos `$LXMOD` do WSL) no lugar do `umask`/`dmask`: a pasta
   principal pode aparecer `777`. Um `chmod` fica gravado no disco e vale nas próximas montagens.
+- O rótulo de um disco LUKS fica dentro da criptografia: travado, o `lsblk` só mostra o rótulo do cabeçalho LUKS2
+  (vazio por padrão). O `disk_setup` copia o rótulo de dentro para o cabeçalho ao destravar.
 - `lsblk -J` só devolve a árvore (`children`) com `--tree` ou a coluna `NAME`.
 - `$(...)` cujo último comando é `((n)) && ...` com `n=0` sai com 1 e, numa atribuição, derruba o `set -e`.
 - `journalctl --user -u <padrão>` sai com 1 quando nenhuma unidade tem mensagens: em pipeline com `pipefail`, `|| true`.
