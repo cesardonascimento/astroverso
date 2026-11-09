@@ -52,6 +52,10 @@ Trocar a pasta dos arquivos depois de instalado também não move os arquivos.
   - janela de manutenção às 3h no fuso da máquina;
   - tarefas em segundo plano pelo cron;
   - índices que faltam no banco e reparos.
+- Troca o site padrão do Apache por `apache.conf`, que avisa ao Apache que o endereço público é
+  `https://<endereço>` (`ServerName` com `https://` e `UseCanonicalName On`). Sem isso, o Apache, que recebe
+  o acesso do Caddy em HTTP, redireciona `/.well-known/caldav` e `/.well-known/carddav` para `http://`. O
+  mesmo arquivo liga o HSTS (`Strict-Transport-Security`, 180 dias), para o navegador nunca usar HTTP.
 - Publica a rota `https://<endereço> → http://astro-nextcloud:80` no Caddy.
 
 ## Arquivos gerados
