@@ -9,6 +9,7 @@ instalação.
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
+| [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
@@ -95,6 +96,17 @@ respostas ficam em `<projeto>/.env`, fora do git.
 
 - **Endereço no Caddy:** o nome pelo qual o painel é acessado. Por padrão,
   `<nome-da-máquina>.<domínio do Caddy>`.
+
+### nextcloud
+
+- **Endereço do Nextcloud no Caddy:** o nome pelo qual o Nextcloud é aberto no navegador e configurado nos
+  apps. Por padrão, `nextcloud.<domínio>`.
+- **Usuário administrador:** a conta que administra o Nextcloud e cria as contas das outras pessoas. Por
+  padrão, `astro`. Só vale na primeira instalação.
+- **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, `nextcloud/data/files`,
+  dentro do projeto.
+- **Senha do administrador:** só aparece na primeira instalação, depois que o Nextcloud termina de instalar
+  (alguns minutos). Se o Nextcloud a recusar, por ser curta ou já ter vazado em algum site, ele pede outra.
 
 ### sunshine
 

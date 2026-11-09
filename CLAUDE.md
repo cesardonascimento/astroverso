@@ -81,7 +81,8 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
   vão pela entrada padrão.
 - Um projeto publica um endereço no Caddy com `proxy_publish` (escreve `<projeto>/.proxy` e recarrega o Caddy).
   Rotas manuais ficam em `caddy/.routes`; as de projeto têm prioridade sobre uma manual com o mesmo endereço.
-- Versões fixadas: AdGuard na 1ª linha de `adguard/Dockerfile`; Caddy e `caddy-dns/cloudflare` em `caddy/Dockerfile`.
+- Versões fixadas: AdGuard na 1ª linha de `adguard/Dockerfile`; Caddy e `caddy-dns/cloudflare` em `caddy/Dockerfile`;
+  Nextcloud, PostgreSQL e Valkey nas imagens de `nextcloud/docker-compose.yml`.
 
 ### Projetos
 
@@ -90,6 +91,7 @@ lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy 
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
+| nextcloud | Imagem oficial `nextcloud:<versão>-apache` + PostgreSQL + Valkey + container de cron (mesma imagem, `/cron.sh`). Sem porta no host: o Caddy chega em `astro-nextcloud:80` pela `astro_default`. Senha do banco em `data/secrets` (lida pelos `*_FILE`; arquivo `644` em pasta `700`, porque o Postgres lê como o usuário `postgres`). A imagem instala com uma senha aleatória, trocada pela digitada com `occ user:resetpassword --password-from-env`. `trusted_proxies`, `overwriteprotocol`, fuso, região e cron aplicados pelo `occ` a cada instalação. |
 | sunshine | Pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com login automático no GDM, sem bloqueio de tela; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot), torna a NVIDIA a placa principal do GNOME (udev `mutter-device-preferred-primary`). O codificador não é fixado: o Sunshine testa (NVENC primeiro) a cada stream; a instalação só avisa se não houver tela na saída da NVIDIA. Padrão: tampa fechada e tela externa (TV ou plugue HDMI fantasma) no HDMI, que sai pela NVIDIA. `astro-sunshine-display` (Python + DBus do Mutter) no `global_prep_cmd` troca a tela, temporariamente, para a resolução exata do aparelho e volta no `undo`; nunca sai com erro. Alto-falantes internos mudos para o usuário de jogos (`pw-dump` + `wpctl`; o Fedora não traz `pactl`). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. |
 
 ## Armadilhas conhecidas

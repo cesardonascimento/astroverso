@@ -44,6 +44,6 @@ Bibliotecas compartilhadas:
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
 - `lib/env.sh`: `env_get CHAVE [padrão]` lê valores do `.env` do projeto. Validadores para as perguntas,
-  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`.
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto).
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.

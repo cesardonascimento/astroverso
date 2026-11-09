@@ -1,0 +1,73 @@
+name: astro
+
+x-podman:
+  in_pod: false
+
+services:
+  nextcloud-db:
+    image: docker.io/library/postgres:18.6-alpine
+    container_name: astro-nextcloud-db
+    restart: always
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - ./data/db:/var/lib/postgresql:Z
+      - ./data/secrets/db_password:/run/secrets/db_password:ro,z
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "nextcloud", "-d", "nextcloud"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  nextcloud-redis:
+    image: docker.io/valkey/valkey:9.1.3-alpine
+    container_name: astro-nextcloud-redis
+    restart: always
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  nextcloud:
+    image: docker.io/library/nextcloud:35.0.2-apache
+    container_name: astro-nextcloud
+    restart: always
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    environment: &nextcloud-env
+      POSTGRES_HOST: nextcloud-db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      NEXTCLOUD_ADMIN_USER: ${ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      REDIS_HOST: nextcloud-redis
+      PHP_MEMORY_LIMIT: 1G
+      PHP_UPLOAD_LIMIT: 16G
+      APACHE_DISABLE_REWRITE_IP: 1
+    volumes: &nextcloud-volumes
+      - ./data/html:/var/www/html:z
+      - ${FILES_DIR}:/var/www/html/data:z
+      - ./data/secrets:/run/secrets:ro,z
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/status.php"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5m
+      retries: 3
+
+  nextcloud-cron:
+    image: docker.io/library/nextcloud:35.0.2-apache
+    container_name: astro-nextcloud-cron
+    restart: always
+    depends_on:
+      - nextcloud
+    entrypoint: /cron.sh
+    environment: *nextcloud-env
+    volumes: *nextcloud-volumes

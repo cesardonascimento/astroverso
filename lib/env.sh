@@ -32,3 +32,8 @@ is_timezone() {
 is_username() {
     [[ $1 =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && printf '%s' "$1"
 }
+
+is_path() {
+    local path="${1%/}"
+    [[ $path =~ ^/[A-Za-z0-9._/-]+$ && $path != *..* ]] && printf '%s' "$path"
+}
