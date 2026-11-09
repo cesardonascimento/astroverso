@@ -11,7 +11,7 @@ instalação.
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), atualizada a cada 15 minutos. |
-| [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que entra sozinho no boot, separado do usuário que cuida do homelab. |
+| [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que pode entrar sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
 
@@ -150,9 +150,15 @@ só na nuvem é apagado no espelho noturno.
   proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
   aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
   senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
-- **Nome do usuário de jogos:** o usuário que entra sozinho no boot e cuja tela é transmitida. É nele que
-  ficam os emuladores, os jogos e as configurações. Ele é criado sem senha e sem `sudo`, para que quem
-  estiver jogando não tenha acesso ao homelab. Por padrão, `jogos`.
+- **Nome do usuário de jogos:** o usuário cuja tela é transmitida. É nele que ficam os emuladores, os jogos
+  e as configurações. Ele é criado sem `sudo`, para que quem estiver jogando não tenha acesso ao homelab.
+  Por padrão, `jogos`.
+- **Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?** Com **S** (padrão), a máquina liga
+  direto na sessão de jogos, pronta para o Moonlight, e a tela não bloqueia sozinha (dá para bloquear e
+  trocar de usuário à mão). Com **N**, é preciso entrar com ele na tela antes de jogar, e a tela bloqueia
+  depois de 5 minutos parada.
+- **Senha do usuário de jogos:** para entrar na tela, trocar de usuário e desbloquear. Não dá acesso ao
+  `sudo`. Na reinstalação, o assistente pergunta se mantém a atual.
 - **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
   aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
 - **Quais discos são de jogos?** Marque com Espaço os discos com jogos, ROMs e emuladores (ao reconfigurar, os

@@ -44,7 +44,7 @@ gdm_autologin_user() {
 cmd_status() {
     local user
     user="$(env_get GAMES_USER)"
-    [[ -n $user ]] && command -v sunshine >/dev/null && [[ $(gdm_autologin_user) == "$user" ]]
+    [[ -n $user ]] && command -v sunshine >/dev/null && id "$user" >/dev/null 2>&1
 }
 
 as_user() {
@@ -73,9 +73,17 @@ check_games_user() {
         return 1
     fi
     if id -nG "$user" | grep -qwE 'wheel|sudo|admin'; then
-        ui_warn "$user tem acesso ao sudo; o login automático exige um usuário sem privilégios"
+        ui_warn "$user tem acesso ao sudo; o usuário de jogos não pode ter privilégios"
         return 1
     fi
+}
+
+choose_autologin() {
+    local answer=n
+    ui_confirm "entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?" "$(env_get AUTOLOGIN yes | sed 's/yes/y/;s/no/n/')" && answer=yes
+    [[ $answer == yes ]] || answer=no
+    sed -i '/^AUTOLOGIN=/d' .env
+    printf "AUTOLOGIN='%s'\n" "$answer" >> .env
 }
 
 choose_disks() {
@@ -92,9 +100,11 @@ configure() {
     if [[ -f .env ]] && ui_confirm "usar a configuração já salva em sunshine/.env?" y; then
         ui_ok "configuração existente mantida"
         grep -q '^GAMES_DISKS=' .env || choose_disks
+        grep -q '^AUTOLOGIN=' .env || choose_autologin
         return
     fi
-    local user host domain
+    local user host domain autologin_current
+    autologin_current="$(env_get AUTOLOGIN yes)"
     domain="$(proxy_domain)"
     while true; do
         ui_input user "nome do usuário de jogos (criado se não existir)" "$(env_get GAMES_USER jogos)" is_username
@@ -106,6 +116,8 @@ configure() {
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > .env.new
     )
     mv .env.new .env
+    printf "AUTOLOGIN='%s'\n" "$autologin_current" >> .env
+    choose_autologin
     choose_disks "$current_disks"
     ui_ok "configuração salva em sunshine/.env"
 }
@@ -143,26 +155,48 @@ create_user() {
         ui_ok "usuário $user já existe"
     else
         sudo useradd -m -c "Jogos" "$user"
-        ui_ok "usuário $user criado, sem senha e sem sudo"
+        ui_ok "usuário $user criado, sem sudo"
     fi
     as_user "$user" sh -c 'mkdir -p "$HOME/.config" && printf "yes\n" > "$HOME/.config/gnome-initial-setup-done"'
 }
 
-desktop_settings() {
-    local user=$1
-    if ! command -v gsettings >/dev/null || ! gsettings list-schemas 2>/dev/null | grep -qx org.gnome.desktop.lockdown; then
-        ui_warn "GNOME não encontrado: desative o bloqueio de tela de $user manualmente"
+games_password() {
+    local user=$1 password status
+    status="$(sudo passwd -S "$user" 2>/dev/null | awk '{ print $2 }')"
+    if [[ $status == P* ]] && ui_confirm "manter a senha atual de $user?" y; then
+        ui_ok "senha de $user mantida"
         return
     fi
+    ui_info "a senha serve para entrar na tela, trocar de usuário e desbloquear; ela não dá acesso ao sudo"
+    ui_secret password "senha de $user"
+    printf '%s:%s\n' "$user" "$password" | sudo chpasswd
+    ui_ok "senha de $user definida"
+}
+
+desktop_settings() {
+    local user=$1 autologin=$2 lock=true idle=300
+    if ! command -v gsettings >/dev/null || ! gsettings list-schemas 2>/dev/null | grep -qx org.gnome.desktop.lockdown; then
+        ui_warn "GNOME não encontrado: ajuste o bloqueio de tela de $user manualmente"
+        return
+    fi
+    if [[ $autologin == yes ]]; then
+        lock=false
+        idle=0
+    fi
     as_user "$user" dbus-run-session -- sh -c '
-        gsettings set org.gnome.desktop.screensaver lock-enabled false
-        gsettings set org.gnome.desktop.lockdown disable-lock-screen true
-        gsettings set org.gnome.desktop.session idle-delay 0
+        gsettings set org.gnome.desktop.screensaver lock-enabled "$1"
+        gsettings set org.gnome.desktop.lockdown disable-lock-screen false
+        gsettings set org.gnome.desktop.session idle-delay "$2"
         gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing
-    ' >/dev/null 2>&1
-    ui_ok "bloqueio de tela, escurecimento e suspensão desativados para $user"
+    ' sh "$lock" "$idle" >/dev/null 2>&1
+    if [[ $autologin == yes ]]; then
+        ui_ok "$user sem bloqueio automático de tela (bloquear e trocar de usuário à mão continuam funcionando)"
+    else
+        ui_ok "$user com bloqueio de tela depois de 5 minutos parado"
+    fi
+    ui_ok "escurecimento e suspensão desativados para $user"
 }
 
 gdm_render() {
@@ -474,9 +508,10 @@ display_check() {
 
 cmd_install() {
     configure
-    local user host
+    local user host autologin_mode
     user="$(env_get GAMES_USER)"
     host="$(env_get SUNSHINE_HOST)"
+    autologin_mode="$(env_get AUTOLOGIN yes)"
 
     ui_step "Host"
     host_base
@@ -485,8 +520,15 @@ cmd_install() {
 
     ui_step "Usuário de jogos"
     create_user "$user"
-    desktop_settings "$user"
-    autologin "$user"
+    games_password "$user"
+    desktop_settings "$user" "$autologin_mode"
+    if [[ $autologin_mode == yes ]]; then
+        autologin "$user"
+    elif [[ $(gdm_autologin_user) == "$user" ]]; then
+        autologin_off
+    else
+        ui_ok "$user entra pela tela de login, com a senha"
+    fi
     games_disks "$user"
     primary_gpu
 
@@ -508,7 +550,10 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "painel: https://$host"
     ui_ok "Moonlight: $(host_lan_ip)"
-    if $HOST_REBOOT || ! user_manager_running "$user"; then
+    if [[ $autologin_mode != yes ]] && ! user_session_active "$user"; then
+        $HOST_REBOOT && ui_warn "reinicie a máquina para concluir: sudo systemctl reboot"
+        ui_info "o Sunshine roda dentro da sessão de $user: entre com $user na tela para ele começar a transmitir"
+    elif $HOST_REBOOT || ! user_manager_running "$user"; then
         ui_warn "reinicie a máquina para concluir: sudo systemctl reboot"
     elif ! user_session_active "$user"; then
         ui_warn "a sessão de $user não está na tela: o Sunshine só transmite e recebe os controles dela"

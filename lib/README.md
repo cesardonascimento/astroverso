@@ -63,6 +63,8 @@ Bibliotecas compartilhadas:
     `crypttab` e, no `fstab`, `x-systemd.requires=` do serviço do `cryptsetup` com espera de 5min (o TPM pode
     levar quase um minuto no boot; disco ausente falha em 10s pelo `crypttab`). Nada
     pede senha no boot: um disco ausente ou que o TPM não destrava fica de fora e a máquina sobe.
+  - Disco desligado e religado (cabo, troca de case) volta a montar sozinho: um link em
+    `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem (e o `cryptsetup`, no LUKS) ao disco.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
   - `disk_mounts [projeto a ignorar]` lista as montagens do astro (`/srv/<rótulo> projeto`), lidas do `fstab`.
   - Discos tirados da lista são desmontados e saem dos dois arquivos. `disk_release projeto` libera todos.

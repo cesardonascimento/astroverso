@@ -111,6 +111,19 @@ disk_block_write() {
     return 0
 }
 
+disk_hotplug_link() {
+    local wants
+    wants="/etc/systemd/system/$(systemd-escape -p --suffix=device "$1").wants"
+    [[ -L $wants/$2 ]] && return 0
+    sudo mkdir -p "$wants"
+    sudo ln -sfn "/run/systemd/generator/$2" "$wants/$2"
+}
+
+disk_hotplug_unlink() {
+    sudo find /etc/systemd/system -path '*.device.wants/*' -name "${1//\\/\\\\}" -delete 2>/dev/null || true
+    sudo find /etc/systemd/system -name '*.device.wants' -type d -empty -delete 2>/dev/null || true
+}
+
 disk_tpm_ok() {
     sudo cryptsetup open --test-passphrase --token-only "$1" >/dev/null 2>&1
 }
@@ -150,6 +163,7 @@ disk_release_unused() {
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
         target="$(awk '{ print $2 }' <<< "$line")"
+        disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
         if mountpoint -q "$target"; then
             sudo umount "$target"
             ui_ok "$target desmontado"
@@ -164,6 +178,7 @@ disk_release_unused() {
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
         target="$(awk '{ print $1 }' <<< "$line")"
+        disk_hotplug_unlink "systemd-cryptsetup@$(systemd-escape "$target").service"
         if [[ -e /dev/mapper/$target ]]; then
             sudo cryptsetup close "$target" 2>/dev/null || ui_warn "não foi possível travar $target (em uso)"
         fi
@@ -173,7 +188,7 @@ disk_release_unused() {
 disk_setup() {
     local project=$1 options=$2
     shift 2
-    local uuid device fstype label mapper fs_uuid fs_type name target pass wait_options fstab=() crypttab=() keep=() mounts=()
+    local uuid device fstype label mapper fs_uuid fs_type name target pass wait_options hotplug=() fstab=() crypttab=() keep=() mounts=()
     local -A seen=()
     DISK_MOUNTS=()
     if (($# == 0)) && [[ -z $(disk_block "$DISK_FSTAB" "$project") ]]; then
@@ -206,6 +221,7 @@ disk_setup() {
                 ui_warn "não foi possível destravar ${label:-o disco $uuid} agora; ele fica de fora"
                 continue
             fi
+            hotplug+=("/dev/disk/by-uuid/$uuid systemd-cryptsetup@$(systemd-escape "$mapper").service")
             crypttab+=("# astro:$project $uuid"
                 "$mapper UUID=$uuid none tpm2-device=auto,headless=true,nofail,x-systemd.device-timeout=10s,x-udisks-auth")
             udevadm settle 2>/dev/null || true
@@ -228,6 +244,7 @@ disk_setup() {
         fstab+=("# astro:$project $uuid"
             "UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth${options:+,$options} 0 $pass")
         keep+=("$uuid")
+        hotplug+=("/dev/disk/by-uuid/$fs_uuid $(systemd-escape -p --suffix=mount "$target")")
         mounts+=("$device $target $fs_type")
         DISK_MOUNTS+=("$target")
     done
@@ -235,6 +252,10 @@ disk_setup() {
     disk_release_unused "$project" "${keep[*]}"
     disk_block_write "$DISK_CRYPTTAB" "$project" "${crypttab[@]}"
     disk_block_write "$DISK_FSTAB" "$project" "${fstab[@]}"
+    local link
+    for link in "${hotplug[@]}"; do
+        disk_hotplug_link "${link% *}" "${link##* }"
+    done
     sudo systemctl daemon-reload
 
     local entry source mounted log already busy

@@ -78,6 +78,10 @@ container_uid() {
 storage() {
     local uuids=() path wid service
     read -ra uuids <<< "$(env_get DISKS)"
+    if cmd_status; then
+        remove_containers
+        ui_ok "containers parados para soltar os discos (sobem de novo logo adiante)"
+    fi
     disk_setup nextcloud "$DISK_OPTIONS" "${uuids[@]}"
     wid="$(container_uid 33)"
     for path in "${DISK_MOUNTS[@]}"; do

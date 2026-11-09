@@ -17,6 +17,7 @@ controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 | Pergunta | Padrão |
 |---|---|
 | Nome do usuário de jogos | `jogos` |
+| Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela? | `S` |
 | Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
 | Quais discos são de jogos? | (nenhum marcado) |
 
@@ -31,15 +32,22 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
   na tela azul do MOK: Enroll MOK → Continue → Yes → senha → Reboot.
 - **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
-- **Usuário de jogos:** cria o usuário sem senha e sem `sudo`, pula a tela de boas-vindas do GNOME e
-  desativa o bloqueio de tela, o escurecimento e a suspensão para ele.
+- **Usuário de jogos:** cria o usuário sem `sudo` e pula a tela de boas-vindas do GNOME.
+- **Senha do usuário de jogos:** pedida na instalação (com `chpasswd`, pela entrada padrão). Se ele já tiver
+  senha, pergunta se mantém. Ela serve para entrar na tela, trocar de usuário e desbloquear.
+- **Tela do usuário de jogos:** desativa o escurecimento e a suspensão. Com login automático, desativa também o
+  bloqueio automático (`lock-enabled false`, `idle-delay 0`); sem ele, a tela bloqueia depois de 5 minutos
+  parada. Em nenhum caso o bloqueio manual e a troca de usuário são proibidos (`disable-lock-screen false`).
 - **Discos de jogos:** cria o grupo `jogos` com o usuário de jogos e monta cada disco escolhido em
   `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh` (nada pede senha no boot). NTFS usa o driver do
   kernel (`ntfs3`). Dono `$USER`, grupo `jogos`, `umask=007`: os dois leem e escrevem, os outros usuários não
   entram. A pasta principal de cada disco recebe `chmod 770`, porque o `ntfs3` usa a permissão gravada no disco
   (atributos do WSL) no lugar do `umask`; a permissão fica gravada no disco. O disco aparece no Arquivos (`x-gvfs-show`) e monta antes da sessão do usuário de jogos. Um NTFS
   marcado como sujo (desligado sem fechar no Windows) não monta: a instalação mostra o `ntfsfix` para corrigir.
-- **Login automático:** configura o GDM (`custom.conf`) para entrar com o usuário de jogos.
+- **Login automático (opcional):** configura o GDM (`custom.conf`) para entrar com o usuário de jogos. Com a
+  resposta **N**, tira o login automático dele, e o Sunshine só começa depois que alguém entra com ele na tela.
+  Com login automático e senha, o chaveiro do GNOME não é destravado no boot: programas que guardam senhas
+  nele (ex.: navegador) pedem a senha do usuário na primeira vez.
 - **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev
   (`61-astro-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
   e rodar os aplicativos na NVIDIA, sem copiar cada quadro da Intel.
@@ -62,8 +70,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
-- Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica,
-  aberta pelo login automático no boot.
+- Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica dele,
+  aberta pelo login automático no boot ou quando alguém entra com ele na tela.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
   `48010`.
 - Bloqueia a porta `47990` (painel) para a rede local: o acesso passa só pelo Caddy, em
@@ -107,7 +115,8 @@ próprio para ele, também pelo DNS da Cloudflare.
 
 ## Depois de instalar
 
-Reinicie a máquina. O login automático, o driver da NVIDIA e o Sunshine só entram em ação no boot.
+Reinicie a máquina. O login automático, o driver da NVIDIA e o Sunshine só entram em ação no boot. Sem login
+automático, entre com o usuário de jogos na tela para o Sunshine começar.
 No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de administração.
 
 ## Remoção
