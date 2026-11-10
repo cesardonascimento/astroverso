@@ -11,14 +11,13 @@ source common.sh
 
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT_PREFIX=astro-rclone
-TICK_CALENDAR="*:0/15"
+TICK_CALENDAR=("*-*-* 08..19:00/30:00" "*-*-* 20:00:00")
 CONFIG_CALENDAR="*-*-* 01:00:00"
-NIGHTLY_CALENDAR="*-*-* 02:00:00"
 LOCAL_CALENDAR="*-*-* 03:00:00"
 RECONFIGURE=false
 
 stop_runs() {
-    systemctl --user stop "$UNIT_PREFIX-tick.service" "$UNIT_PREFIX-nightly.service" \
+    systemctl --user stop "$UNIT_PREFIX-tick.service" "$UNIT_PREFIX-import-*.service" \
         "$UNIT_PREFIX-local.service" "$UNIT_PREFIX-config.service" 2>/dev/null || true
     ui_ok "rodadas em andamento paradas (a primeira cópia continua de onde parou)"
 }
@@ -144,23 +143,28 @@ service_unit() {
 }
 
 timer_unit() {
-    printf '[Unit]\nDescription=astro rclone: %s\n\n[Timer]\nOnCalendar=%s\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n' \
-        "$1" "$2"
+    printf '[Unit]\nDescription=astro rclone: %s\n\n[Timer]\n' "$1"
+    shift
+    printf 'OnCalendar=%s\n' "$@"
+    printf 'Persistent=true\n\n[Install]\nWantedBy=timers.target\n'
 }
 
 schedules() {
     mkdir -p "$UNIT_DIR"
-    write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "envio a cada 15 minutos" tick)"
-    write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "envio a cada 15 minutos" "$TICK_CALENDAR")"
-    write_unit "$UNIT_PREFIX-nightly.service" "$(service_unit "espelho noturno na nuvem" nightly)"
-    write_unit "$UNIT_PREFIX-nightly.timer" "$(timer_unit "espelho noturno na nuvem" "$NIGHTLY_CALENDAR")"
-    write_unit "$UNIT_PREFIX-local.service" "$(service_unit "espelho noturno no disco de backup" local)"
-    write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "espelho noturno no disco de backup" "$LOCAL_CALENDAR")"
+    if [[ -f $UNIT_DIR/$UNIT_PREFIX-nightly.timer ]]; then
+        systemctl --user disable -q --now "$UNIT_PREFIX-nightly.timer" 2>/dev/null || true
+        rm -f "$UNIT_DIR/$UNIT_PREFIX-nightly.timer" "$UNIT_DIR/$UNIT_PREFIX-nightly.service"
+        ui_ok "espelho noturno na nuvem removido (substituído pela sincronização nos dois sentidos)"
+    fi
+    write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "sincronização com a nuvem" tick)"
+    write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "sincronização com a nuvem" "${TICK_CALENDAR[@]}")"
+    write_unit "$UNIT_PREFIX-local.service" "$(service_unit "sincronização com a nuvem e espelho no disco de backup" local)"
+    write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "sincronização com a nuvem e espelho no disco de backup" "$LOCAL_CALENDAR")"
     write_unit "$UNIT_PREFIX-config.service" "$(service_unit "backup das configurações" config)"
     write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "backup das configurações" "$CONFIG_CALENDAR")"
     systemctl --user daemon-reload
-    systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer" "$UNIT_PREFIX-nightly.timer"
-    ui_ok "nuvem: envio a cada 15 minutos e espelho com exclusões às 02:00"
+    systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer"
+    ui_ok "nuvem: sincronização nos dois sentidos a cada 30 minutos, das 08:00 às 20:00, e às 03:00"
     if [[ -n $(env_get CONFIG_BACKUP) ]]; then
         systemctl --user enable -q --now "$UNIT_PREFIX-config.timer"
         ui_ok "configurações: backup criptografado à 01:00 em $(env_get CONFIG_BACKUP)"
@@ -169,7 +173,7 @@ schedules() {
     fi
     if [[ -n $(env_get BACKUP_MOUNT) ]]; then
         systemctl --user enable -q --now "$UNIT_PREFIX-local.timer"
-        ui_ok "disco de backup: espelho às 03:00, com $(env_get KEEP_DAYS 30) dias de versões"
+        ui_ok "disco de backup: espelho às 03:00, logo depois da sincronização com a nuvem, com $(env_get KEEP_DAYS 30) dias de versões"
     else
         systemctl --user disable -q --now "$UNIT_PREFIX-local.timer" 2>/dev/null || true
     fi
@@ -215,7 +219,11 @@ schedule_import() {
         systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
         ui_ok "primeira cópia começou em segundo plano (acompanhe em \"Ver as últimas execuções\")"
     else
-        ui_ok "primeira cópia agendada para $(date -d "@$at" '+%d/%m às %H:%M') (começa em até 15 minutos depois)"
+        systemctl --user stop "$UNIT_PREFIX-import-$name.timer" 2>/dev/null || true
+        systemd-run --user --quiet --collect --unit "$UNIT_PREFIX-import-$name" \
+            --on-calendar "$(date -d "@$at" '+%F %T')" --setenv ASTRO_PLAIN=1 "$PWD/run.sh" tick
+        ui_ok "primeira cópia agendada para $(date -d "@$at" '+%d/%m às %H:%M')"
+        ui_info "se a máquina reiniciar antes, ela começa na próxima sincronização (das 08:00 às 20:00)"
     fi
 }
 
@@ -243,8 +251,8 @@ action_add() {
     target_set "$name" FOLDER "$folder"
     target_set "$name" REMOTE_PATH ""
     ui_ok "$(provider_describe) ↔ $disk/$folder"
-    ui_warn "a partir da primeira cópia, quem manda é $disk/$folder: o que for apagado só na nuvem volta, e o que"
-    ui_warn "for apagado aqui é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem"
+    ui_warn "depois da primeira cópia, $disk/$folder e a nuvem ficam iguais: o que for criado, alterado ou apagado"
+    ui_warn "de um lado vai para o outro (a cada 30 minutos, das 08:00 às 20:00, e às 03:00)"
     schedule_import "$name"
 }
 
@@ -304,9 +312,16 @@ action_now() {
         if [[ $(target_get "$name" IMPORT_DONE) != yes ]]; then
             target_set "$name" IMPORT_AT "$(date +%s)"
         fi
+        if [[ $(target_get "$name" TOO_MANY_DELETES) == yes ]]; then
+            ui_warn "$name: a última sincronização parou porque apagaria mais de 5% dos arquivos"
+            ui_info "confira em \"Ver as últimas execuções\" o que seria apagado antes de liberar"
+            if ui_confirm "liberar as exclusões nesta rodada?" n; then
+                target_set "$name" BISYNC_FORCE yes
+            fi
+        fi
     done
     systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
-    ui_ok "rodada iniciada em segundo plano (envio dos arquivos recentes ou primeira cópia pendente)"
+    ui_ok "rodada iniciada em segundo plano (sincronização nos dois sentidos ou primeira cópia pendente)"
     ui_info "acompanhe em \"Ver as últimas execuções\" ou com: journalctl --user -fu $UNIT_PREFIX-tick"
 }
 
@@ -388,7 +403,7 @@ action_backup_now() {
 
 rclone_busy() {
     local unit
-    for unit in tick nightly local config; do
+    for unit in tick local config; do
         if systemctl --user is-active -q "$UNIT_PREFIX-$unit.service" 2>/dev/null; then
             printf '%s\n' "$UNIT_PREFIX-$unit"
         fi
@@ -528,6 +543,7 @@ cmd_remove() {
     [[ ${1:-} == --purge ]] && purge=true
 
     ui_step "Remoção"
+    systemctl --user stop "$UNIT_PREFIX-import-*.timer" 2>/dev/null || true
     for unit in tick nightly local config; do
         systemctl --user disable -q --now "$UNIT_PREFIX-$unit.timer" 2>/dev/null || true
         rm -f "$UNIT_DIR/$UNIT_PREFIX-$unit.timer" "$UNIT_DIR/$UNIT_PREFIX-$unit.service"

@@ -7,8 +7,7 @@ source ../lib/ui.sh
 source ../lib/env.sh
 source common.sh
 
-MARGIN=120
-MAX_DELETE=1000
+MAX_DELETE=5
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
 lock() {
@@ -57,43 +56,46 @@ import_target() {
         return 1
     fi
     target_set "$name" IMPORT_DONE yes
-    target_set "$name" LAST_UPLOAD "$(date +%s)"
-    ui_ok "$name: primeira cópia concluída; o envio a cada 15 minutos e o espelho noturno estão ativos"
+    target_set "$name" BISYNC_READY no
+    ui_ok "$name: primeira cópia concluída; a sincronização nos dois sentidos está ativa"
 }
 
-upload_target() {
-    local name=$1 list start since
-    start="$(date +%s)"
-    since="$(target_get "$name" LAST_UPLOAD)"
-    since="$(( ${since:-$((start - 1200))} - MARGIN ))"
-    list="$(mktemp)"
-    find "$LOCAL" -type f -newerct "@$since" ! -name '*.partial' -printf '%P\n' > "$list"
-    if [[ ! -s $list ]]; then
-        rm -f "$list"
-        target_set "$name" LAST_UPLOAD "$start"
-        return 0
+bisync_target() {
+    local name=$1 log options=()
+    options=(--create-empty-src-dirs --conflict-resolve newer --conflict-loser num --resilient --recover
+        --max-lock 2h --max-delete "$MAX_DELETE" --exclude '*.partial')
+    if [[ $(target_get "$name" BISYNC_READY) != yes ]]; then
+        ui_step "$name: primeira sincronização $LOCAL ↔ $REMOTE (junta os dois lados, sem apagar nada)"
+        options+=(--resync --resync-mode newer)
+    else
+        ui_step "$name: sincronizando $LOCAL ↔ $REMOTE"
     fi
-    ui_step "$name: enviando $(wc -l < "$list") arquivo(s) novo(s) ou alterado(s)"
-    if ! rclone_run copy "$LOCAL" "$REMOTE" --files-from-raw "$list" --no-traverse \
-            "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}"; then
-        rm -f "$list"
-        ui_error "$name: envio falhou, a próxima rodada tenta de novo"
+    if [[ $(target_get "$name" BISYNC_FORCE) == yes ]]; then
+        ui_warn "$name: exclusões liberadas nesta rodada, sem o limite de $MAX_DELETE%"
+        options+=(--force)
+        target_set "$name" BISYNC_FORCE no
+    fi
+    log="$(mktemp)"
+    if ! rclone_run bisync "$LOCAL" "$REMOTE" "${options[@]}" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 \
+            | tee "$log"; then
+        if grep -qi 'too many deletes' "$log"; then
+            target_set "$name" TOO_MANY_DELETES yes
+            ui_warn "$name: parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados"
+            ui_warn "$name: para apagar mesmo assim, use \"Sincronizar agora\" no assistente"
+        fi
+        if grep -qiE 'must run --resync|cannot find prior' "$log"; then
+            target_set "$name" BISYNC_READY no
+            ui_warn "$name: o rclone perdeu o estado da sincronização; a próxima rodada junta os dois lados de novo"
+            ui_warn "$name: nessa junção, arquivos apagados de um lado só voltam a aparecer"
+        fi
+        rm -f "$log"
+        ui_error "$name: sincronização falhou, a próxima rodada tenta de novo"
         return 1
     fi
-    rm -f "$list"
-    target_set "$name" LAST_UPLOAD "$start"
-    ui_ok "$name: envio concluído"
-}
-
-mirror_target() {
-    local name=$1
-    ui_step "$name: espelho $LOCAL → $REMOTE (com exclusões, no máximo $MAX_DELETE)"
-    if ! rclone_run sync "$LOCAL" "$REMOTE" --max-delete "$MAX_DELETE" --exclude '*.partial' \
-            "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}"; then
-        ui_error "$name: espelho falhou (se passou de $MAX_DELETE exclusões, confira antes de rodar de novo)"
-        return 1
-    fi
-    ui_ok "$name: espelho concluído"
+    rm -f "$log"
+    target_set "$name" BISYNC_READY yes
+    target_set "$name" TOO_MANY_DELETES no
+    ui_ok "$name: sincronização concluída"
 }
 
 run_targets() {
@@ -102,13 +104,12 @@ run_targets() {
         (
             target_paths "$name"
             disk_ready "$DISK" || exit 1
-            if [[ $(target_get "$name" IMPORT_DONE) != yes ]]; then
-                [[ $mode == tick ]] || { ui_info "$name: espelho só depois da primeira cópia"; exit 0; }
-                import_target "$name"
+            if [[ $(target_get "$name" IMPORT_DONE) == yes ]]; then
+                bisync_target "$name"
             elif [[ $mode == tick ]]; then
-                upload_target "$name"
+                import_target "$name"
             else
-                mirror_target "$name"
+                ui_info "$name: sincronização só depois da primeira cópia"
             fi
         ) || failed=1
     done
@@ -134,6 +135,17 @@ local_mirror() {
     fi
     podman unshare find "$backup/versoes" -mindepth 1 -maxdepth 1 -type d -mtime "+$days" -exec rm -rf {} +
     ui_ok "espelho local concluído; versões com mais de $days dias apagadas"
+}
+
+local_run() {
+    local failed=0
+    if ! run_targets local; then
+        failed=1
+    fi
+    if ! local_mirror; then
+        failed=1
+    fi
+    return "$failed"
 }
 
 regex_escape() {
@@ -260,8 +272,7 @@ config_backup() {
 
 case "${1:-}" in
     tick)    lock skip; run_targets tick ;;
-    nightly) lock wait; run_targets nightly ;;
-    local)   lock wait; local_mirror ;;
+    local)   lock wait; local_run ;;
     config)  lock wait "$CONFIG_LOCK"; config_backup "${2:-}" ;;
-    *)       ui_fail "uso: $0 tick | nightly | local | config [rótulo]" ;;
+    *)       ui_fail "uso: $0 tick | local | config [rótulo]" ;;
 esac

@@ -11,7 +11,7 @@ instalação.
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal e gerencia os containers (ver logs, reiniciar, parar). Serve para cuidar do servidor sem SSH, inclusive pelo celular. |
 | [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
-| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), atualizada a cada 15 minutos. |
+| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos a cada 30 minutos durante o dia. |
 | [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que pode entrar sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
@@ -169,7 +169,8 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
   a hora (ex.: `2026-11-10_010000/nextcloud/nextcloud.tar.zst.gpg`); as mais antigas que isso são apagadas. Por
   padrão, `90`.
 
-Os horários: 01:00 backup das configurações, 02:00 espelho na nuvem, 03:00 espelho no disco de backup.
+Os horários: sincronização com a nuvem a cada 30 minutos, das 08:00 às 20:00; 01:00 backup das configurações;
+03:00 uma última sincronização com a nuvem e o espelho no disco de backup.
 
 **Restaurar uma versão** (menu principal): mostra as versões da mais nova para a mais antiga e os serviços de
 cada uma. Antes de trocar qualquer coisa, o assistente para o rclone (se estiver copiando algo, pergunta antes) e
@@ -177,9 +178,11 @@ salva a situação atual como uma versão "antes da restauração", para dar par
 escolhido: para os containers, troca a configuração pela do backup e sobe de novo. Se a senha atual não abrir a
 versão escolhida, ele pede a senha daquela época.
 
-Depois da primeira cópia, **o disco manda**: o que você criar ou mudar chega à nuvem em até 15 minutos, e o
-que apagar é apagado lá à noite. Mexa nos arquivos pelo Nextcloud, não pelo app da nuvem: o que for criado
-só na nuvem é apagado no espelho noturno.
+Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado, alterado ou apagado de um lado
+(pelo Nextcloud, pelo app da nuvem ou por quem tem uma pasta compartilhada com você) vai para o outro na
+sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
+lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
+"Sincronizar agora" mostra o aviso e pergunta se libera.
 
 ### sunshine
 
