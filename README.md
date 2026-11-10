@@ -34,7 +34,7 @@ git clone <url-deste-repositório> ~/Projects/astro
 
 ## Respondendo a instalação
 
-A máquina é preparada para funcionar como servidor: antes de instalar, o assistente atualiza o sistema uma vez
+A máquina é preparada para funcionar como servidor: na primeira instalação, o assistente atualiza o sistema
 (se vier um kernel novo, ele pede para reiniciar ao final) e ela nunca suspende nem hiberna, nem ao fechar a
 tampa de um notebook, para não perder o acesso remoto.
 

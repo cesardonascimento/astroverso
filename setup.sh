@@ -34,6 +34,10 @@ run_all() {
 }
 
 system_upgrade() {
+    local name
+    for name in "${PROJECTS[@]}"; do
+        project "$name" status && return 0
+    done
     ui_step "Sistema"
     host_upgrade
 }

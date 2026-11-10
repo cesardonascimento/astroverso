@@ -64,7 +64,7 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Arquitetura
 
 ```
-setup.sh             assistente: atualiza o sistema (host_upgrade), descobre */project.sh e mostra as ações globais
+setup.sh             assistente: atualiza o sistema na primeira instalação (host_upgrade), descobre */project.sh e mostra as ações globais
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
 lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão]
