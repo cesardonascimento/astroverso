@@ -46,9 +46,41 @@ disk_read() {
     fi
 }
 
-disk_block() {
-    disk_read "$1" | awk '/^# astro / { print; getline; print }'
+DISK_OURS='
+function ours(line,  f) {
+    split(line, f, /[ \t]+/)
+    if (kind == "fstab")
+        return index(f[2], root "/") == 1 && f[4] ~ /x-udisks-auth/ && f[4] ~ /container_file_t/
+    return f[1] ~ /^luks-/ && f[4] ~ /headless=true/
+}
+function owns(uuid, line,  part, count, esc, i) {
+    count = split(uuid, part, "-")
+    esc = part[1]
+    for (i = 2; i <= count; i++)
+        esc = esc "\\x2d" part[i]
+    return uuid != "" && (index(line, uuid) || index(line, esc))
+}
+'
+
+disk_awk() {
+    local kind=crypttab
+    [[ $1 == "$DISK_FSTAB" ]] && kind=fstab
+    disk_read "$1" | awk -v kind="$kind" -v root="$DISK_ROOT" "$DISK_OURS$2"
     return 0
+}
+
+disk_block() {
+    disk_awk "$1" '
+        /^# astro / { marker = $0; uuid = $3; next }
+        marker != "" { if (ours($0) && owns(uuid, $0)) { print marker; print }; marker = "" }
+    '
+}
+
+disk_orphans() {
+    disk_awk "$1" '
+        /^# astro / { uuid = $3; next }
+        { if (ours($0) && !owns(uuid, $0)) print; uuid = "" }
+    '
 }
 
 disk_configured() {
@@ -74,7 +106,7 @@ disk_type() {
 }
 
 disk_line() {
-    disk_block "$1" | awk -v uuid="$2" '/^# astro / { match_uuid = ($3 == uuid); getline; if (match_uuid) print }'
+    disk_block "$1" | awk -v uuid="$2" '/^# astro / { match_uuid = ($3 == uuid); next } match_uuid { print; match_uuid = 0 }'
 }
 
 disk_block_write() {
@@ -83,7 +115,7 @@ disk_block_write() {
     current="$(disk_read "$file")"
     wanted="$(
         if [[ -n $current ]]; then
-            printf '%s\n' "$current" | awk '/^# astro / { getline; next } { print }'
+            disk_awk "$file" '/^# astro / { next } ours($0) { next } { print }'
         fi
         if (($#)); then
             printf '%s\n' "$@"
@@ -143,45 +175,65 @@ disk_tpm_enroll() {
     ui_ok "TPM cadastrado: $name destrava sozinho no boot (Secure Boot conferido, PCR 7)"
 }
 
+disk_release_target() {
+    local target=$1
+    [[ $target == "$DISK_ROOT"/* ]] || return 0
+    disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
+    if mountpoint -q "$target"; then
+        if sudo umount "$target"; then
+            ui_ok "$target desmontado"
+        else
+            ui_warn "$target está em uso: ele sai do fstab e deixa de montar no próximo boot"
+        fi
+    fi
+    if [[ -d $target ]] && ! mountpoint -q "$target"; then
+        sudo chattr -i "$target" 2>/dev/null || true
+        sudo rmdir "$target" 2>/dev/null || true
+    fi
+}
+
+disk_release_mapper() {
+    local mapper=$1
+    disk_hotplug_unlink "systemd-cryptsetup@$(systemd-escape "$mapper").service"
+    if [[ -e /dev/mapper/$mapper ]]; then
+        sudo cryptsetup close "$mapper" 2>/dev/null || ui_warn "não foi possível travar $mapper (em uso)"
+    fi
+}
+
 disk_release_unused() {
-    local keep=" $1 " marker uuid target line
+    local keep=" $1 " marker uuid line target
     while read -r marker; do
         uuid="$(awk '{ print $3 }' <<< "$marker")"
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
-        target="$(awk '{ print $2 }' <<< "$line")"
-        disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
-        if mountpoint -q "$target"; then
-            if sudo umount "$target"; then
-                ui_ok "$target desmontado"
-            else
-                ui_warn "$target está em uso: ele sai do fstab e deixa de montar no próximo boot"
-            fi
-        fi
-        if [[ -d $target ]] && ! mountpoint -q "$target"; then
-            sudo chattr -i "$target" 2>/dev/null || true
-            sudo rmdir "$target" 2>/dev/null || true
-        fi
+        disk_release_target "$(awk '{ print $2 }' <<< "$line")"
     done < <(disk_block "$DISK_FSTAB")
+    while read -r line; do
+        target="$(awk '{ print $2 }' <<< "$line")"
+        [[ " ${DISK_MOUNTS[*]} " == *" $target "* ]] && continue
+        disk_release_target "$target"
+    done < <(disk_orphans "$DISK_FSTAB")
     while read -r marker; do
         uuid="$(awk '{ print $3 }' <<< "$marker")"
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
-        target="$(awk '{ print $1 }' <<< "$line")"
-        disk_hotplug_unlink "systemd-cryptsetup@$(systemd-escape "$target").service"
-        if [[ -e /dev/mapper/$target ]]; then
-            sudo cryptsetup close "$target" 2>/dev/null || ui_warn "não foi possível travar $target (em uso)"
-        fi
+        disk_release_mapper "$(awk '{ print $1 }' <<< "$line")"
     done < <(disk_block "$DISK_CRYPTTAB")
+    while read -r line; do
+        target="$(awk '{ print $1 }' <<< "$line")"
+        [[ $keep == *" ${target#luks-} "* ]] && continue
+        disk_release_mapper "$target"
+    done < <(disk_orphans "$DISK_CRYPTTAB")
 }
 
 disk_release_all() {
     local uuid file luks=()
-    mapfile -t luks < <(disk_block "$DISK_CRYPTTAB" | awk '/^# astro / { print $3 }')
-    if [[ -z $(disk_block "$DISK_FSTAB") && ${#luks[@]} -eq 0 ]]; then
+    mapfile -t luks < <(disk_awk "$DISK_CRYPTTAB" 'ours($0) { sub(/^UUID=/, "", $2); print $2 }')
+    if [[ -z $(disk_awk "$DISK_FSTAB" '/^# astro / || ours($0)') && -z $(disk_awk "$DISK_CRYPTTAB" '/^# astro / || ours($0)') ]]; then
         ui_ok "nenhum disco montado pelo Astro"
         return 0
     fi
+    DISK_MOUNTS=()
     disk_release_unused ""
     disk_block_write "$DISK_CRYPTTAB"
     disk_block_write "$DISK_FSTAB"

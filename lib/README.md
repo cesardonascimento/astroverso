@@ -84,7 +84,9 @@ Bibliotecas compartilhadas:
     pede confirmação.
   - `disk_setup uuid:tipo...` (tipo `privado` ou `compartilhado`) cadastra o TPM nos discos LUKS (pede a senha só
     se o TPM ainda não destravar), escreve as linhas no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um
-    comentário `# astro <uuid> [tipo]`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Num LUKS2
+    comentário `# astro <uuid> [tipo]`;
+    as linhas também são reconhecidas pela assinatura, mesmo separadas da marca: no `fstab`, destino em `/srv/` com
+    `x-udisks-auth` e `container_file_t`; no `crypttab`, `luks-*` com `headless=true`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Num LUKS2
     sem nome no cabeçalho, copia para lá o rótulo do sistema de arquivos (`cryptsetup config --label`), para o
     disco aparecer com nome na lista mesmo travado. Sem nome nenhum, a lista mostra o dispositivo e o UUID. Deixa os
     caminhos em `DISK_MOUNTS`. Um disco já montado só é remontado se mudarem as opções que não são `x-*`

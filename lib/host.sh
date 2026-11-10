@@ -60,10 +60,11 @@ host_firewall() {
 
 host_firewall_remove() {
     command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld || return 0
-    local rule changed=false
+    local rule changed=false listed
+    listed=" $(firewall-cmd --list-ports) "
     for rule in "$@"; do
         if [[ $rule == */* ]]; then
-            if firewall-cmd -q --query-port="$rule"; then
+            if [[ $listed == *" $rule "* ]]; then
                 sudo firewall-cmd -q --permanent --remove-port="$rule"
                 changed=true
             fi

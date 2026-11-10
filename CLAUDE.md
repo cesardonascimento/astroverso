@@ -213,7 +213,13 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
 - `find -cmin`/`-newerct` usa a data de mudança no disco: pega também arquivos copiados com data antiga (o
   `--max-age` do rclone, que olha a data do arquivo, não pegaria).
 - `tailscale status --json` usa indentação de 2 espaços (a extração do bloco "Self" depende disso).
-- O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local.
+- O firewall do Fedora Workstation libera as portas TCP/UDP de 1025 a 65535 para a rede local. O `--query-port` diz que
+  uma porta dentro dessa faixa está aberta, e o `--remove-port` dela parte a faixa (fecha a porta): para desfazer, só
+  tirar o que aparece exatamente em `--list-ports` (`host_firewall_remove`).
+- O udisks (app Discos, Armazenamento do Cockpit) regrava as linhas do `fstab`/`crypttab` que ele edita (ex.:
+  `auto noauto`) e pode separá-las da marca `# astro`. O `lib/disk.sh` reconhece as linhas do Astro também pela
+  assinatura (`fstab`: destino em `/srv/` com `x-udisks-auth` e `container_file_t`; `crypttab`: `luks-*` com
+  `headless=true`) e só emparelha marca e linha quando a linha tem o UUID da marca (`\x2d` no LUKS).
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
 - `rclone bisync` com `--resilient` não pede `--resync` quando as listas somem ("cannot find prior Path1 or Path2
   listings"): tenta para sempre. O `run.sh` detecta essa mensagem e a de "must run --resync" e faz a junção.
