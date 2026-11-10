@@ -12,6 +12,8 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `action <id>` | Executa uma ação listada em `actions` |
 | `global-actions` (opcional) | Como `actions`, mas as ações aparecem no menu principal do `setup.sh` (com o projeto instalado) e rodam com `action <id>` |
 | `restore <pasta>` (opcional) | Troca a configuração pela da pasta extraída do backup (`state_restore`), cuidando do que for do projeto (ex.: carregar o dump do banco), e sobe o serviço de novo |
+| `remote-actions` (opcional) | Ações para o Discord, uma por linha: `id\|Descrição\|sim` (`sim` pede confirmação por botão; senão `nao`). Aparecem como `/astro <projeto>:<id>`. Os nomes `iniciar`, `parar` e `reiniciar` são do executor (containers `astro-<projeto>*`) |
+| `remote <id> [argumento]` (opcional) | Roda uma ação de `remote-actions` sem perguntas e imprime o resultado em texto (vai para o Discord). O argumento já chega validado (`[A-Za-z0-9._-]`, até 64) |
 | `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <nome> <caminho>` (entra no arquivo do serviço como `<serviço>/<nome>`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
 
 **Estado fora do repositório.** Tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`): o `.env`
@@ -63,11 +65,12 @@ Bibliotecas compartilhadas:
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
-- `lib/notify.sh`: avisos no Discord (webhook em `DISCORD_WEBHOOK` no `~/.astro/host.env`, `600`; sem webhook,
-  nada é enviado). `notify_problem <chave> <texto>` avisa um problema no máximo uma vez por dia (marca em
-  `~/.local/state/astro/notify/<projeto>-<chave>`); `notify_resolved <chave> <texto>` avisa que ele acabou, só se
-  houve aviso. `notify_send <texto>` manda direto. Nenhuma delas derruba o chamador se o Discord falhar.
-  `notify_configure` é a opção "Notificações no Discord" do menu principal. Precisa de `lib/ui.sh`.
+- `lib/notify.sh`: avisos pelo bot do projeto `discord` (deixa um arquivo na fila `~/.astro/discord/fila/saida`;
+  sem o projeto instalado, nada é enviado). `notify_problem <chave> <texto> [botões]` avisa um problema no máximo
+  uma vez por dia (marca em `~/.local/state/astro/notify/<projeto>-<chave>`); `notify_resolved <chave> <texto>`
+  avisa que ele acabou, só se houve aviso. `notify_send <texto> [botões]` manda direto. Cada botão é
+  `"Rótulo|<projeto>:<ação>|<argumento>"` e roda a ação como o `/astro`. Nenhuma delas derruba o chamador.
+  Precisa de `lib/ui.sh`.
 - `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
   - `disk_choose VAR projeto título [uuids atuais]` lista os discos (sem o do sistema e sem os de outro projeto),
     com os atuais já marcados, e devolve os UUIDs marcados, que o projeto grava no `.env`.

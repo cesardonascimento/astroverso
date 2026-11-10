@@ -1,0 +1,14 @@
+name: astro
+
+x-podman:
+  in_pod: false
+
+services:
+  discord:
+    build: .
+    image: localhost/astro-discord:latest
+    container_name: astro-discord
+    restart: always
+    env_file: ${ASTRO_STATE}/.env
+    volumes:
+      - ${ASTRO_STATE}/fila:/fila:Z

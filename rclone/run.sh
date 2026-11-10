@@ -85,12 +85,14 @@ bisync_target() {
             target_set "$name" TOO_MANY_DELETES yes
             ui_warn "$name: parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados"
             ui_warn "$name: para apagar mesmo assim, use \"Sincronizar agora\" no assistente"
-            notify_problem "$name-exclusoes" "a sincronização do $name parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados. Se foi de propósito (ex.: pasta grande renomeada), libere em \"Sincronizar agora\" no assistente do rclone; se não, confira o que sumiu"
+            notify_problem "$name-exclusoes" "a sincronização do $name parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados. Se foi de propósito (ex.: pasta grande renomeada), libere as exclusões; se não, confira o que sumiu" \
+                "Ver o que seria apagado|rclone:ver-exclusoes|$name" "Liberar exclusões|rclone:liberar-exclusoes|$name"
         else
             failures=$(( $(target_get "$name" FAILURES) + 1 ))
             target_set "$name" FAILURES "$failures"
             if ((failures >= 3)); then
-                notify_problem "$name-falha" "a sincronização do $name falhou $failures vezes seguidas. Veja \"Ver as últimas execuções\" no assistente do rclone"
+                notify_problem "$name-falha" "a sincronização do $name falhou $failures vezes seguidas. Veja \"Ver as últimas execuções\" no assistente do rclone" \
+                    "Tentar de novo|rclone:sincronizar|"
             fi
         fi
         if grep -qiE 'must run --resync|cannot find prior' "$log"; then
@@ -111,6 +113,39 @@ bisync_target() {
     notify_resolved "$name-falha" "a sincronização do $name voltou a funcionar"
     notify_resolved "$name-estado" "a sincronização do $name juntou os dois lados e voltou ao normal"
     ui_ok "$name: sincronização concluída"
+}
+
+preview_target() {
+    local name=$1
+    [[ -f $TARGETS/$name.env ]] || ui_fail "armazenamento desconhecido: $name"
+    target_paths "$name"
+    disk_ready "$DISK" || return 1
+    [[ $(target_get "$name" BISYNC_READY) == yes ]] || ui_fail "$name ainda não tem uma sincronização completa para comparar"
+    local log
+    log="$(mktemp)"
+    if ! rclone_run bisync "$LOCAL" "$REMOTE" --dry-run --force --resilient --recover --max-lock 2h --exclude '*.partial' \
+            --log-level NOTICE "${PROVIDER_OPTIONS[@]}" > "$log" 2>&1; then
+        sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -E 'ERROR|critical' | tail -5
+        rm -f "$log"
+        ui_error "o teste falhou"
+        return 1
+    fi
+    sed 's/\x1b\[[0-9;]*m//g' "$log" | python3 -I -c '
+import collections, re, sys
+lado = {"Path1": "apagados no disco, seriam apagados na nuvem", "Path2": "apagados na nuvem, seriam apagados no disco"}
+contagem = {k: collections.Counter() for k in lado}
+for linha in sys.stdin:
+    m = re.search(r"- (Path[12])\s+File was deleted\s+- (.+)$", linha.rstrip())
+    if m:
+        pasta = m.group(2).split("/")[0] if "/" in m.group(2) else "(raiz)"
+        contagem[m.group(1)][pasta] += 1
+for chave, titulo in lado.items():
+    total = sum(contagem[chave].values())
+    print(f"{titulo}: {total}")
+    for pasta, n in contagem[chave].most_common(15):
+        print(f"  {pasta}: {n}")
+'
+    rm -f "$log"
 }
 
 run_targets() {
@@ -284,7 +319,8 @@ config_backup() {
     podman unshare rm -rf "$work"
     ((${#saved[@]})) && ui_ok "versão $version salva e criptografada: ${saved[*]}"
     if ((failed)); then
-        notify_problem backup-config "o backup das configurações falhou em parte (salvos: ${saved[*]:-nenhum}). Veja \"Ver as últimas execuções\" no assistente do rclone"
+        notify_problem backup-config "o backup das configurações falhou em parte (salvos: ${saved[*]:-nenhum}). Veja \"Ver as últimas execuções\" no assistente do rclone" \
+            "Tentar de novo|rclone:backup|"
         return 1
     fi
     notify_resolved backup-config "o backup das configurações voltou a funcionar"
@@ -294,6 +330,7 @@ config_backup() {
 case "${1:-}" in
     tick)    lock skip; run_targets tick ;;
     local)   lock wait; local_run ;;
+    preview) lock wait; preview_target "${2:-}" ;;
     config)  lock wait "$CONFIG_LOCK"; config_backup "${2:-}" ;;
-    *)       ui_fail "uso: $0 tick | local | config [rótulo]" ;;
+    *)       ui_fail "uso: $0 tick | local | config [rótulo] | preview <armazenamento>" ;;
 esac

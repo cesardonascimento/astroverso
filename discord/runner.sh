@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+
+ASTRO_PROJECT=discord
+source ../lib/ui.sh
+source ../lib/env.sh
+
+FILA="$STATE/fila"
+TIMEOUT=600
+SELF=discord
+CONTAINER_OPS="iniciar parar reiniciar"
+
+project_containers() {
+    podman ps -a --format '{{.Names}}' | grep -E "^astro-$1(-[a-z0-9-]+)?$" | sort -r || true
+}
+
+catalog_lines() {
+    echo "host:estado|Estado da máquina: containers, discos e próximos agendamentos|nao"
+    local file name
+    for file in ../*/project.sh; do
+        name="$(basename "$(dirname "$file")")"
+        [[ -x $file ]] || continue
+        "$file" status >/dev/null 2>&1 </dev/null || continue
+        if [[ $name != "$SELF" && -n $(project_containers "$name") ]]; then
+            printf '%s\n' \
+                "$name:iniciar|Inicia os containers do $name|nao" \
+                "$name:parar|Para os containers do $name (ficam parados até iniciar de novo, mesmo depois de reiniciar a máquina)|sim" \
+                "$name:reiniciar|Reinicia os containers do $name|sim"
+        fi
+        if grep -q '^    remote-actions)' "$file"; then
+            "$file" remote-actions 2>/dev/null </dev/null | sed "s/^/$name:/" || true
+        fi
+    done
+}
+
+write_catalog() {
+    mkdir -p "$FILA"/{pedidos,respostas,saida,tmp,andamento}
+    catalog_lines | python3 -I -c '
+import json, sys
+items = []
+for line in sys.stdin:
+    parts = line.rstrip("\n").split("|")
+    if len(parts) >= 2 and parts[0]:
+        items.append({"id": parts[0], "descricao": parts[1], "confirmar": len(parts) > 2 and parts[2] == "sim"})
+print(json.dumps(items, ensure_ascii=False))
+' > "$FILA/tmp/catalogo.json"
+    mv "$FILA/tmp/catalogo.json" "$FILA/catalogo.json"
+}
+
+catalog_has() {
+    python3 -I -c '
+import json, sys
+sys.exit(0 if any(a["id"] == sys.argv[2] for a in json.load(open(sys.argv[1]))) else 1)
+' "$FILA/catalogo.json" "$1"
+}
+
+next_run() {
+    systemctl --user show -p NextElapseUSecRealtime --value "$1" 2>/dev/null || true
+}
+
+host_status() {
+    local latest timer
+    echo "$(hostname -s): ligada desde $(uptime -s)"
+    if command -v rpm >/dev/null; then
+        latest="$(rpm -q --last kernel-core 2>/dev/null | head -1 | awk '{ print $1 }')"
+        if [[ -n $latest && $latest != "kernel-core-$(uname -r)" ]]; then
+            echo "kernel novo instalado (${latest#kernel-core-}): falta reiniciar"
+        fi
+    fi
+    echo
+    echo "containers:"
+    podman ps -a --format '{{.Names}}: {{.Status}}' | grep '^astro-' | sed 's/^/  /' || echo "  nenhum"
+    echo
+    echo "discos:"
+    df -h --output=target,used,size,pcent / /home $(findmnt -rn -o TARGET | grep '^/srv/' | sort) 2>/dev/null \
+        | tail -n +2 | awk '!seen[$1]++ { printf "  %s: %s de %s (%s)\n", $1, $2, $3, $4 }'
+    echo
+    echo "próximos agendamentos:"
+    while read -r timer; do
+        [[ -n $timer ]] && printf '  %s: %s\n' "${timer%.timer}" "$(next_run "$timer")"
+    done < <(systemctl --user list-timers 'astro-*' --all --no-pager --no-legend --plain 2>/dev/null \
+        | grep -oE 'astro-[A-Za-z0-9-]+\.timer' | sort -u)
+    return 0
+}
+
+container_op() {
+    local project=$1 op=$2 names=()
+    mapfile -t names < <(project_containers "$project")
+    if ((${#names[@]} == 0)); then
+        echo "nenhum container do $project"
+        return 1
+    fi
+    case $op in
+        iniciar)   podman start "${names[@]}" >/dev/null ;;
+        parar)     podman stop "${names[@]}" >/dev/null ;;
+        reiniciar) podman restart "${names[@]}" >/dev/null ;;
+    esac
+    podman ps -a --format '{{.Names}}: {{.Status}}' | grep -E "^astro-$project(-[a-z0-9-]+)?:" || true
+}
+
+respond() {
+    local id=$1 status=$2 output=$3
+    python3 -I -c '
+import json, sys
+print(json.dumps({"id": sys.argv[1], "ok": sys.argv[2] == "0", "saida": sys.argv[3]}, ensure_ascii=False))
+' "$id" "$status" "$output" > "$FILA/tmp/$id.json"
+    mv "$FILA/tmp/$id.json" "$FILA/respostas/$id.json"
+}
+
+process() {
+    local file=$1 work id="" action="" arg="" user="" name="" output="" status=0 project op
+    work="$FILA/andamento/${file##*/}"
+    mv "$file" "$work" 2>/dev/null || return 0
+    IFS=$'\x1f' read -r id action arg user name < <(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for k in ("id", "acao", "arg", "usuario", "nome")))
+' "$work" 2>/dev/null) || true
+    rm -f "$work"
+    if [[ ! $id =~ ^[a-f0-9]{32}$ ]]; then
+        ui_warn "pedido ilegível descartado"
+        return 0
+    fi
+    if [[ ! $arg =~ ^[A-Za-z0-9._-]{0,64}$ ]] || ! catalog_has "$action"; then
+        ui_warn "recusado: $name ($user) pediu \"$action $arg\", fora da lista permitida"
+        respond "$id" 1 "comando fora da lista permitida"
+        return 0
+    fi
+    ui_info "pedido de $name ($user): $action${arg:+ $arg}"
+    project="${action%%:*}"
+    op="${action#*:}"
+    if [[ $action == host:estado ]]; then
+        output="$(host_status 2>&1)" || status=$?
+    elif [[ $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
+        output="$(container_op "$project" "$op" 2>&1)" || status=$?
+    else
+        output="$(timeout "$TIMEOUT" "../$project/project.sh" remote "$op" ${arg:+"$arg"} 2>&1 </dev/null)" || status=$?
+        ((status == 124)) && output+=$'\n'"interrompido: passou de $((TIMEOUT / 60)) minutos"
+    fi
+    output="$(sed 's/\x1b\[[0-9;]*m//g' <<< "$output")"
+    ((${#output} <= 4000)) || output="${output: -4000}"
+    respond "$id" "$status" "$output"
+    if ((status)); then
+        ui_warn "$action${arg:+ $arg}: falhou ($status)"
+    else
+        ui_ok "$action${arg:+ $arg}: concluído"
+    fi
+}
+
+run() {
+    write_catalog
+    local file
+    while true; do
+        for file in "$FILA"/pedidos/*.json; do
+            [[ -f $file ]] || continue
+            process "$file" &
+        done
+        if [[ -z $(jobs -rp) ]] && ! compgen -G "$FILA/pedidos/*.json" >/dev/null; then
+            break
+        fi
+        sleep 1
+    done
+    find "$FILA/respostas" -type f -mmin +1440 -delete 2>/dev/null || true
+}
+
+case "${1:-}" in
+    run)     run ;;
+    catalog) write_catalog ;;
+    *)       ui_fail "uso: $0 run | catalog" ;;
+esac

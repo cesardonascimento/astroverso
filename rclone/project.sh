@@ -40,6 +40,56 @@ cmd_actions() {
     cmd_global_actions
 }
 
+cmd_remote_actions() {
+    printf '%s\n' \
+        "sincronizar|Sincronizar com a nuvem agora|nao" \
+        "ver-exclusoes|Ver o que a sincronização apagaria (teste sem efeito; argumento: armazenamento)|nao" \
+        "liberar-exclusoes|Liberar as exclusões acima do limite na próxima sincronização (argumento: armazenamento)|sim"
+    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup|Fazer backup das configurações agora|nao"
+    return 0
+}
+
+remote_target() {
+    local -n __remote_out=$1
+    local names=()
+    mapfile -t names < <(target_names)
+    if [[ -n $2 ]]; then
+        [[ -f $TARGETS/$2.env ]] || ui_fail "armazenamento desconhecido: $2 (cadastrados: ${names[*]:-nenhum})"
+        __remote_out=$2
+    elif ((${#names[@]} == 1)); then
+        __remote_out=${names[0]}
+    else
+        ui_fail "diga qual armazenamento: ${names[*]:-nenhum cadastrado}"
+    fi
+}
+
+cmd_remote() {
+    local name
+    case "${1:-}" in
+        sincronizar)
+            systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+            echo "sincronização iniciada em segundo plano; se der problema, o aviso chega aqui"
+            ;;
+        ver-exclusoes)
+            remote_target name "${2:-}"
+            echo "teste sem efeito em $name (listar a nuvem leva alguns minutos):"
+            ./run.sh preview "$name"
+            ;;
+        liberar-exclusoes)
+            remote_target name "${2:-}"
+            target_set "$name" BISYNC_FORCE yes
+            systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+            echo "exclusões liberadas em $name; sincronização iniciada em segundo plano"
+            ;;
+        backup)
+            [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
+            systemctl --user start --no-block "$UNIT_PREFIX-config.service"
+            echo "backup das configurações iniciado em segundo plano; se der problema, o aviso chega aqui"
+            ;;
+        *) ui_fail "ação desconhecida: ${1:-}" ;;
+    esac
+}
+
 cmd_global_actions() {
     [[ -n $(env_get CONFIG_BACKUP) ]] || return 0
     printf '%s\n' \
@@ -565,9 +615,11 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  cmd_actions ;;
     global-actions) cmd_global_actions ;;
+    remote-actions) cmd_remote_actions ;;
+    remote)   shift; cmd_remote "$@" ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | global-actions | action <id> | install | remove [--purge] | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | global-actions | remote-actions | remote <id> [argumento] | action <id> | install | remove [--purge] | restore <pasta>" ;;
 esac

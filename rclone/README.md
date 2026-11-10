@@ -71,17 +71,26 @@ Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: 
 
 ## Avisos no Discord
 
-Com as notificações ligadas (menu principal, "Notificações no Discord"), o rclone avisa, no máximo uma vez
-por dia por problema, e de novo quando ele se resolve:
+Com o projeto `discord` instalado, o rclone avisa, no máximo uma vez por dia por problema, e de novo quando ele
+se resolve:
 
 | Aviso | Quando |
 |---|---|
-| Sincronização parada pelo limite de exclusões | Mais de 5% dos arquivos seriam apagados (libere em "Sincronizar agora") |
-| Sincronização falhando | 3 falhas seguidas (a contagem fica em `FAILURES` no `targets/<nome>.env`) |
+| Sincronização parada pelo limite de exclusões | Mais de 5% dos arquivos seriam apagados. Botões: "Ver o que seria apagado" e "Liberar exclusões" (com confirmação) |
+| Sincronização falhando | 3 falhas seguidas (a contagem fica em `FAILURES` no `targets/<nome>.env`). Botão "Tentar de novo" |
 | Estado da sincronização perdido | O rclone vai juntar os dois lados de novo (arquivos apagados podem voltar) |
 | Disco não montado | Nada é copiado nem apagado até ele voltar |
 | Espelho no disco de backup falhou | Rodada das 03:00 |
-| Backup das configurações falhou | Algum serviço não foi salvo |
+| Backup das configurações falhou | Algum serviço não foi salvo. Botão "Tentar de novo" |
+
+Comandos no Discord (`/astro rclone:<ação> [armazenamento]`; com um só armazenamento, ele pode ficar de fora):
+
+| Ação | O que faz |
+|---|---|
+| `sincronizar` | Começa uma sincronização em segundo plano |
+| `ver-exclusoes` | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
+| `liberar-exclusoes` | Com confirmação: libera o limite na próxima sincronização e a começa |
+| `backup` | Backup das configurações agora |
 
 ## Backup das configurações
 

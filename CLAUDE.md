@@ -70,9 +70,9 @@ lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), 
 lib/env.sh           env_get CHAVE [padrão]
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no fstab e crypttab, TPM)
-lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por dia), notify_configure (menu principal)
+lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_resolved (1 por dia), com botões
 <projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]
-                     opcionais: global-actions | backup | restore <pasta>
+                     opcionais: global-actions | remote-actions | remote <id> [arg] | backup | restore <pasta>
 ```
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
@@ -81,7 +81,7 @@ lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por 
   o repositório só tem código. `state_setup` (início do `cmd_install`) migra o lugar antigo com `podman unshare mv`.
   Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
   roda com outro usuário guarda a configuração no `~/.astro` dele (sunshine), legível por ACL a quem instala.
-  Estado da máquina em `~/.astro/host.env` (`600`: guarda o `DISCORD_WEBHOOK`).
+  Estado da máquina em `~/.astro/host.env` (`600`).
 - Backup das configurações (rclone, 01:00, e "Fazer backup agora"): cada `~/.astro/<serviço>` em
   `<destino>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, versões apagadas depois de `CONFIG_KEEP_DAYS` (90).
   "Restaurar uma versão" (rclone, ação global): para o rclone e segura as travas, salva a situação atual
@@ -101,7 +101,7 @@ lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por 
   diz de quem é cada disco. **Nada pode pedir senha no boot** (a máquina é reiniciada de longe): LUKS só pelo TPM
   (PCR 7) com `headless=true`, e tudo com `nofail`.
 - Versões fixadas: AdGuard na 1ª linha de `adguard/Dockerfile`; Caddy e `caddy-dns/cloudflare` em `caddy/Dockerfile`;
-  Nextcloud, PostgreSQL e Valkey nas imagens de `nextcloud/docker-compose.yml`; Home Assistant em
+  Python e `discord.py` em `discord/Dockerfile`; Nextcloud, PostgreSQL e Valkey nas imagens de `nextcloud/docker-compose.yml`; Home Assistant em
   `homeassistant/docker-compose.yml`.
 
 ### Projetos
@@ -111,6 +111,7 @@ lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por 
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`), não container. `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
+| discord | Bot em Python (`discord.py`, imagem customizada) sem acesso ao host: só monta `~/.astro/discord/fila` (`pedidos/`, `respostas/`, `saida/`, `tmp/`, `catalogo.json`; arquivos gravados em `tmp/` e movidos). Comando `/astro comando:<projeto>:<ação> argumento:<opcional>` com autocompletar do catálogo, registrado só no servidor do canal; botões com `custom_id` `astro\|run\|<ação>\|<arg>` tratados no `on_interaction` (sobrevivem a reinícios); ações com `sim` pedem confirmação. Só os IDs de `DISCORD_USERS`; menções desligadas. O executor no host (`runner.sh`, `astro-discord-runner.path` com `DirectoryNotEmpty`) refaz o catálogo a cada rodada, recusa o que não está nele, roda `host:estado`, `<projeto>:iniciar\|parar\|reiniciar` (`podman start/stop/restart` em `astro-<projeto>*`, nunca o próprio bot) ou `<projeto>/project.sh remote`, com 10 min de limite. `notify_send` deixa o aviso em `saida/`. |
 | homeassistant | Imagem oficial `home-assistant` (Container, sem add-ons) em **`network_mode: host`** (descoberta por multicast). Configuração em `~/.astro/homeassistant/config` montada em `/config`; backup com cópia do SQLite (`backup.db`). Proxy em `.storage/http` (porta, `use_x_forwarded_for`, `trusted_proxies` = host + `astro_default` + IP da máquina), editado com o container parado. Porta bloqueada na rede, rota `http://host.containers.internal:<porta>`. Integrações (Tuya, LG, SmartThings) pelo painel. |
 | nextcloud | Imagem oficial `nextcloud:<versão>-apache` + PostgreSQL + Valkey + container de cron (mesma imagem, `/cron.sh`). Sem porta no host: o Caddy chega em `astro-nextcloud:80` pela `astro_default`. Senha do banco em `~/.astro/nextcloud/data/secrets` (lida pelos `*_FILE`; arquivo `644` em pasta `700`, porque o Postgres lê como o usuário `postgres`). A imagem instala com uma senha aleatória, trocada pela digitada com `occ user:resetpassword --password-from-env`. `trusted_proxies`, `overwriteprotocol`, fuso, região e cron aplicados pelo `occ` a cada instalação. Discos: dono `$USER` `770` (o `group::---` da ACL fecha o grupo) + ACL (também padrão) para o UID do `www-data` no host, `context=container_file_t` na montagem, `x-systemd.before=user@<uid>.service`; volumes em `docker-compose.override.yml` gerado e pasta no Nextcloud pelo `files_external` (`filesystem_check_changes 1`). `apache.conf` substitui o `000-default.conf` da imagem: `ServerName https://${NEXTCLOUD_HOST}:443` + `UseCanonicalName On` (redirecionamentos do `.well-known` em `https`) e HSTS. |
 | rclone | Sem container: timers do systemd do usuário rodando `rclone/run.sh` (`tick` a cada 30min das 08:00 às 20:00, `config` 01:00, `local` 03:00: sincroniza e depois espelha no disco) com `ASTRO_PLAIN=1`. Disco de backup por `disk_setup` (`atual/` + `versoes/<data>`, `podman unshare rclone sync --metadata --backup-dir`). Nuvem pelo rclone, um destino por `data/targets/<nome>.env` e seção no `data/rclone.conf`; serviços em `providers/*.sh` (`provider_describe`, `provider_default_name`, `provider_options`, `provider_configure`). Nuvem ↔ disco por `rclone bisync` (conflito: o mais novo vence, o outro vira `.conflict1`; `--max-delete 5` em %; `--resync --resync-mode newer` na primeira rodada ou quando o estado se perde; `--force` pelo "Sincronizar agora"). Primeira cópia nuvem → disco agendável, retomada pelo `tick` até `IMPORT_DONE=yes`; antes disso nada vai para a nuvem. Nada roda sem o disco montado; `flock` entre rodadas. |
@@ -204,8 +205,8 @@ lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por 
   - avaliar o modo paralelo do DoH (três provedores veem todas as consultas);
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.
 - `armazenamento-c` a definir. Até lá, a sessão do usuário de jogos ainda o monta pelo GNOME (com a senha do LUKS).
-- Notificações: outros canais (e-mail pelo SMTP do Proton, Telegram) e avisos de outros projetos (ex.: DNS do
-  AdGuard fora, renovação do certificado do Caddy).
+- Discord: avisos e comandos de outros projetos (ex.: DNS do AdGuard fora, renovação do certificado do Caddy,
+  consultas bloqueadas). Outros canais (e-mail pelo SMTP do Proton, Telegram), se precisar.
 - Sunshine independente de usuário (ideia combinada, para depois): Sunshine como serviço do sistema com um
   usuário de serviço próprio (`sunshine`, configuração em `/var/lib/sunshine`), subindo no boot; imagem (KMS) e
   controles (`/dev/uinput`, grupo `input`) já valem para qualquer sessão. Som e resolução por um agente em toda
