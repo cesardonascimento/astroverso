@@ -40,19 +40,6 @@ installed() {
     podman unshare grep -qs "'installed' => true" "$CONFIG"
 }
 
-disks_as_paths() {
-    local item path paths=()
-    for item in $1; do
-        if [[ $item == /* ]]; then
-            paths+=("$item")
-        else
-            path="$(disk_path "$item")"
-            [[ -n $path ]] && paths+=("$path")
-        fi
-    done
-    printf '%s' "${paths[*]}"
-}
-
 choose_disks() {
     local current=" $1 " target type paths=() labels=() chosen=() picked=() preset="" i
     while read -r target type; do
@@ -61,7 +48,7 @@ choose_disks() {
         labels+=("$(printf '%-28s %s' "$target" "$type")")
     done < <(disk_mounts)
     if ((${#paths[@]} == 0)); then
-        ui_info "nenhum disco da máquina em $DISK_ROOT: cadastre em \"Discos da máquina\", no menu principal"
+        ui_info "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astro → Administração → Discos da máquina"
     else
         ui_checklist chosen "Quais discos aparecem no Nextcloud?" --selected "$preset" "${labels[@]}"
         for i in "${chosen[@]}"; do picked+=("${paths[i]}"); done
@@ -73,8 +60,6 @@ choose_disks() {
 
 configure() {
     ui_step "Configuração"
-    local current_disks
-    current_disks="$(disks_as_paths "$(env_get DISKS)")"
     if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
     else
@@ -101,11 +86,7 @@ configure() {
         ui_ok "configuração salva em $ENV_FILE"
     fi
     if ! grep -q '^DISKS=' "$ENV_FILE"; then
-        choose_disks "$current_disks"
-    elif [[ $(env_get DISKS) != "$current_disks" ]]; then
-        sed -i '/^DISKS=/d' "$ENV_FILE"
-        printf "DISKS='%s'\n" "$current_disks" >> "$ENV_FILE"
-        ui_ok "discos do Nextcloud gravados pelo caminho: $current_disks"
+        choose_disks "$(env_get DISKS)"
     fi
 }
 
@@ -120,11 +101,11 @@ storage() {
     wid="$(container_uid 33)"
     for path in "${paths[@]}"; do
         if ! mountpoint -q "$path"; then
-            ui_warn "$path não está montado: fica fora do Nextcloud (veja \"Discos da máquina\", no menu principal)"
+            ui_warn "$path não está montado: fica fora do Nextcloud (veja Gerenciar Astro → Administração → Discos da máquina)"
             continue
         fi
         if ! findmnt -no OPTIONS "$path" | grep -q container_file_t; then
-            ui_warn "$path foi montado sem a liberação para containers: rode \"Discos da máquina\", no menu principal"
+            ui_warn "$path foi montado sem a liberação para containers: rode Gerenciar Astro → Administração → Discos da máquina"
             continue
         fi
         NC_DISKS+=("$path")
@@ -319,7 +300,7 @@ tune() {
 }
 
 cmd_install() {
-    state_setup remove_containers .env .proxy data docker-compose.override.yml
+    state_setup
     configure
     local host admin files
     host="$(env_get NEXTCLOUD_HOST)"
@@ -355,36 +336,44 @@ cmd_install() {
     fi
 }
 
+release_disks() {
+    local path paths=() wid
+    read -ra paths <<< "$(env_get DISKS)"
+    wid="$(container_uid 33)"
+    for path in "${paths[@]}"; do
+        mountpoint -q "$path" || continue
+        [[ $(disk_type "$path") == compartilhado ]] && continue
+        getfacl -cp "$path" 2>/dev/null | grep -q "^user:$wid:" || continue
+        ui_info "tirando o acesso do Nextcloud a $path (pode demorar se o disco tiver muitos arquivos)..."
+        sudo setfacl -R -x "u:$wid,u:$USER" "$path" 2>/dev/null || true
+        sudo find "$path" -type d -exec setfacl -x "d:u:$wid,d:u:$USER" {} + 2>/dev/null || true
+        ui_ok "$path: o Nextcloud não acessa mais (os arquivos continuam no disco)"
+    done
+}
+
+remove_files() {
+    local files=$1
+    [[ -n $files && -d $files ]] || return 0
+    if [[ $files == "$HOME" ]] || ! podman unshare test -f "$files/.ncdata"; then
+        ui_warn "$files não parece a pasta de arquivos do Nextcloud: mantida"
+        return 0
+    fi
+    podman unshare rm -rf "$files"
+    ui_ok "pasta local dos arquivos apagada ($files)"
+}
+
 cmd_remove() {
-    local purge=false files
-    [[ ${1:-} == --purge ]] && purge=true
+    local files
     files="$(env_get FILES_DIR)"
-    [[ $files == "$STATE/data/"* ]] && files=""
 
     ui_step "Remoção"
-    if cmd_status; then
-        remove_containers
-        ui_ok "containers removidos"
-    else
-        ui_info "nenhum container para remover"
-    fi
+    remove_containers
+    images_remove
+    ui_ok "containers removidos"
+    release_disks
+    remove_files "$files"
     proxy_unpublish
-    rm -f "$OVERRIDE"
-    ui_info "os discos continuam montados (\"Discos da máquina\", no menu principal)"
-
-    if ! $purge; then
-        ui_info "dados mantidos em $STATE/data${files:+ e $files}"
-        return
-    fi
-    if [[ -n $files && -d $files ]]; then
-        ui_info "pasta dos arquivos fora de $STATE, mantida: $files"
-    fi
-    if [[ -d $STATE/data ]]; then
-        podman unshare rm -rf "$STATE/data" "$STATE/backup"
-        ui_ok "dados apagados ($STATE/data: banco, configuração e arquivos)"
-    else
-        ui_info "nenhum dado para apagar"
-    fi
+    state_purge
 }
 
 cmd_backup() {
@@ -421,11 +410,7 @@ cmd_restore() {
         ui_ok "código do Nextcloud mantido; configuração e apps vieram do backup"
     fi
     files="$(env_get FILES_DIR "$HOME/.nextcloud")"
-    if [[ -d $STATE/arquivos ]]; then
-        podman unshare rm -rf "${files:?}"
-        podman unshare mv "$STATE/arquivos" "$files"
-        ui_ok "pasta dos arquivos restaurada em $files"
-    elif ! podman unshare test -f "$files/.ncdata"; then
+    if ! podman unshare test -f "$files/.ncdata"; then
         mkdir -p "$files"
         podman unshare sh -c 'printf "# Nextcloud data directory\n" > "$1/.ncdata" && chown -R 33:33 "$1" && chmod 770 "$1"' sh "$files"
         ui_ok "pasta dos arquivos preparada em $files (vazia: os arquivos ficam nos discos)"
@@ -470,8 +455,8 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove | backup | restore <pasta>" ;;
 esac

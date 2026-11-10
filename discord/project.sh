@@ -171,7 +171,7 @@ for a in json.load(open(sys.argv[1])):
 }
 
 cmd_install() {
-    state_setup stop_all .env
+    state_setup
     configure
 
     ui_step "Host"
@@ -233,20 +233,13 @@ cmd_action() {
 }
 
 cmd_remove() {
-    local purge=false
-    [[ ${1:-} == --purge ]] && purge=true
-
     ui_step "Remoção"
     stop_all
     rm -f "$UNIT_DIR/$RUNNER.path" "$UNIT_DIR/$RUNNER.service"
     systemctl --user daemon-reload
-    rm -rf -- "$FILA/saida"
+    images_remove
     ui_ok "bot e executor de comandos removidos (os avisos deixam de ser enviados)"
-    if $purge && [[ -d $FILA ]]; then
-        podman unshare rm -rf "$FILA"
-        ui_ok "fila apagada ($FILA)"
-    fi
-    ui_info "token e canal mantidos em $ENV_FILE"
+    state_purge
 }
 
 case "${1:-}" in
@@ -255,8 +248,8 @@ case "${1:-}" in
     actions)  cmd_actions ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | backup | restore <pasta>" ;;
 esac

@@ -8,6 +8,8 @@ source ../lib/env.sh
 source ../lib/notify.sh
 source common.sh
 
+CONFIG_KEY="${ASTRO_BACKUP_KEY:-$CONFIG_KEY}"
+
 MAX_DELETE=5
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
@@ -275,7 +277,7 @@ config_prune() {
 
 config_backup() {
     local dest work disk version label=${1:-}
-    dest="$(env_get CONFIG_BACKUP)"
+    dest="${ASTRO_BACKUP_DEST:-$(env_get CONFIG_BACKUP)}"
     if [[ -z $dest ]]; then
         ui_info "backup das configurações não configurado"
         return 0

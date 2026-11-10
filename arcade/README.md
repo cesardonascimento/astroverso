@@ -11,7 +11,7 @@ quem manda é o usuário que instala.
 
 ```bash
 ./project.sh install           # instala, configura e publica o painel do Sunshine no Caddy
-./project.sh remove [--purge]  # desativa; --purge apaga também a configuração do usuário de jogos
+./project.sh remove           # desfaz tudo o que o projeto criou, inclusive o usuário de jogos (usado pelo Implodir Astro)
 ```
 
 Como o cockpit, não roda em container: o Sunshine precisa da sessão gráfica, da GPU e de criar
@@ -56,9 +56,8 @@ compartilhados).
   | `es-de/` (settings, gamelists, custom_systems, temas) | `~/ES-DE` |
   | `retroarch/` (`retroarch.cfg`, núcleos, saves, states, BIOS) | `~/.var/app/org.libretro.RetroArch/config/retroarch` |
 
-  Uma pasta real que já esteja num desses lugares é movida (sem perder os pareamentos); a antiga
-  `~/.astro/sunshine` vira `~/.astro/arcade/sunshine`. As respostas da instalação ficam no `~/.astro/arcade` de
-  quem instala (o antigo `~/.astro/sunshine` é movido para lá). Uma ACL dá a quem instala só leitura no
+  Num usuário que já existia, uma pasta real num desses lugares é movida para lá (sem perder os pareamentos).
+  As respostas da instalação ficam no `~/.astro/arcade` de quem instala. Uma ACL dá a quem instala só leitura no
   `~/.astro` do usuário de jogos, para o backup das configurações.
 - **Senha do usuário de jogos:** pedida na instalação (com `chpasswd`, pela entrada padrão). Se ele já tiver
   senha, pergunta se mantém. Ela serve para entrar na tela, trocar de usuário e desbloquear.
@@ -90,14 +89,15 @@ compartilhados).
   responder.
 - **Painel pelo Caddy:** inclui `https://<endereço do Sunshine no Caddy>` em `csrf_allowed_origins`. Sem isso, o
   Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
-- **Notebook em silêncio:** deixa mudas, para o usuário de jogos, as saídas de som internas (alto-falante e fone;
-  HDMI fica de fora) com o `wpctl`; o PipeWire guarda o mudo entre os boots. Durante o stream, o som vai para a
-  saída virtual do Sunshine e não é afetado. Precisa da sessão do usuário de jogos aberta.
+- **Notebook em silêncio:** instala `scripts/speakers.py` em `/usr/local/bin/astro-arcade-speakers` e o serviço
+  `astro-arcade-speakers` no usuário de jogos, que sobe com a sessão dele e deixa mudas as saídas de som internas
+  (alto-falante e fone; HDMI fica de fora) com o `wpctl`. Assim funciona desde o primeiro boot, sem rodar a
+  instalação de novo. Durante o stream, o som vai para a saída virtual do Sunshine e não é afetado.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - **RetroArch:** instala o Flatpak `org.libretro.RetroArch` do Flathub para o sistema todo (o pacote do
-  Fedora traz poucos núcleos), adicionando o repositório Flathub se faltar. Precisa do `flatpak`.
+  Fedora traz poucos núcleos), adicionando ou ativando o repositório Flathub se ele faltar ou vier desativado. Precisa do `flatpak`.
 - **ES-DE:** baixa o `ES-DE_x64.AppImage` da versão mais recente pela API do GitLab do projeto, confere o
   SHA-256 publicado lá e instala em `/usr/local/bin/es-de`, com o atalho e o ícone no menu de aplicativos. De
   dentro do AppImage, guarda em `/usr/local/share/astro-arcade/es_systems.xml` a lista de sistemas da versão
@@ -185,12 +185,13 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 
 No backup das configurações (rclone) entram só o Sunshine (`sunshine/`, sem os logs), o `retroarch.cfg` e o
 `es_settings.xml` do usuário de jogos. Saves, states, BIOS, temas, núcleos e gamelists ficam de fora. Na
-restauração, o Sunshine é parado, os arquivos voltam com o dono certo (`sudo`) e ele sobe de novo. Um backup
-antigo do projeto sunshine (`sunshine/usuario`) também é aceito.
+restauração, o Sunshine é parado, os arquivos voltam com o dono certo (`sudo`) e ele sobe de novo.
 
 ## Remoção
 
-`remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o
-papel de placa principal, apaga o ES-DE (programa e atalho) e tira a rota do Caddy. O pacote do Sunshine, o
-RetroArch (Flatpak), o driver da NVIDIA, os discos (são da máquina) e o usuário de jogos são mantidos. `--purge`
-apaga também `~/.astro/arcade` do usuário de jogos (Sunshine, ES-DE e RetroArch) e os atalhos para lá.
+`remove` desativa o login automático, encerra a sessão do usuário de jogos e **apaga o usuário com a home inteira**
+(`userdel -r`: Sunshine, ES-DE, RetroArch, saves, states, BIOS e núcleos). Também apaga o ES-DE (programa e atalho),
+o `astro-sunshine-display` e o `astro-arcade-speakers`, tira o `setcap` do Sunshine, devolve à Intel o papel de
+placa principal, tira a espera do GDM, as portas de stream e o bloqueio do painel no firewall e a rota do Caddy,
+e apaga `~/.astro/arcade`. O pacote do Sunshine, o RetroArch (Flatpak), o driver da NVIDIA e os discos (são da
+máquina) ficam.

@@ -19,6 +19,8 @@ NVIDIA_VENDOR=0x10de
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
+SPEAKERS_BIN=/usr/local/bin/astro-arcade-speakers
+SPEAKERS_UNIT=astro-arcade-speakers.service
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 ESDE_API="https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de"
 ESDE_DOWNLOAD="https://gitlab.com/es-de/emulationstation-de/-/package_files"
@@ -172,10 +174,6 @@ configure() {
         ui_warn "o usuário de jogos $saved não existe nesta máquina: responda a configuração de novo"
     elif [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
-        sed -i '/^GAMES_DISKS=/d' "$ENV_FILE"
-        grep -q '^AUTOLOGIN=' "$ENV_FILE" || choose_autologin
-        grep -q '^MEDIA_DIR=' "$ENV_FILE" || choose_media
-        grep -q '^ROM_DIRS=' "$ENV_FILE" || choose_roms
         return
     fi
     default=$GAMES_DEFAULT
@@ -201,13 +199,6 @@ configure() {
     choose_media
     choose_roms
     ui_ok "configuração salva em $ENV_FILE"
-}
-
-migrate_sunshine() {
-    local old="$ASTRO_HOME/sunshine"
-    [[ -d $old && ! -e $STATE ]] || return 0
-    mv "$old" "$STATE"
-    ui_ok "configuração do antigo projeto sunshine movida para $STATE"
 }
 
 install_packages() {
@@ -269,10 +260,6 @@ games_state() {
         base="$HOME/.astro/arcade"
         mkdir -p "$base"
         chmod 700 "$HOME/.astro"
-        if [ -d "$HOME/.astro/sunshine" ] && [ ! -e "$base/sunshine" ]; then
-            mv "$HOME/.astro/sunshine" "$base/sunshine"
-            echo "moved .astro/sunshine"
-        fi
         link() {
             new="$base/$1"
             old="$HOME/$2"
@@ -475,16 +462,6 @@ enable_service() {
     fi
 }
 
-disable_service() {
-    local user=$1 unit
-    unit="$(sunshine_unit)"
-    if user_manager_running "$user"; then
-        sudo systemctl --user -M "$user@" stop "${unit##*/}" || true
-    fi
-    as_user "$user" sh -c 'rm -f "$HOME"/.config/systemd/user/*.wants/"$1"' sh "${unit##*/}"
-    ui_ok "Sunshine não inicia mais com a sessão de $user"
-}
-
 nvidia_pci() {
     local card
     for card in /sys/class/drm/card[0-9]*; do
@@ -582,35 +559,24 @@ origin_settings() {
     ui_ok "painel do Sunshine aceita alterações vindas de $origin (proteção CSRF)"
 }
 
-internal_sinks() {
-    as_user "$1" env XDG_RUNTIME_DIR="/run/user/$(id -u "$1")" pw-dump 2>/dev/null | python3 -I -c '
-import json, re, sys
-for node in json.load(sys.stdin):
-    props = (node.get("info") or {}).get("props") or {}
-    if props.get("media.class") != "Audio/Sink" or props.get("device.api") != "alsa":
-        continue
-    if re.search("hdmi|displayport", (props.get("node.name", "") + props.get("node.description", "")).lower()):
-        continue
-    print(node["id"], props.get("node.description", props.get("node.name", "")))
-'
-}
-
-speakers_mute() {
-    local user=$1 state=$2 id name count=0
-    if ! user_manager_running "$user"; then
-        ui_warn "sessão de $user fechada: alto-falantes do notebook não ajustados (rode de novo depois do boot)"
-        return
+speakers_setup() {
+    local user=$1
+    if ! cmp -s scripts/speakers.py "$SPEAKERS_BIN"; then
+        sudo install -m 0755 scripts/speakers.py "$SPEAKERS_BIN"
+        if command -v restorecon >/dev/null; then
+            sudo restorecon -q "$SPEAKERS_BIN"
+        fi
     fi
-    while read -r id name; do
-        as_user "$user" env XDG_RUNTIME_DIR="/run/user/$(id -u "$user")" wpctl set-mute "$id" "$state"
-        count=$((count + 1))
-    done < <(internal_sinks "$user")
-    if ((count == 0)); then
-        ui_info "nenhuma saída de som interna encontrada para $user"
-    elif ((state)); then
-        ui_ok "alto-falantes do notebook mudos para $user (o som do stream não é afetado)"
-    else
-        ui_ok "alto-falantes do notebook reativados para $user"
+    as_user "$user" sh -c '
+        dir="$HOME/.config/systemd/user"
+        mkdir -p "$dir/graphical-session.target.wants"
+        printf "%s\n" "[Unit]" "Description=astro arcade: alto-falantes internos mudos" "After=wireplumber.service" "" \
+            "[Service]" "Type=oneshot" "ExecStart=$1" "" "[Install]" "WantedBy=graphical-session.target" > "$dir/$2"
+        ln -sfn "$dir/$2" "$dir/graphical-session.target.wants/$2"
+    ' sh "$SPEAKERS_BIN" "$SPEAKERS_UNIT"
+    ui_ok "alto-falantes do notebook mudos a cada sessão de $user (o som do stream não é afetado)"
+    if user_session_active "$user"; then
+        as_user "$user" env XDG_RUNTIME_DIR="/run/user/$(id -u "$user")" "$SPEAKERS_BIN"
     fi
 }
 
@@ -637,17 +603,6 @@ display_switch() {
     fi
 }
 
-display_switch_off() {
-    local user=$1
-    if [[ $(sunshine_conf_get "$user" global_prep_cmd) == *"$DISPLAY_BIN"* ]]; then
-        sunshine_conf "$user" global_prep_cmd
-    fi
-    if [[ -e $DISPLAY_BIN ]]; then
-        sudo rm -f "$DISPLAY_BIN"
-        ui_ok "ajuste de resolução removido"
-    fi
-}
-
 display_check() {
     local output
     nvidia_pci >/dev/null || return 0
@@ -663,7 +618,8 @@ install_retroarch() {
     local log
     if ! flatpak remotes --system --columns=name | grep -qx flathub; then
         sudo flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-        ui_ok "repositório Flathub adicionado"
+        sudo flatpak remote-modify --system --enable flathub
+        ui_ok "repositório Flathub ativado"
     fi
     if flatpak info --system "$RETROARCH_APP" >/dev/null 2>&1; then
         ui_ok "RetroArch já instalado (Flatpak $RETROARCH_APP)"
@@ -857,8 +813,7 @@ apply_retroarch() {
 }
 
 cmd_install() {
-    migrate_sunshine
-    state_setup true .env .proxy
+    state_setup
     browse_roots
     configure
     local user host autologin_mode
@@ -903,7 +858,7 @@ cmd_install() {
     capture_settings "$user"
     origin_settings "$user" "$host"
     display_switch "$user"
-    speakers_mute "$user" 1
+    speakers_setup "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"
@@ -976,30 +931,47 @@ cmd_action() {
     games_acl "$user"
 }
 
+remove_games_user() {
+    local user=$1
+    [[ -n $user ]] && id "$user" >/dev/null 2>&1 || return 0
+    if [[ $user == "$USER" ]] || (($(id -u "$user") < 1000)); then
+        ui_warn "$user não é um usuário de jogos: mantido"
+        return 0
+    fi
+    sudo loginctl terminate-user "$user" 2>/dev/null || true
+    if ! timeout 30 bash -c "while pgrep -u '$user' >/dev/null; do sleep 1; done"; then
+        sudo pkill -KILL -u "$user" || true
+        sleep 2
+    fi
+    sudo userdel -r "$user" 2>&1 | grep -v 'mail spool' | ui_prefix || true
+    if id "$user" >/dev/null 2>&1; then
+        ui_warn "não foi possível apagar o usuário $user"
+        return 1
+    fi
+    ui_ok "usuário $user apagado, com a home"
+}
+
 cmd_remove() {
-    local purge=false user
-    [[ ${1:-} == --purge ]] && purge=true
+    local user bin
     user="$(env_get GAMES_USER)"
 
     ui_step "Remoção"
-    if [[ -n $user ]] && id "$user" >/dev/null 2>&1; then
-        if command -v sunshine >/dev/null; then
-            disable_service "$user"
-        fi
-        display_switch_off "$user"
-        speakers_mute "$user" 0
-        if $purge; then
-            as_user "$user" sh -c '
-                rm -rf "$HOME/.astro/arcade"
-                for link in "$HOME/.config/sunshine" "$HOME/ES-DE" "$HOME/.var/app/org.libretro.RetroArch/config/retroarch"; do
-                    [ -L "$link" ] && rm -f "$link"
-                done
-            '
-            ui_ok "configuração do usuário de jogos apagada (Sunshine, ES-DE e RetroArch)"
+    if [[ -n $user && $(gdm_autologin_user) == "$user" ]]; then
+        autologin_off
+    fi
+    remove_games_user "$user"
+    remove_esde
+    if command -v sunshine >/dev/null; then
+        bin="$(readlink -f "$(command -v sunshine)")"
+        if getcap "$bin" | grep -q cap_sys_admin; then
+            sudo setcap -r "$bin"
+            ui_ok "permissão de captura de tela tirada do Sunshine"
         fi
     fi
-    autologin_off
-    remove_esde
+    if [[ -e $DISPLAY_BIN || -e $SPEAKERS_BIN ]]; then
+        sudo rm -f "$DISPLAY_BIN" "$SPEAKERS_BIN"
+        ui_ok "ajuste de resolução e alto-falantes removidos"
+    fi
     if [[ -f $MUTTER_RULE ]]; then
         sudo rm -f "$MUTTER_RULE"
         sudo udevadm control --reload
@@ -1011,8 +983,11 @@ cmd_remove() {
         sudo systemctl daemon-reload
         ui_ok "a tela de login não espera mais a NVIDIA"
     fi
+    host_firewall_remove "${STREAM_PORTS[@]}"
+    host_firewall_unblock_lan "$WEB_PORT"
     proxy_unpublish
-    ui_info "mantidos: pacote do Sunshine, RetroArch (Flatpak), driver da NVIDIA e o usuário${user:+ $user}"
+    state_purge
+    ui_info "mantidos: pacote do Sunshine, RetroArch (Flatpak) e driver da NVIDIA"
 }
 
 cmd_backup() {
@@ -1038,9 +1013,6 @@ cmd_backup() {
 cmd_restore() {
     local from=$1 user home base group
     state_restore "$from"
-    if [[ -d $STATE/usuario && ! -e $STATE/sunshine ]]; then
-        podman unshare mv "$STATE/usuario" "$STATE/sunshine"
-    fi
     [[ -e $STATE/sunshine || -e $STATE/retroarch.cfg || -e $STATE/es_settings.xml ]] || return 0
     user="$(env_get GAMES_USER)"
     home="$(games_home "$user" 2>/dev/null || true)"
@@ -1077,8 +1049,8 @@ case "${1:-}" in
     actions)  cmd_actions ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | backup | restore <pasta>" ;;
 esac

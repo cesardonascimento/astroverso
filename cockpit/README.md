@@ -5,7 +5,7 @@ arquivos, e dos containers do astro (logs, reiniciar, parar), acessível em `htt
 
 ```bash
 ./project.sh install           # instala, configura e publica a rota no Caddy
-./project.sh remove [--purge]  # desativa; --purge apaga também a configuração de proxy
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 Diferente dos outros projetos, o Cockpit não roda em container: são pacotes do sistema
@@ -30,3 +30,8 @@ Diferente dos outros projetos, o Cockpit não roda em container: são pacotes do
 O login usa o usuário e a senha do sistema. A página Arquivos mostra o que esse usuário pode ler (ex.: os
 discos em `/srv`); com "Acesso administrativo" ligado no topo do painel, ela mexe em qualquer arquivo, inclusive
 num disco plugado e montado pela sessão de outro usuário.
+
+## Remoção
+
+`remove` desativa o Cockpit e o `podman.socket`, apaga o `cockpit.conf`, tira o bloqueio da porta 9090 e a rota do
+Caddy, e apaga `~/.astro/cockpit`. Os pacotes ficam instalados.

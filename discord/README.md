@@ -6,7 +6,7 @@ ações de uma lista.
 
 ```bash
 ./project.sh install           # perguntas, imagem, executor de comandos, container e mensagem de teste
-./project.sh remove [--purge]  # tira o bot e o executor; --purge apaga também a fila
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 ## Perguntas da instalação
@@ -56,7 +56,7 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 
 O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltaria pelo Discord.
 
-## Ações (Configurar um projeto instalado)
+## Ações (Gerenciar Astro → discord)
 
 | Ação | O que faz |
 |---|---|
@@ -72,3 +72,8 @@ O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltar
 | `~/.config/systemd/user/astro-discord-runner.{path,service}` | O executor de comandos |
 
 Logs: `podman logs -f astro-discord` (bot) e `journalctl --user -fu astro-discord-runner` (comandos executados).
+
+## Remoção
+
+`remove` tira o container, as imagens e o executor de comandos (`astro-discord-runner`), e apaga
+`~/.astro/discord` (token, canal e fila).

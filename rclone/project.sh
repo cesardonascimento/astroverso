@@ -117,7 +117,7 @@ pick_data_disk() {
         fi
     done < <(data_disks "$skip")
     if ((${#mounts[@]} == 0)); then
-        ui_fail "nenhum disco da máquina em $DISK_ROOT: cadastre em \"Discos da máquina\", no menu principal"
+        ui_fail "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astro → Administração → Discos da máquina"
     fi
     ui_menu choice "$title" "${labels[@]}"
     __pick_out=${mounts[choice]}
@@ -126,7 +126,6 @@ pick_data_disk() {
 configure() {
     ui_step "Configuração"
     if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
-        sed -i '/^BACKUP_DISKS=/d' "$ENV_FILE"
         ui_ok "configuração existente mantida"
         return
     fi
@@ -160,16 +159,20 @@ configure() {
 }
 
 install_rclone() {
-    if command -v rclone >/dev/null; then
+    local package missing=()
+    for package in rclone zstd; do
+        command -v "$package" >/dev/null || missing+=("$package")
+    done
+    if ((${#missing[@]} == 0)); then
         ui_ok "rclone já instalado ($(rclone version | head -1))"
     elif command -v dnf >/dev/null; then
-        sudo dnf install -y -q rclone
-        ui_ok "rclone instalado via dnf"
+        sudo dnf install -y -q "${missing[@]}"
+        ui_ok "instalados via dnf: ${missing[*]}"
     elif command -v apt-get >/dev/null; then
-        sudo apt-get install -y -qq rclone
-        ui_ok "rclone instalado via apt"
+        sudo apt-get install -y -qq "${missing[@]}"
+        ui_ok "instalados via apt: ${missing[*]}"
     else
-        ui_fail "instale o rclone manualmente: https://rclone.org/install/"
+        ui_fail "instale manualmente: ${missing[*]}"
     fi
 }
 
@@ -178,7 +181,7 @@ backup_disk() {
     mount="$(env_get BACKUP_MOUNT)"
     [[ -n $mount ]] || return 0
     if ! mountpoint -q "$mount"; then
-        ui_warn "$mount não está montado: o espelho fica parado até ele voltar (veja \"Discos da máquina\", no menu principal)"
+        ui_warn "$mount não está montado: o espelho fica parado até ele voltar (veja Gerenciar Astro → Administração → Discos da máquina)"
         return 0
     fi
     [[ $(disk_type "$mount") == compartilhado ]] && ui_warn "$mount é compartilhado: todos os usuários da máquina leem o espelho"
@@ -207,11 +210,6 @@ timer_unit() {
 
 schedules() {
     mkdir -p "$UNIT_DIR"
-    if [[ -f $UNIT_DIR/$UNIT_PREFIX-nightly.timer ]]; then
-        systemctl --user disable -q --now "$UNIT_PREFIX-nightly.timer" 2>/dev/null || true
-        rm -f "$UNIT_DIR/$UNIT_PREFIX-nightly.timer" "$UNIT_DIR/$UNIT_PREFIX-nightly.service"
-        ui_ok "espelho noturno na nuvem removido (substituído pela sincronização nos dois sentidos)"
-    fi
     write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "sincronização com a nuvem" tick)"
     write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "sincronização com a nuvem" "${TICK_CALENDAR[@]}")"
     write_unit "$UNIT_PREFIX-local.service" "$(service_unit "sincronização com a nuvem e espelho no disco de backup" local)"
@@ -392,7 +390,7 @@ action_now() {
 }
 
 cmd_install() {
-    state_setup stop_runs .env data
+    state_setup
     configure
 
     ui_step "Host"
@@ -408,10 +406,13 @@ cmd_install() {
         for name in $(target_names); do
             ui_ok "$name ↔ $(target_get "$name" DISK)/$(target_get "$name" FOLDER), sincronizados nos dois sentidos"
         done
+    elif [[ -z $(disk_mounts) ]]; then
+        ui_warn "nenhum disco da máquina: a cópia da nuvem precisa de um disco para ficar"
+        ui_info "cadastre um em Gerenciar Astro → Administração → Discos da máquina e reinstale o Astro"
     elif ui_confirm "adicionar um armazenamento em nuvem agora?" y; then
         action_add
     else
-        ui_info "adicione depois em \"Configurar um projeto instalado\""
+        ui_info "adicione depois em Gerenciar Astro → rclone"
     fi
 
     ui_step "Backup das configurações"
@@ -425,16 +426,30 @@ cmd_install() {
 }
 
 config_backup_setup() {
-    local dest default name password days
+    local dest default="" name password days disk
     name="$(target_names | head -1)"
     if [[ -n $name ]]; then
         default="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)/Astro/Configurações"
     else
-        default="$(env_get SOURCE "/srv")/Astro/Configurações"
+        disk="$(env_get SOURCE)"
+        [[ -n $disk ]] || disk="$(disk_mounts | awk 'NR == 1 { print $1 }')"
+        [[ -z $disk ]] || default="$disk/Astro/Configurações"
     fi
-    if $RECONFIGURE || ! grep -q '^CONFIG_BACKUP=' "$ENV_FILE"; then
+    default="$(env_get CONFIG_BACKUP "$default")"
+    if [[ -z $default ]]; then
+        ui_warn "nenhum disco da máquina: o backup das configurações fica desligado"
+        ui_info "cadastre um em Gerenciar Astro → Administração → Discos da máquina e reinstale o Astro"
+        sed -i '/^CONFIG_BACKUP=/d;/^CONFIG_KEEP_DAYS=/d' "$ENV_FILE"
+        printf "CONFIG_BACKUP=''\nCONFIG_KEEP_DAYS='90'\n" >> "$ENV_FILE"
+        return 0
+    fi
+    if $RECONFIGURE || ! grep -q '^CONFIG_BACKUP=' "$ENV_FILE" || [[ -z $(env_get CONFIG_BACKUP) ]]; then
         ui_info "toda noite, à 01:00, a configuração de cada serviço vira um arquivo criptografado nesta pasta (uma subpasta por serviço)"
-        ui_input dest "pasta do backup das configurações" "$(env_get CONFIG_BACKUP "$default")" is_path
+        while true; do
+            ui_input dest "pasta do backup das configurações" "$default" is_path
+            mkdir -p "$dest" 2>/dev/null && [[ -w $dest ]] && break
+            ui_warn "não foi possível gravar em $dest: escolha outra pasta"
+        done
         ui_input days "por quantos dias guardar as versões do backup das configurações" "$(env_get CONFIG_KEEP_DAYS 90)" is_number
         sed -i '/^CONFIG_BACKUP=/d;/^CONFIG_KEEP_DAYS=/d' "$ENV_FILE"
         printf "CONFIG_BACKUP='%s'\nCONFIG_KEEP_DAYS='%s'\n" "$dest" "$days" >> "$ENV_FILE"
@@ -608,22 +623,19 @@ cmd_restore() {
 }
 
 cmd_remove() {
-    local purge=false unit
-    [[ ${1:-} == --purge ]] && purge=true
-
+    local unit
     ui_step "Remoção"
+    stop_runs
     systemctl --user stop "$UNIT_PREFIX-import-*.timer" 2>/dev/null || true
-    for unit in tick nightly local config; do
+    for unit in tick local config; do
         systemctl --user disable -q --now "$UNIT_PREFIX-$unit.timer" 2>/dev/null || true
         rm -f "$UNIT_DIR/$UNIT_PREFIX-$unit.timer" "$UNIT_DIR/$UNIT_PREFIX-$unit.service"
     done
     systemctl --user daemon-reload
     ui_ok "agendamentos removidos"
-    if $purge && [[ -d data ]]; then
-        rm -rf data
-        ui_ok "configuração da nuvem apagada (rclone/data: logins e armazenamentos)"
-    fi
-    ui_info "mantidos: os arquivos nos discos, na nuvem e o rclone"
+    rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/rclone/bisync"
+    state_purge
+    ui_info "mantidos: os arquivos nos discos e na nuvem, o backup das configurações e o pacote do rclone"
 }
 
 case "${1:-}" in
@@ -635,7 +647,7 @@ case "${1:-}" in
     remote)   shift; cmd_remote "$@" ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | global-actions | remote-actions | remote <id> [argumento] | action <id> | install | remove [--purge] | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | global-actions | remote-actions | remote <id> [argumento] | action <id> | install | remove | restore <pasta>" ;;
 esac

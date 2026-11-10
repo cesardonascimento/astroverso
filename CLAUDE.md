@@ -53,9 +53,9 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 - **Nunca testar na pasta real nem no container real.** Copiar para o scratchpad e trocar `name:` do compose,
   `container_name`, imagem, portas (`15353`, `18080`, `18081`, `18443`) e a constante `CONTAINER` do `project.sh`.
   Um teste antigo recriou o container real e apagou um `.env` real.
-- Nunca apagar nada em `~/.astro` (nem os `.env`, `.routes`, `.proxy` ou `data/` antigos dentro das pastas dos
-  projetos, que a instalação migra). Contêm segredos e não estão no git. Para testar, usar outro `HOME` (o
-  `ASTRO_HOME` vem de `$HOME/.astro`).
+- Nunca apagar nada em `~/.astro`: contém segredos e não está no git. Nunca rodar `remove` de um projeto nem o
+  "Implodir Astro" na máquina real: eles apagam `~/.astro`, o usuário de jogos e as montagens dos discos. Para
+  testar, usar outro `HOME` (o `ASTRO_HOME` vem de `$HOME/.astro`).
 - `sudo` não funciona na sessão do Claude (sem TTY). `systemctl` e `pkexec` disparam uma janela gráfica do
   polkit para o usuário digitar a senha. Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
@@ -64,31 +64,40 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 ## Arquitetura
 
 ```
-setup.sh             assistente: atualiza o sistema na primeira instalação (host_upgrade), descobre */project.sh e mostra as ações globais
+setup.sh             assistente: Instalar/Reinstalar Astro (host_upgrade na primeira vez, discos, projetos na ordem ORDER),
+                     Gerenciar Astro (ações dos projetos) → Administração (discos, ações globais, Implodir Astro)
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
-lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), firewall, portas, IP e sub-rede
-lib/env.sh           env_get CHAVE [padrão]
+lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale) / host_undo, firewall, portas, IP e sub-rede
+lib/env.sh           env_get CHAVE [padrão], state_setup / state_purge, images_remove, validadores
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
-lib/disk.sh          disk_manage / disk_setup / disk_mounts (discos da máquina no fstab e crypttab, TPM; privado ou compartilhado)
+lib/disk.sh          disk_manage / disk_setup / disk_mounts / disk_release_all (discos da máquina no fstab e crypttab, TPM; privado ou compartilhado)
 lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_resolved (1 por dia), com botões
-<projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]
+<projeto>/project.sh describe | status | actions | action <id> | install | remove
                      opcionais: global-actions | remote-actions | remote <id> [arg] | backup | restore <pasta>
 ```
 
 - Contrato e bibliotecas documentados em `lib/README.md`.
 - Compose de todo projeto: `name: astro` + `x-podman: in_pod: false` (agrupados, mas independentes).
 - **Estado fora do repositório:** tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`, `$ENV_FILE`),
-  o repositório só tem código. `state_setup` (início do `cmd_install`) migra o lugar antigo com `podman unshare mv`.
+  o repositório só tem código. `state_setup` (início do `cmd_install`) cria a pasta; `state_purge` (fim do `remove`) a apaga.
   Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
   roda com outro usuário guarda a configuração no `~/.astro` dele (arcade), legível por ACL a quem instala.
   Estado da máquina em `~/.astro/host.env` (`600`).
 - Backup das configurações (rclone, 01:00, e "Fazer backup agora"): cada `~/.astro/<serviço>` em
   `<destino>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, versões apagadas depois de `CONFIG_KEEP_DAYS` (90).
-  "Restaurar uma versão" (rclone, ação global): para o rclone e segura as travas, salva a situação atual
+  "Restaurar uma versão" (rclone, ação global, em Administração): para o rclone e segura as travas, salva a situação atual
   (`_antes-da-restauracao`) e chama `<projeto>/project.sh restore <pasta>`. Formato
   (gpg simétrico, senha em `~/.astro/rclone/data/config-backup.key`), com caminhos relativos ao serviço (`tar
   --transform`), sem home nem usuário. Cada projeto pode ter o comando `backup` (dumps e `exclude <caminho>`,
   `include <nome> <caminho>`, `add <caminho>`).
+- **Instalar Astro** sempre instala tudo, na ordem `ORDER` do `setup.sh` (`caddy` primeiro, pelo domínio; `rclone` e
+  `discord` por último, por verem os outros), depois da atualização do sistema (primeira vez) e de "Discos da
+  máquina". Um projeto que falha não para os outros; o resumo mostra quais falharam.
+- **Implodir Astro** (Administração): confirmação digitando `IMPLODIR`; backup `antes-de-implodir` pelo
+  `rclone/run.sh config` (pasta e senha do rclone ou, sem elas, perguntadas: `ASTRO_BACKUP_DEST`/`ASTRO_BACKUP_KEY`),
+  e nada é desfeito se ele falhar; `remove` de cada projeto na ordem inversa; `disk_release_all`; `host_undo`; rede
+  `astro_default`; `~/.astro` (mantido se algum `remove` falhou). Ficam pacotes, dados dos discos e o SSH ativo.
+  `remove` desfaz tudo o que é do projeto (não existe mais `--purge`) e não falha no que já não existe.
 - Configuração por prompts, gravada em `~/.astro/<projeto>/.env` (permissão 600). "Usar a configuração já salva?" reaproveita.
   Toda resposta passa por um validador de `lib/env.sh` (`is_port`, `is_ipv4`, `is_hostname`...), porque vai parar
   em `.env`, YAML, `sed` ou Caddyfile.
@@ -111,7 +120,7 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
 | Projeto | Resumo |
 |---|---|
 | adguard | Imagem customizada em **`network_mode: host`**. O entrypoint gera `AdGuardHome.yaml` do template se ele não existir. `.env` guarda só o **hash bcrypt** da senha. Reescritas `*.<domínio> → IP`. Configura o DNS da máquina, confere o Split DNS do Tailscale e publica o painel no Caddy (`PANEL_HOST`). |
-| arcade | ES-DE + RetroArch + Sunshine no usuário de jogos (padrão `ristar`), a única exceção ao usuário que instala (dados sensíveis, nunca logado). **ES-DE:** AppImage `ES-DE_x64.AppImage` mais recente pela API de pacotes do GitLab (`file_sha256` conferido) em `/usr/local/bin/es-de`, com `.desktop`, ícone e o `es_systems.xml` da versão em `/usr/local/share/astro-arcade` (extraídos com `--appimage-extract <caminho>` para `squashfs-root/`); runtime estático com `fusermount3`. **RetroArch:** Flatpak `org.libretro.RetroArch` do Flathub (sistema). Configuração em `~<jogos>/.astro/arcade/{sunshine,es-de,retroarch}`, com atalhos `~/.config/sunshine`, `~/ES-DE` e `~/.var/app/org.libretro.RetroArch/config/retroarch`. Pastas escolhidas por `ui_browse` (`MEDIA_DIR`, `ROM_DIRS` separadas por `|`); `scripts/emulation.py` roda como o usuário de jogos (`python3 -I -` pela entrada padrão) e grava `ROMDirectory`/`MediaDirectory`, limpa caminhos e drivers do Windows do `retroarch.cfg`, gera `custom_systems/es_systems.xml` (sistemas das outras pastas de ROMs, `<path>` absoluto, lista em `.astro-sistemas`) e baixa o núcleo padrão de cada sistema do buildbot. Carregar configuração/gamelists: `sudo tar` + `chown` (só com a pasta local vazia na instalação; depois por ações). Backup só do `sunshine/`, `retroarch.cfg` e `es_settings.xml`. **Sunshine:** pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com senha (`chpasswd` pela entrada padrão); login automático no GDM e sem bloqueio automático de tela opcionais (`AUTOLOGIN`), bloqueio manual e troca de usuário sempre permitidos; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot), torna a NVIDIA a placa principal do GNOME (udev `mutter-device-preferred-primary`). O codificador não é fixado: o Sunshine testa (NVENC primeiro) a cada stream; a instalação só avisa se não houver tela na saída da NVIDIA. Padrão: tampa fechada e tela externa (TV ou plugue HDMI fantasma) no HDMI, que sai pela NVIDIA. `astro-sunshine-display` (Python + DBus do Mutter) no `global_prep_cmd` troca a tela, temporariamente, para a resolução exata do aparelho e volta no `undo`; nunca sai com erro. Alto-falantes internos mudos para o usuário de jogos (`pw-dump` + `wpctl`; o Fedora não traz `pactl`). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. ACL `u:<quem instala>:rX` no `~/.astro` do usuário de jogos para o backup. Discos de jogos: compartilhados em "Discos da máquina" (o arcade não cuida de discos). O antigo `~/.astro/sunshine` é movido para `~/.astro/arcade`; `.env` com usuário inexistente (renomeado) refaz as perguntas em vez de criá-lo. |
+| arcade | ES-DE + RetroArch + Sunshine no usuário de jogos (padrão `ristar`), a única exceção ao usuário que instala (dados sensíveis, nunca logado). **ES-DE:** AppImage `ES-DE_x64.AppImage` mais recente pela API de pacotes do GitLab (`file_sha256` conferido) em `/usr/local/bin/es-de`, com `.desktop`, ícone e o `es_systems.xml` da versão em `/usr/local/share/astro-arcade` (extraídos com `--appimage-extract <caminho>` para `squashfs-root/`); runtime estático com `fusermount3`. **RetroArch:** Flatpak `org.libretro.RetroArch` do Flathub (sistema). Configuração em `~<jogos>/.astro/arcade/{sunshine,es-de,retroarch}`, com atalhos `~/.config/sunshine`, `~/ES-DE` e `~/.var/app/org.libretro.RetroArch/config/retroarch`. Pastas escolhidas por `ui_browse` (`MEDIA_DIR`, `ROM_DIRS` separadas por `|`); `scripts/emulation.py` roda como o usuário de jogos (`python3 -I -` pela entrada padrão) e grava `ROMDirectory`/`MediaDirectory`, limpa caminhos e drivers do Windows do `retroarch.cfg`, gera `custom_systems/es_systems.xml` (sistemas das outras pastas de ROMs, `<path>` absoluto, lista em `.astro-sistemas`) e baixa o núcleo padrão de cada sistema do buildbot. Carregar configuração/gamelists: `sudo tar` + `chown` (só com a pasta local vazia na instalação; depois por ações). Backup só do `sunshine/`, `retroarch.cfg` e `es_settings.xml`. **Sunshine:** pacote do sistema baixado da última release no GitHub (SHA-256 conferido), não container. Usuário de jogos sem `sudo`, com senha (`chpasswd` pela entrada padrão); login automático no GDM e sem bloqueio automático de tela opcionais (`AUTOLOGIN`), bloqueio manual e troca de usuário sempre permitidos; o serviço de usuário sobe com a `graphical-session.target` dele. `setcap cap_sys_admin+p` para captura KMS. Instala o driver NVIDIA (RPM Fusion + chave MOK no Secure Boot), torna a NVIDIA a placa principal do GNOME (udev `mutter-device-preferred-primary`). O codificador não é fixado: o Sunshine testa (NVENC primeiro) a cada stream; a instalação só avisa se não houver tela na saída da NVIDIA. Padrão: tampa fechada e tela externa (TV ou plugue HDMI fantasma) no HDMI, que sai pela NVIDIA. `astro-sunshine-display` (Python + DBus do Mutter) no `global_prep_cmd` troca a tela, temporariamente, para a resolução exata do aparelho e volta no `undo`; nunca sai com erro. Alto-falantes internos mudos a cada sessão do usuário de jogos: `scripts/speakers.py` em `/usr/local/bin/astro-arcade-speakers`, serviço de usuário `astro-arcade-speakers` na `graphical-session.target` dele (`pw-dump` + `wpctl`; o Fedora não traz `pactl`). Flathub ativado com `remote-modify --enable` (vem desligado sem os repositórios de terceiros). Painel `47990` bloqueado na rede, rota `https+insecure://host.containers.internal:47990`. ACL `u:<quem instala>:rX` no `~/.astro` do usuário de jogos para o backup. Discos de jogos: compartilhados em "Discos da máquina" (o arcade não cuida de discos). `.env` com usuário inexistente refaz as perguntas em vez de criá-lo. O `remove` apaga o usuário de jogos com a home (`userdel -r`; backup dos saves fica para depois). |
 | caddy | Let's Encrypt **curinga `*.<domínio>`** por DNS-01 na Cloudflare. O token precisa de **Zone:Read + DNS:Edit** na zona, sem expiração, e é validado na API ao instalar. Ações: listar, adicionar, remover e recarregar rotas. |
 | cockpit | Pacotes do sistema (`cockpit`, `cockpit-podman`, `cockpit-storaged`, `cockpit-files`), não container. Arquivos e discos pelo navegador (com "Acesso administrativo", qualquer arquivo). `cockpit.conf` em modo proxy; porta 9090 bloqueada para a rede no firewalld (rich rule). Rota `<nome-da-máquina>.<domínio> → http://host.containers.internal:9090`. |
 | discord | Bot em Python (`discord.py`, imagem customizada) sem acesso ao host: só monta `~/.astro/discord/fila` (`pedidos/`, `respostas/`, `saida/`, `tmp/`, `catalogo.json`; arquivos gravados em `tmp/` e movidos). Comando `/astro command:<projeto>:<ação> argument:<opcional>` (nomes sempre em inglês) com autocompletar do catálogo, registrado só no servidor do canal; botões com `custom_id` `astro\|run\|<ação>\|<arg>` tratados no `on_interaction` (sobrevivem a reinícios); ações com `sim` pedem confirmação. Só os IDs de `DISCORD_USERS`; menções desligadas. O executor no host (`runner.sh`, `astro-discord-runner.path` com `DirectoryNotEmpty`) refaz o catálogo a cada rodada, recusa o que não está nele, roda `host:status`, `<projeto>:start\|stop\|restart` (`podman start/stop/restart` em `astro-<projeto>*`, nunca o próprio bot) ou `<projeto>/project.sh remote`, com 10 min de limite. `notify_send` deixa o aviso em `saida/`. |
@@ -222,7 +231,7 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
   - revisar as ACLs do Tailscale (hoje "todos acessam tudo" e a rede inteira está anunciada);
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.
 - Discord: avisos e comandos de outros projetos (ex.: DNS do AdGuard fora, renovação do certificado do Caddy,
-  consultas bloqueadas). Outros canais (e-mail pelo SMTP do Proton, Telegram), se precisar.
+  consultas bloqueadas). Outros canais (e-mail por SMTP, Telegram), se precisar.
 - Sunshine independente de usuário (ideia combinada, para depois): Sunshine como serviço do sistema com um
   usuário de serviço próprio (`sunshine`, configuração em `/var/lib/sunshine`), subindo no boot; imagem (KMS) e
   controles (`/dev/uinput`, grupo `input`) já valem para qualquer sessão. Som e resolução por um agente em toda
@@ -233,4 +242,6 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
   depois, testado pelo Moonlight. Hoje o Sunshine é serviço da sessão do usuário de jogos: sair da sessão
   derruba o stream (usar "Trocar de usuário").
 - Ação "verificar atualizações" para as versões fixadas.
+- Backup dos arquivos do arcade (saves, states, BIOS do usuário de jogos), chamado também pelo "Implodir Astro"
+  antes de apagar o usuário de jogos.
 - Ações de pós-configuração no adguard (ex.: gerenciar reescritas).

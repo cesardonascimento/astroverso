@@ -1,5 +1,9 @@
 export PODMAN_COMPOSE_WARNING_LOGS=false
 
+HOST_PORTS_CONF=/etc/sysctl.d/99-astro.conf
+HOST_FORWARD_CONF=/etc/sysctl.d/99-astro-tailscale.conf
+HOST_SSH_CONF=/etc/ssh/sshd_config.d/10-astro.conf
+
 host_compose() {
     if podman compose version >/dev/null 2>&1; then
         ui_ok "podman-compose já instalado"
@@ -21,8 +25,8 @@ host_unprivileged_ports() {
         ui_ok "portas a partir da $current já liberadas para Podman rootless"
         return
     fi
-    echo "net.ipv4.ip_unprivileged_port_start=$port" | sudo tee /etc/sysctl.d/99-astro.conf >/dev/null
-    sudo sysctl -q -p /etc/sysctl.d/99-astro.conf
+    echo "net.ipv4.ip_unprivileged_port_start=$port" | sudo tee "$HOST_PORTS_CONF" >/dev/null
+    sudo sysctl -q -p "$HOST_PORTS_CONF"
     ui_ok "portas a partir da $port liberadas para Podman rootless"
 }
 
@@ -52,6 +56,27 @@ host_firewall() {
     done
     $changed && sudo firewall-cmd -q --reload
     ui_ok "firewall liberado: $*"
+}
+
+host_firewall_remove() {
+    command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld || return 0
+    local rule changed=false
+    for rule in "$@"; do
+        if [[ $rule == */* ]]; then
+            if firewall-cmd -q --query-port="$rule"; then
+                sudo firewall-cmd -q --permanent --remove-port="$rule"
+                changed=true
+            fi
+        elif firewall-cmd -q --query-service="$rule"; then
+            sudo firewall-cmd -q --permanent --remove-service="$rule"
+            changed=true
+        fi
+    done
+    if $changed; then
+        sudo firewall-cmd -q --reload
+        ui_ok "firewall fechado de novo: $*"
+    fi
+    return 0
 }
 
 host_firewall_block_lan() {
@@ -161,7 +186,7 @@ host_ssh() {
         ui_info "em ~/.ssh/authorized_keys (ssh-copy-id $USER@$(host_lan_ip)) e rode a instalação de novo"
     elif ui_confirm "desativar o login por senha no SSH (só chaves, mais seguro)?" y; then
         printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' \
-            | sudo tee /etc/ssh/sshd_config.d/10-astro.conf >/dev/null
+            | sudo tee "$HOST_SSH_CONF" >/dev/null
         sudo systemctl reload "$service"
         ui_ok "SSH agora aceita só login por chave"
     fi
@@ -213,6 +238,57 @@ host_upgrade() {
     fi
 }
 
+host_undo() {
+    local target masked=()
+    for target in "${HOST_SLEEP_TARGETS[@]}"; do
+        [[ $(systemctl is-enabled "$target" 2>/dev/null) == masked ]] && masked+=("$target")
+    done
+    ((${#masked[@]} == 0)) || sudo systemctl unmask -q "${masked[@]}"
+    if [[ -f $HOST_LOGIND_CONF ]]; then
+        sudo rm -f "$HOST_LOGIND_CONF"
+        sudo systemctl reload systemd-logind 2>/dev/null || sudo systemctl kill -s HUP systemd-logind
+    fi
+    if command -v gsettings >/dev/null \
+        && gsettings list-schemas 2>/dev/null | grep -qx org.gnome.settings-daemon.plugins.power; then
+        gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 2>/dev/null || true
+        gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 2>/dev/null || true
+    fi
+    ui_ok "suspensão e tampa de volta ao padrão do sistema"
+
+    if [[ -f $HOST_PORTS_CONF ]]; then
+        sudo rm -f "$HOST_PORTS_CONF"
+        sudo sysctl -q -w net.ipv4.ip_unprivileged_port_start=1024
+        ui_ok "portas abaixo de 1024 voltam a ser só do root"
+    fi
+
+    if command -v tailscale >/dev/null && tailscale status >/dev/null 2>&1; then
+        tailscale set --advertise-routes= 2>/dev/null || sudo tailscale set --advertise-routes=
+        ui_ok "rede local não é mais anunciada no Tailscale (a conexão continua)"
+    fi
+    if [[ -f $HOST_FORWARD_CONF ]]; then
+        sudo rm -f "$HOST_FORWARD_CONF"
+        sudo sysctl -q -w net.ipv4.ip_forward=0 net.ipv6.conf.all.forwarding=0
+        ui_ok "encaminhamento de pacotes desativado"
+    fi
+    if command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld && firewall-cmd -q --query-masquerade; then
+        sudo firewall-cmd -q --permanent --remove-masquerade
+        sudo firewall-cmd -q --reload
+        ui_ok "masquerade removido do firewalld"
+    fi
+
+    if [[ -f $HOST_SSH_CONF ]]; then
+        sudo rm -f "$HOST_SSH_CONF"
+        sudo systemctl reload sshd 2>/dev/null || sudo systemctl reload ssh 2>/dev/null || true
+        ui_ok "SSH aceita login por senha de novo (o serviço continua ativo)"
+    fi
+
+    systemctl --user disable -q --now podman-restart.service 2>/dev/null || true
+    if [[ $(loginctl show-user "$USER" -P Linger 2>/dev/null) == yes ]]; then
+        loginctl disable-linger "$USER"
+    fi
+    ui_ok "containers e serviços de $USER não sobem mais sozinhos no boot"
+}
+
 host_base() {
     host_no_sleep
     host_compose
@@ -228,14 +304,6 @@ host_lan_subnet() {
 }
 
 HOST_STATE="$HOME/.astro/host.env"
-HOST_STATE_OLD="${XDG_CONFIG_HOME:-$HOME/.config}/astro/host.env"
-
-host_state_migrate() {
-    [[ -f $HOST_STATE_OLD && ! -f $HOST_STATE ]] || return 0
-    mkdir -p "${HOST_STATE%/*}"
-    mv "$HOST_STATE_OLD" "$HOST_STATE"
-    rmdir "${HOST_STATE_OLD%/*}" 2>/dev/null || true
-}
 
 host_tailscale_port() {
     local port
@@ -246,7 +314,6 @@ host_tailscale_port() {
 host_tailscale_port_forward() {
     local forward
     forward="$(host_lan_ip):$(host_tailscale_port)"
-    host_state_migrate
     if grep -qx "TAILSCALE_PORT_FORWARD=$forward" "$HOST_STATE" 2>/dev/null; then
         ui_ok "porta UDP ${forward#*:} redirecionada no roteador para ${forward%:*}"
         return
@@ -283,8 +350,8 @@ host_tailscale_subnet() {
         fi
         if [[ $(sysctl -n net.ipv4.ip_forward) != 1 ]]; then
             printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' \
-                | sudo tee /etc/sysctl.d/99-astro-tailscale.conf >/dev/null
-            sudo sysctl -q -p /etc/sysctl.d/99-astro-tailscale.conf
+                | sudo tee "$HOST_FORWARD_CONF" >/dev/null
+            sudo sysctl -q -p "$HOST_FORWARD_CONF"
             ui_ok "encaminhamento de pacotes ativado"
         fi
         if command -v firewall-cmd >/dev/null && systemctl is-active -q firewalld \

@@ -5,13 +5,24 @@ cd "$(dirname "$(readlink -f "$0")")"
 ASTRO_PROJECT=astro
 source lib/ui.sh
 source lib/host.sh
+source lib/env.sh
 source lib/disk.sh
 
 trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
 [[ -t 0 ]] || ui_fail "execute em um terminal interativo"
 
-mapfile -t PROJECTS < <(for f in */project.sh; do [[ -x $f ]] && dirname "$f"; done)
+ORDER=(caddy adguard cockpit homeassistant nextcloud arcade rclone discord)
+IMPLODE_WORD=IMPLODIR
+
+PROJECTS=()
+for name in "${ORDER[@]}"; do
+    [[ -x $name/project.sh ]] && PROJECTS+=("$name")
+done
+for file in */project.sh; do
+    name="${file%/*}"
+    [[ -x $file && " ${ORDER[*]} " != *" $name "* ]] && PROJECTS+=("$name")
+done
 ((${#PROJECTS[@]})) || ui_fail "nenhum projeto encontrado"
 
 project() {
@@ -20,27 +31,12 @@ project() {
     "./$name/project.sh" "$@"
 }
 
-run_all() {
-    local action=$1
-    shift
-    local name failed=() succeeded=()
-    for name in "${@:2}"; do
-        if project "$name" $action ${1:+"$1"}; then
-            succeeded+=("$name")
-        else
-            failed+=("$name")
-        fi
-    done
-    summary
-}
-
-system_upgrade() {
+installed_any() {
     local name
     for name in "${PROJECTS[@]}"; do
         project "$name" status && return 0
     done
-    ui_step "Sistema"
-    host_upgrade
+    return 1
 }
 
 summary() {
@@ -50,48 +46,15 @@ summary() {
     ((${#failed[@]} == 0))
 }
 
-install_all() {
-    local name pending=()
-    ui_step "Verificando projetos"
-    for name in "${PROJECTS[@]}"; do
-        if project "$name" status; then
-            ui_info "$name já instalado, pulando"
-        else
-            ui_info "$name será instalado"
-            pending+=("$name")
-        fi
-    done
-    if ((${#pending[@]} == 0)); then
-        ui_ok "tudo já está instalado"
-        return
-    fi
-    system_upgrade
-    run_all install "" "${pending[@]}"
-}
-
-install_selected() {
-    local name labels=() chosen=() picked=()
-    for name in "${PROJECTS[@]}"; do
-        local label
-        label="$(printf '%-12s %s' "$name" "$(project "$name" describe)")"
-        project "$name" status && label+=$' \033[2m(instalado, será recriado)\033[0m'
-        labels+=("$label")
-    done
-
-    ui_checklist chosen "Quais projetos instalar?" --all "${labels[@]}"
-    ((${#chosen[@]})) || { ui_warn "nenhum projeto selecionado"; return; }
-    for name in "${chosen[@]}"; do picked+=("${PROJECTS[name]}"); done
-    system_upgrade
-    run_all install "" "${picked[@]}"
-}
-
-reinstall_all() {
-    ui_confirm "isso apaga os dados de TODOS os projetos e reinstala do zero. confirma?" n \
-        || { ui_warn "cancelado"; return; }
-    system_upgrade
+install_astro() {
     local name failed=() succeeded=()
+    if ! installed_any; then
+        ui_step "Sistema"
+        host_upgrade
+    fi
+    disk_manage || true
     for name in "${PROJECTS[@]}"; do
-        if project "$name" remove --purge && project "$name" install; then
+        if project "$name" install; then
             succeeded+=("$name")
         else
             failed+=("$name")
@@ -100,46 +63,13 @@ reinstall_all() {
     summary
 }
 
-remove_all() {
-    local mode
-    ui_menu mode "Como remover os containers de todos os projetos?" \
-        "Manter os dados (os volumes continuam no disco)" \
-        "Apagar tudo (containers e volumes)" \
-        "Cancelar"
-    case $mode in
-        0) run_all remove "" "${PROJECTS[@]}" ;;
-        1)
-            ui_confirm "isso apaga os dados de TODOS os projetos. confirma?" n || { ui_warn "cancelado"; return; }
-            run_all remove --purge "${PROJECTS[@]}"
-            ;;
-        *) ui_warn "cancelado" ;;
-    esac
-}
-
-configure_project() {
-    local name index candidates=() labels=()
-    for name in "${PROJECTS[@]}"; do
-        project "$name" status || continue
-        [[ -n "$(project "$name" actions 2>/dev/null)" ]] || continue
-        candidates+=("$name")
-        labels+=("$(printf '%-12s %s' "$name" "$(project "$name" describe)")")
-    done
-    if ((${#candidates[@]} == 0)); then
-        ui_warn "nenhum projeto instalado tem configurações extras"
-        return
-    fi
-
-    ui_menu index "Qual projeto configurar?" "${labels[@]}" "Voltar"
-    ((index < ${#candidates[@]})) || return 0
-    name=${candidates[index]}
-
-    local id label ids=() action_labels=()
+project_actions() {
+    local name=$1 index id label ids=() labels=()
     while IFS='|' read -r id label; do
         ids+=("$id")
-        action_labels+=("$label")
+        labels+=("$label")
     done < <(project "$name" actions)
-
-    ui_menu index "O que fazer no $name?" "${action_labels[@]}" "Voltar"
+    ui_menu index "O que fazer no $name?" "${labels[@]}" "Voltar"
     ((index < ${#ids[@]})) || return 0
     project "$name" action "${ids[index]}"
 }
@@ -159,34 +89,159 @@ global_actions() {
     done
 }
 
-ui_step "Astro: ${#PROJECTS[@]} projeto(s) encontrado(s): ${PROJECTS[*]}"
-while true; do
-    global_actions
-    ui_menu choice "O que você quer fazer?" \
-        "Instalar todos (pula os já instalados)" \
-        "Escolher quais instalar" \
-        "Configurar um projeto instalado" \
-        "Discos da máquina" \
-        "${GLOBAL_LABELS[@]}" \
-        "Reinstalar tudo do zero (apaga os dados)" \
-        "Remover todos os containers" \
-        "Sair"
-
-    globals=${#GLOBAL_IDS[@]}
-    if ((choice >= 4 && choice < 4 + globals)); then
-        read -r name id <<< "${GLOBAL_IDS[choice - 4]}"
-        project "$name" action "$id" || true
-        echo
-        continue
+backup_default() {
+    local mount
+    mount="$(disk_mounts | awk 'NR == 1 { print $1 }')"
+    if [[ -n $mount ]]; then
+        printf '%s/Astro/Configurações' "$mount"
+    else
+        printf '%s/astro-backup' "$HOME"
     fi
-    ((choice >= 4 + globals)) && choice=$((choice - globals))
+}
+
+implode_backup() {
+    local dest key password status=0
+    ui_step "Backup antes de implodir"
+    command -v zstd >/dev/null && command -v gpg >/dev/null || ui_fail "o backup precisa do zstd e do gpg: sudo dnf install -y zstd gnupg2"
+    dest="$(env_get CONFIG_BACKUP "" "$ASTRO_HOME/rclone/.env")"
+    key="$ASTRO_HOME/rclone/data/config-backup.key"
+    if [[ -n $dest && -s $key ]]; then
+        ui_info "usando a pasta e a senha do backup das configurações do rclone: $dest"
+        ./rclone/run.sh config antes-de-implodir
+        return
+    fi
+    ui_info "o backup das configurações do rclone não está ligado: escolha uma pasta e uma senha para este backup"
+    ui_info "depois de reinstalar, use essa pasta como \"pasta do backup das configurações\" do rclone para restaurar"
+    while true; do
+        ui_input dest "pasta do backup" "$(backup_default)" is_path
+        if [[ $dest == "$ASTRO_HOME" || $dest == "$ASTRO_HOME"/* ]]; then
+            ui_warn "$ASTRO_HOME é apagada na implosão: escolha outra pasta"
+        elif mkdir -p "$dest" 2>/dev/null && [[ -w $dest ]]; then
+            break
+        else
+            ui_warn "não foi possível gravar em $dest: escolha outra pasta"
+        fi
+    done
+    ui_warn "guarde esta senha fora da máquina (ex.: gerenciador de senhas): sem ela, o backup não abre"
+    ui_secret password "senha do backup"
+    key="$(mktemp -p /var/tmp astro-key.XXXXXX)"
+    printf '%s' "$password" > "$key"
+    ASTRO_BACKUP_DEST="$dest" ASTRO_BACKUP_KEY="$key" ./rclone/run.sh config antes-de-implodir || status=$?
+    rm -f "$key"
+    return "$status"
+}
+
+implode() {
+    local answer games i name failed=() succeeded=()
+    games="$(env_get GAMES_USER "" "$ASTRO_HOME/arcade/.env")"
+    ui_step "Implodir Astro"
+    ui_warn "isto desfaz tudo o que o Astro criou nesta máquina:"
+    ui_info "  containers, imagens, serviços e a configuração de todos os projetos ($ASTRO_HOME)"
+    [[ -z $games ]] || ui_info "  o usuário de jogos $games, com a home inteira (saves, states, BIOS e núcleos)"
+    ui_info "  a pasta local de arquivos do Nextcloud"
+    ui_info "  as montagens dos discos em $DISK_ROOT e o TPM dos discos criptografados"
+    ui_info "  os ajustes da máquina: suspensão, firewall, DNS, portas, rede anunciada no Tailscale e início no boot"
+    ui_info "ficam: os pacotes instalados (sistema, Tailscale, driver da NVIDIA...), os dados dos discos e o SSH"
+    ui_info "antes de tudo, as configurações vão para um backup criptografado"
+    answer="$(_ui_ask "para confirmar, digite $IMPLODE_WORD: ")"
+    if [[ $answer != "$IMPLODE_WORD" ]]; then
+        ui_warn "cancelado, nada mudou"
+        return 0
+    fi
+    IMPLODED=true
+
+    if ! implode_backup; then
+        ui_error "o backup falhou: nada foi desfeito"
+        return 1
+    fi
+
+    for ((i = ${#PROJECTS[@]} - 1; i >= 0; i--)); do
+        name=${PROJECTS[i]}
+        if project "$name" remove; then
+            succeeded+=("$name")
+        else
+            failed+=("$name")
+        fi
+    done
+
+    ui_step "Discos da máquina"
+    disk_release_all
+
+    ui_step "Máquina"
+    host_undo
+    if podman network exists astro_default 2>/dev/null; then
+        podman network rm -f astro_default >/dev/null
+        ui_ok "rede astro_default apagada"
+    fi
+    podman image prune -f >/dev/null 2>&1 || true
+    rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/astro"
+    if ((${#failed[@]})); then
+        ui_warn "$ASTRO_HOME mantida, porque algum projeto falhou: corrija e rode a implosão de novo"
+    elif [[ -e $ASTRO_HOME ]]; then
+        podman unshare rm -rf "$ASTRO_HOME"
+        ui_ok "$ASTRO_HOME apagada"
+    fi
+    summary
+    ui_info "o repositório continua aqui: para instalar de novo, rode o setup.sh"
+}
+
+administration() {
+    local index globals name id
+    while true; do
+        global_actions
+        globals=${#GLOBAL_IDS[@]}
+        ui_menu index "Administração" "Discos da máquina" "${GLOBAL_LABELS[@]}" "Implodir Astro" "Voltar"
+        if ((index == 0)); then
+            disk_manage || true
+        elif ((index <= globals)); then
+            read -r name id <<< "${GLOBAL_IDS[index - 1]}"
+            project "$name" action "$id" || true
+        elif ((index == globals + 1)); then
+            implode || true
+            $IMPLODED && return 0
+        else
+            return 0
+        fi
+        echo
+    done
+}
+
+manage() {
+    local name index candidates labels
+    while true; do
+        candidates=()
+        labels=()
+        for name in "${PROJECTS[@]}"; do
+            project "$name" status || continue
+            [[ -n "$(project "$name" actions 2>/dev/null)" ]] || continue
+            candidates+=("$name")
+            labels+=("$(printf '%-14s %s' "$name" "$(project "$name" describe)")")
+        done
+        ui_menu index "Gerenciar Astro" "${labels[@]}" "Administração" "Voltar"
+        if ((index < ${#candidates[@]})); then
+            project_actions "${candidates[index]}" || true
+        elif ((index == ${#candidates[@]})); then
+            IMPLODED=false
+            administration
+            $IMPLODED && return 0
+        else
+            return 0
+        fi
+        echo
+    done
+}
+
+ui_step "Astro: ${#PROJECTS[@]} projeto(s): ${PROJECTS[*]}"
+while true; do
+    if installed_any; then
+        install_label="Reinstalar Astro"
+    else
+        install_label="Instalar Astro"
+    fi
+    ui_menu choice "O que você quer fazer?" "$install_label" "Gerenciar Astro" "Sair"
     case $choice in
-        0) install_all || true ;;
-        1) install_selected || true ;;
-        2) configure_project || true ;;
-        3) disk_manage || true ;;
-        4) reinstall_all || true ;;
-        5) remove_all || true ;;
+        0) install_astro || true ;;
+        1) manage || true ;;
         *) ui_info "até mais!"; break ;;
     esac
     echo

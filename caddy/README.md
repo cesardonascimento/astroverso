@@ -5,10 +5,10 @@ Proxy reverso com HTTPS válido (Let's Encrypt) para os serviços da rede, por e
 
 ```bash
 ./project.sh install           # pergunta a configuração, prepara o host e sobe o container
-./project.sh action add        # adiciona rotas (também pelo setup.sh: "Configurar um projeto instalado")
+./project.sh action add        # adiciona rotas (também pelo setup.sh: Gerenciar Astro → caddy)
 ./project.sh action remove     # remove rotas
 ./project.sh action list       # lista as rotas
-./project.sh remove [--purge]  # remove o container; --purge apaga os certificados
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 ## Perguntas da instalação
@@ -54,3 +54,8 @@ do host, por `host.containers.internal`.
 
 Os nomes não existem no DNS público: eles resolvem para esta máquina só dentro da rede, pela reescrita
 `*.<domínio base>` do adguard.
+
+## Remoção
+
+`remove` tira o container, as imagens e as portas HTTP e HTTPS do firewall, e apaga `~/.astro/caddy` (token,
+rotas manuais e certificados).

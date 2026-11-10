@@ -5,7 +5,7 @@ e pelos apps do Nextcloud no celular e no computador.
 
 ```bash
 ./project.sh install           # instala, configura e publica o endereço no Caddy
-./project.sh remove [--purge]  # remove os containers; --purge apaga também o banco, a configuração e os arquivos
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 ## Containers
@@ -75,7 +75,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo caminho em `/srv`; um `.env` antigo com UUIDs é convertido) |
+| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo caminho em `/srv`) |
 | `~/.astro/nextcloud/docker-compose.override.yml` | Volumes dos discos |
 | `~/.astro/nextcloud/data/secrets/` | Senha do banco |
 | `~/.astro/nextcloud/data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
@@ -88,7 +88,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 À 01:00, o rclone pede ao projeto um dump do banco (`pg_dump -Fc`, em `~/.astro/nextcloud/backup`). No arquivo
 do backup entram o `.env`, a senha do banco, o dump, `config/`, `custom_apps/`, `themes/` e `version.php`; o
 banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) também fica
-de fora: os arquivos do dia a dia ficam nos discos (`armazenamento-a`), que têm o próprio backup.
+de fora: os arquivos do dia a dia ficam nos discos da máquina, que têm o próprio backup.
 
 ## Restauração
 
@@ -104,6 +104,6 @@ de fora: os arquivos do dia a dia ficam nos discos (`armazenamento-a`), que têm
 
 ## Remoção
 
-`remove` derruba os containers e tira a rota do Caddy, mantendo tudo em `~/.astro/nextcloud`. Os discos continuam
-montados (são da máquina). `--purge` apaga `~/.astro/nextcloud/data`. Uma pasta dos arquivos fora do projeto e os
-arquivos dos discos nunca são apagados.
+`remove` derruba os containers, apaga as imagens, tira a ACL do Nextcloud dos discos privados, apaga a pasta local
+dos arquivos (padrão `~/.nextcloud`, só se for mesmo uma pasta de dados do Nextcloud) e `~/.astro/nextcloud`, e
+tira a rota do Caddy. Os discos continuam montados (são da máquina) e os arquivos neles nunca são apagados.

@@ -14,24 +14,33 @@ compose() {
 }
 
 state_setup() {
-    local stop=$1 item pending=()
-    shift
     mkdir -p "$STATE"
     chmod 700 "$ASTRO_HOME" "$STATE"
-    for item in "$@"; do
-        [[ -e $item ]] && pending+=("$item")
-    done
-    ((${#pending[@]})) || return 0
-    ui_step "Migração para $STATE"
-    "$stop"
-    for item in "${pending[@]}"; do
-        if [[ -e $STATE/$item ]]; then
-            ui_warn "$item existe nos dois lugares: mantido o de $STATE, o antigo ficou em $PWD/$item"
-            continue
-        fi
-        podman unshare mv "$item" "$STATE/$item"
-        ui_ok "$item movido para $STATE (donos e permissões mantidos)"
-    done
+}
+
+state_purge() {
+    [[ -e $STATE ]] || return 0
+    podman unshare rm -rf "$STATE"
+    ui_ok "configuração e dados apagados ($STATE)"
+}
+
+project_images() {
+    [[ -f docker-compose.yml ]] && sed -n 's/^ *image: *//p' docker-compose.yml
+    [[ -f Dockerfile ]] && awk '
+        /^ARG [A-Za-z_]+=/ { split($2, pair, "="); value[pair[1]] = pair[2] }
+        /^FROM / { image = $2; for (name in value) gsub("\\$\\{" name "\\}", value[name], image); print image }
+    ' Dockerfile
+    return 0
+}
+
+images_remove() {
+    local image count=0
+    while read -r image; do
+        [[ -n $image ]] && podman image exists "$image" || continue
+        podman rmi -f "$image" >/dev/null 2>&1 && count=$((count + 1))
+    done < <(project_images | sort -u)
+    ((count == 0)) || ui_ok "$count imagem(ns) apagada(s)"
+    return 0
 }
 
 state_restore() {

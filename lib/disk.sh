@@ -47,16 +47,15 @@ disk_read() {
 }
 
 disk_block() {
-    disk_read "$1" | awk '/^# astro[: ]/ { print; getline; print }'
+    disk_read "$1" | awk '/^# astro / { print; getline; print }'
     return 0
 }
 
 disk_configured() {
     disk_block "$DISK_FSTAB" | awk '
-        /^# astro[: ]/ {
+        /^# astro / {
             uuid = $3
-            if ($2 ~ /^astro:/) { split($2, tag, ":"); type = (tag[2] == "sunshine") ? "compartilhado" : "privado" }
-            else { type = ($4 == "compartilhado") ? "compartilhado" : "privado" }
+            type = ($4 == "compartilhado") ? "compartilhado" : "privado"
             getline
             print uuid, type, $2
         }
@@ -70,16 +69,12 @@ disk_mounts() {
     done < <(disk_configured)
 }
 
-disk_path() {
-    disk_configured | awk -v uuid="$1" '$1 == uuid { print $3; exit }'
-}
-
 disk_type() {
     disk_configured | awk -v target="$1" '$3 == target { print $2; exit }'
 }
 
 disk_line() {
-    disk_block "$1" | awk -v uuid="$2" '/^# astro[: ]/ { match_uuid = ($3 == uuid); getline; if (match_uuid) print }'
+    disk_block "$1" | awk -v uuid="$2" '/^# astro / { match_uuid = ($3 == uuid); getline; if (match_uuid) print }'
 }
 
 disk_block_write() {
@@ -88,7 +83,7 @@ disk_block_write() {
     current="$(disk_read "$file")"
     wanted="$(
         if [[ -n $current ]]; then
-            printf '%s\n' "$current" | awk '/^# astro[: ]/ { getline; next } { print }'
+            printf '%s\n' "$current" | awk '/^# astro / { getline; next } { print }'
         fi
         if (($#)); then
             printf '%s\n' "$@"
@@ -178,6 +173,31 @@ disk_release_unused() {
             sudo cryptsetup close "$target" 2>/dev/null || ui_warn "não foi possível travar $target (em uso)"
         fi
     done < <(disk_block "$DISK_CRYPTTAB")
+}
+
+disk_release_all() {
+    local uuid file luks=()
+    mapfile -t luks < <(disk_block "$DISK_CRYPTTAB" | awk '/^# astro / { print $3 }')
+    if [[ -z $(disk_block "$DISK_FSTAB") && ${#luks[@]} -eq 0 ]]; then
+        ui_ok "nenhum disco montado pelo Astro"
+        return 0
+    fi
+    disk_release_unused ""
+    disk_block_write "$DISK_CRYPTTAB"
+    disk_block_write "$DISK_FSTAB"
+    for file in "$DISK_FSTAB" "$DISK_CRYPTTAB"; do
+        sudo rm -f "$file.astro-bak"
+    done
+    sudo systemctl daemon-reload
+    ui_ok "discos fora do fstab e do crypttab: deixam de montar no boot (os dados continuam neles)"
+    for uuid in "${luks[@]}"; do
+        [[ -e /dev/disk/by-uuid/$uuid ]] || continue
+        if sudo timeout 60 systemd-cryptenroll --wipe-slot=tpm2 "/dev/disk/by-uuid/$uuid" </dev/null >/dev/null 2>&1; then
+            ui_ok "TPM descadastrado do disco $uuid: ele volta a abrir só com a senha"
+        else
+            ui_warn "não foi possível descadastrar o TPM do disco $uuid (a senha continua valendo)"
+        fi
+    done
 }
 
 disk_options() {

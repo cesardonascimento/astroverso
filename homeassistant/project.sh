@@ -13,7 +13,7 @@ NETWORK=astro_default
 CONFIG="$STATE/config"
 
 cmd_describe() {
-    echo "Home Assistant: automação da casa (Tuya, LG, Samsung e outros) num painel só"
+    echo "Home Assistant: automação da casa, com aparelhos de várias marcas num painel só"
 }
 
 cmd_status() {
@@ -72,6 +72,7 @@ wait_ready() {
 trusted_proxies() {
     local subnet
     printf '%s\n' 127.0.0.1 ::1
+    podman network exists "$NETWORK" || podman network create "$NETWORK" >/dev/null
     subnet="$(podman network inspect "$NETWORK" --format '{{range .Subnets}}{{.Subnet}} {{end}}' 2>/dev/null | awk '{ print $1 }')"
     [[ -n $subnet ]] && printf '%s\n' "$subnet"
     host_lan_ip
@@ -110,7 +111,7 @@ proxy_settings() {
 }
 
 cmd_install() {
-    state_setup remove_container .env .proxy
+    state_setup
     configure
     local host config="$CONFIG" port
     host="$(env_get HA_HOST)"
@@ -132,29 +133,17 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "Home Assistant: https://$host"
     ui_warn "abra o endereço logo: o primeiro acesso cria o usuário administrador"
-    ui_info "integrações sugeridas: Tuya (aparelhos Wi-Fi e o hub Zigbee), LG ThinQ, LG webOS TV e SmartThings"
+    ui_info "os aparelhos entram pelas integrações: Configurações → Dispositivos e serviços → Adicionar integração"
 }
 
 cmd_remove() {
-    local purge=false config="$CONFIG"
-    [[ ${1:-} == --purge ]] && purge=true
-
     ui_step "Remoção"
-    if cmd_status; then
-        remove_container
-        ui_ok "container $CONTAINER removido"
-    else
-        ui_info "nenhum container para remover"
-    fi
-    proxy_unpublish
+    remove_container
+    images_remove
+    ui_ok "container $CONTAINER removido"
     host_firewall_unblock_lan "$(env_get HA_PORT 8123)"
-
-    if $purge && [[ -d $config ]]; then
-        podman unshare rm -rf "$config"
-        ui_ok "configuração apagada ($config)"
-    else
-        ui_info "configuração mantida em $config"
-    fi
+    proxy_unpublish
+    state_purge
 }
 
 cmd_backup() {
@@ -197,8 +186,8 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove | backup | restore <pasta>" ;;
 esac

@@ -17,21 +17,23 @@ instalação.
 
 ## Como usar
 
+Numa máquina com Fedora recém-instalado:
+
 ```bash
+sudo dnf install -y git
 git clone <url-deste-repositório> ~/Projects/astro
 ~/Projects/astro/setup.sh
 ```
 
 | Opção | O que faz |
 |---|---|
-| Instalar todos | Instala o que ainda não está instalado |
-| Escolher quais instalar | Marca os projetos com Espaço (ou "Todos"); os já instalados são recriados |
-| Configurar um projeto instalado | Ajustes do dia a dia, como adicionar rotas no Caddy |
-| Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
-| Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
-| Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
-| Reinstalar tudo do zero | Apaga os dados e instala de novo |
-| Remover todos os containers | Mantendo os dados ou apagando tudo |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `homeassistant`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Reinstalar Astro | O mesmo, com algum projeto já instalado. Cada um pergunta se usa a configuração já salva |
+| Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
+| Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
+| Gerenciar Astro → Administração → Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
+| Gerenciar Astro → Administração → Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
+| Gerenciar Astro → Administração → Implodir Astro | Faz um backup das configurações e desfaz tudo o que o Astro criou na máquina (veja abaixo) |
 
 ## Respondendo a instalação
 
@@ -42,8 +44,7 @@ tampa de um notebook, para não perder o acesso remoto.
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
 respostas e tudo o que a instalação gera (dados, certificados, logins) ficam em `~/.astro/<projeto>`, fora do
-repositório: o repositório tem só o código. Instalações antigas são migradas sozinhas na próxima instalação,
-sem perder nada. Serviços que rodam com outro usuário (ex.: o de jogos) guardam a configuração no `~/.astro`
+repositório: o repositório tem só o código. Serviços que rodam com outro usuário (ex.: o de jogos) guardam a configuração no `~/.astro`
 desse usuário.
 
 ### Em todos os projetos
@@ -64,8 +65,9 @@ desse usuário.
 
 ### Discos da máquina
 
-Os discos de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud,
-rclone) só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
+É a primeira etapa da instalação, antes dos projetos, e também fica em Gerenciar Astro → Administração. Os discos
+de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud, rclone,
+arcade) só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
 Fedora o monta para quem está na tela, e de longe ele é acessado pelo Cockpit (Armazenamento e Arquivos, com o
 acesso administrativo ligado).
 
@@ -104,7 +106,7 @@ acesso administrativo ligado).
   `adguard.<domínio>`.
 - **Usar só o AdGuard como DNS desta máquina?** Define o DNS do próprio servidor. Com **S**, ele sempre
   resolve os nomes internos, mas fica sem DNS nenhum quando o AdGuard está parado (por exemplo, durante
-  um "Reinstalar tudo do zero", o que impede baixar as imagens). Com **N** (padrão), ele usa também o DNS
+  a implosão, o que impede baixar as imagens). Com **N** (padrão), ele usa também o DNS
   secundário do roteador e nunca fica sem DNS. Nesse caso, a cada conexão de rede (inclusive no boot) o
   servidor confere se o roteador entregou o AdGuard como DNS primário (pede de novo até 3 vezes), espera
   o AdGuard responder e volta a usá-lo se tiver ficado preso no secundário.
@@ -138,13 +140,13 @@ fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca 
   (ex.: uma por disco): a primeira é a principal do ES-DE, e os sistemas das outras aparecem do mesmo jeito.
   As ROMs também ficam onde estão.
 - **Carregar uma configuração existente do RetroArch?** Só aparece na primeira vez. Com **S**, você escolhe a
-  pasta de uma instalação antiga (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
+  pasta de outra instalação (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
   jogos. Uma configuração do Windows serve: caminhos e drivers do Windows são limpos.
 - **Carregar uma configuração existente do ES-DE?** Igual, para o ES-DE (a pasta `ES-DE` do Windows também
   serve). As pastas de ROMs e mídias passam a ser as respondidas acima.
 - **Carregar gamelists existentes?** Igual, para as gamelists (a lista de jogos com nomes e descrições).
 
-Depois, as mesmas cópias podem ser feitas pelas ações do projeto, em "Configurar um projeto instalado".
+Depois, as mesmas cópias podem ser feitas pelas ações do projeto, em Gerenciar Astro → arcade.
 
 Os discos de jogos (ROMs, emuladores) entram em "Discos da máquina" como **compartilhados**: assim o usuário de
 jogos os acessa e eles aparecem no Arquivos dele.
@@ -154,8 +156,8 @@ ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela
 e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
 Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
 cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
-essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos para o usuário de jogos, para a
-máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
+essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos a cada sessão do usuário de jogos,
+para a máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
 
 ### caddy
 
@@ -195,7 +197,7 @@ notificações do canal em "Todas as mensagens".
   acesso passa só pelo Caddy. Mude só se `8123` estiver ocupada.
 
 Depois de instalar, abra o endereço logo: o primeiro acesso cria o usuário administrador. Os aparelhos entram
-pelas integrações, no próprio painel (Tuya, LG, Samsung...).
+pelas integrações, no próprio painel.
 
 ### nextcloud
 
@@ -223,7 +225,7 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
 - **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
   pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
 - **Adicionar um armazenamento em nuvem agora?** Liga a cópia fora de casa. Dá para adicionar depois, em
-  "Configurar um projeto instalado".
+  Gerenciar Astro → rclone. Sem nenhum disco da máquina, não aparece: a cópia da nuvem precisa de um disco.
   - **Qual armazenamento em nuvem?** O serviço. Hoje, o Proton Drive.
   - **Nome do armazenamento** e **pasta dentro do disco:** onde a cópia da nuvem fica no disco. Por padrão,
     uma pasta com o nome do serviço (ex.: `proton`). A raiz do disco não é aceita, para caber mais de um
@@ -239,7 +241,8 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
   (ex.: `nextcloud/nextcloud.tar.zst.gpg`). Dentro dele fica só a pasta do serviço, sem o nome do usuário: dá para
   restaurar em outra máquina, com outro usuário.
   Por padrão, `Astro/Configurações` dentro da pasta do primeiro armazenamento em nuvem: assim ele segue para a
-  nuvem e para o disco de backup nas rodadas seguintes.
+  nuvem e para o disco de backup nas rodadas seguintes. Sem nenhum disco da máquina, o backup das configurações
+  fica desligado até um disco ser cadastrado e o Astro reinstalado.
 - **Senha do backup das configurações:** criptografa esse arquivo. **Guarde-a fora da máquina** (num gerenciador
   de senhas): sem ela, o backup não abre. Na reinstalação, o assistente pergunta se mantém a atual.
 
@@ -250,7 +253,7 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
 Os horários: sincronização com a nuvem a cada 30 minutos, das 08:00 às 20:00; 01:00 backup das configurações;
 03:00 uma última sincronização com a nuvem e o espelho no disco de backup.
 
-**Restaurar uma versão** (menu principal): mostra as versões da mais nova para a mais antiga e os serviços de
+**Restaurar uma versão** (Gerenciar Astro → Administração): mostra as versões da mais nova para a mais antiga e os serviços de
 cada uma. Antes de trocar qualquer coisa, o assistente para o rclone (se estiver copiando algo, pergunta antes) e
 salva a situação atual como uma versão "antes da restauração", para dar para voltar. Depois, para cada serviço
 escolhido: para os containers, troca a configuração pela do backup e sobe de novo. Se a senha atual não abrir a
@@ -261,6 +264,23 @@ Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado,
 sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
 "Sincronizar agora" mostra o aviso e pergunta se libera.
+
+### Implodir Astro
+
+Fica em Gerenciar Astro → Administração. Desfaz tudo o que o Astro criou, na ordem inversa da instalação:
+containers, imagens, serviços e a configuração de todos os projetos (`~/.astro`), o usuário de jogos com a home
+inteira, a pasta local de arquivos do Nextcloud, as montagens dos discos em `/srv` (o TPM dos discos criptografados
+é descadastrado e eles voltam a abrir só com a senha) e os ajustes da máquina feitos para o Astro: suspensão,
+firewall, DNS, portas baixas, a rede anunciada no Tailscale e o início automático no boot. Ficam os pacotes
+instalados (sistema atualizado, Tailscale, driver da NVIDIA, Cockpit, Sunshine, RetroArch, rclone), os dados dos
+discos, o SSH ligado (só volta o login por senha) e o repositório.
+
+- **Para confirmar, digite IMPLODIR:** qualquer outra resposta cancela sem mudar nada.
+- **Pasta e senha do backup:** antes de desfazer qualquer coisa, a configuração de cada serviço vai para uma
+  versão `antes-de-implodir` do backup das configurações. Com o backup do rclone ligado, usa a pasta e a senha
+  dele, sem perguntar. Sem ele, pergunta uma pasta (por padrão, `Astro/Configurações` no primeiro disco da máquina)
+  e uma senha. **Guarde a senha fora da máquina.** Depois de reinstalar, use essa pasta como "pasta do backup das
+  configurações" do rclone e restaure em Gerenciar Astro → Administração. Se o backup falhar, nada é desfeito.
 
 ### Depois de instalar
 

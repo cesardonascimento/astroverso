@@ -6,7 +6,7 @@ mesmo sem ninguém logado.
 
 ```bash
 ./project.sh install           # disco de backup, agendamentos e (opcional) o primeiro armazenamento em nuvem
-./project.sh remove [--purge]  # tira os agendamentos; --purge apaga também os logins da nuvem
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 ## Perguntas da instalação
@@ -16,7 +16,7 @@ mesmo sem ninguém logado.
 | Qual disco recebe o espelho noturno? | o atual, ou "Nenhum (só nuvem)" |
 | Qual disco copiar para ele toda noite? | o atual, ou o primeiro dos outros discos da máquina |
 | Por quantos dias guardar o que for apagado ou alterado | `30` |
-| Adicionar um armazenamento em nuvem agora? | `S` |
+| Adicionar um armazenamento em nuvem agora? | `S` (sem nenhum disco da máquina, não aparece) |
 
 Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 
@@ -44,7 +44,7 @@ Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo
 
 Depois da primeira cópia, a pasta no disco (`<disco>/<pasta>`) e a nuvem ficam iguais: o que for criado,
 alterado ou apagado de um lado vai para o outro na rodada seguinte. Serve para pastas que outras pessoas
-mexem pela nuvem (ex.: uma pasta compartilhada da empresa). O `rclone bisync` guarda a lista de arquivos da
+mexem pela nuvem (ex.: uma pasta compartilhada com outras pessoas). O `rclone bisync` guarda a lista de arquivos da
 última rodada (em `~/.cache/rclone/bisync`) para saber o que mudou de cada lado.
 
 | Situação | O que acontece |
@@ -95,6 +95,10 @@ argumento pode ficar de fora):
 
 ## Backup das configurações
 
+A pasta padrão é `Astro/Configurações` dentro do primeiro armazenamento em nuvem ou, sem ele, do disco copiado
+toda noite. Sem nenhum disco da máquina, o backup das configurações fica desligado até um disco ser cadastrado e
+o Astro reinstalado. A instalação instala também o `zstd`, usado na compactação.
+
 À 01:00, antes dos espelhos, o `astro-rclone-config`:
 
 1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud,
@@ -117,7 +121,12 @@ Astro/Configurações/
     host/host.tar.zst.gpg
   2026-11-10_154512_antes-da-restauracao/
     ...
+  2026-11-10_170000_antes-de-implodir/
+    ...
 ```
+
+O "Implodir Astro" grava uma versão `antes-de-implodir` com o mesmo `run.sh config`. Sem o backup das
+configurações ligado, ele pergunta uma pasta e uma senha (`ASTRO_BACKUP_DEST` e `ASTRO_BACKUP_KEY`).
 
 A parte de outro usuário (ex.: `arcade/sunshine`) é gravada como do usuário que instala (`--owner=0`): a
 restauração devolve o dono certo.
@@ -125,7 +134,7 @@ restauração devolve o dono certo.
 Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos
 arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-owner`.
 
-## Ações (Configurar um projeto instalado)
+## Ações (Gerenciar Astro → rclone)
 
 | Ação | O que faz |
 |---|---|
@@ -134,8 +143,8 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Adicionar armazenamento em nuvem | As perguntas acima |
 | Reconectar a um armazenamento em nuvem | Refaz o login (ex.: depois de ligar a verificação em duas etapas) |
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
-| Fazer backup das configurações agora | Também no menu principal: roda o backup das configurações na hora |
-| Restaurar uma versão das configurações | Também no menu principal: veja abaixo |
+| Fazer backup das configurações agora | Também em Gerenciar Astro → Administração: roda o backup das configurações na hora |
+| Restaurar uma versão das configurações | Também em Gerenciar Astro → Administração: veja abaixo |
 
 ## Restaurar uma versão
 
@@ -174,6 +183,12 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 | `~/.astro/rclone/data/targets/<nome>.env` | Serviço, disco, pasta, o estado da primeira cópia e o da sincronização (`BISYNC_READY`, `TOO_MANY_DELETES`, `BISYNC_FORCE`) |
 | `~/.cache/rclone/bisync/` | Listas de arquivos da última sincronização (fora do backup; se sumirem, a próxima rodada junta os dois lados) |
 | `~/.astro/rclone/data/config-backup.key` | Senha do backup das configurações (`600`) |
-| `~/.config/systemd/user/astro-rclone-*` | Os três serviços e seus timers (a instalação remove o antigo `astro-rclone-nightly`) |
+| `~/.config/systemd/user/astro-rclone-*` | Os três serviços e seus timers |
 
 Para acompanhar ao vivo: `journalctl --user -fu astro-rclone-tick`.
+
+## Remoção
+
+`remove` para o que estiver rodando, tira os serviços e os timers, o estado do `bisync` (`~/.cache/rclone/bisync`) e
+apaga `~/.astro/rclone` (logins da nuvem e a senha do backup das configurações). Os arquivos nos discos e na
+nuvem, o backup das configurações e o pacote do rclone ficam.

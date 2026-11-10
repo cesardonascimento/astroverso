@@ -226,7 +226,7 @@ check_tailscale_split_dns() {
 }
 
 cmd_install() {
-    state_setup remove_container .env .proxy data
+    state_setup
     configure
     local web_port
     web_port="$(env_get WEB_PORT 8080)"
@@ -287,30 +287,48 @@ cmd_install() {
     fi
 }
 
+restore_host_dns() {
+    local dns_ip=$1 device connection
+    device="$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'dev \K\S+')" || true
+    [[ -n $device ]] || return 0
+    connection="$(nmcli -g GENERAL.CONNECTION device show "$device" 2>/dev/null)" || true
+    [[ -n $connection ]] || return 0
+    if [[ $(nmcli -g ipv4.ignore-auto-dns connection show "$connection") == yes \
+        && $(nmcli -g ipv4.dns connection show "$connection") == "$dns_ip" ]]; then
+        nmcli connection modify "$connection" ipv4.ignore-auto-dns no ipv4.dns "" ipv6.ignore-auto-dns no
+        nmcli connection up "$connection" >/dev/null
+        ui_ok "esta máquina volta a usar o DNS entregue pelo roteador ($connection)"
+    fi
+}
+
+restore_port53() {
+    local conf=/etc/systemd/resolved.conf.d/99-astro-adguard.conf
+    [[ -f $conf ]] || return 0
+    sudo rm -f "$conf"
+    sudo ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    sudo systemctl restart systemd-resolved
+    ui_ok "DNS stub do systemd-resolved reativado"
+}
+
 cmd_remove() {
-    local purge=false
-    [[ ${1:-} == --purge ]] && purge=true
+    local web_port dns_ip
+    web_port="$(env_get WEB_PORT 8080)"
+    dns_ip="$(env_get DNS_BIND_IP 0.0.0.0)"
+    if [[ $dns_ip == 0.0.0.0 ]]; then
+        dns_ip="$(host_lan_ip)" || true
+    fi
 
     ui_step "Remoção"
-    if cmd_status; then
-        remove_container
-        ui_ok "container $CONTAINER removido"
-    else
-        ui_info "nenhum container para remover"
-    fi
-
-    if $purge; then
-        if [[ -d $STATE/data ]]; then
-            podman unshare rm -rf "$STATE/data"
-            ui_ok "dados apagados ($STATE/data)"
-        else
-            ui_info "nenhum dado para apagar"
-        fi
-    else
-        ui_info "dados mantidos em $STATE/data"
-    fi
+    restore_host_dns "$dns_ip"
+    remove_container
+    images_remove
+    ui_ok "container $CONTAINER removido"
     remove_dns_check
+    restore_port53
+    host_firewall_remove dns "$web_port/tcp"
+    host_firewall_unblock_lan "$web_port"
     proxy_unpublish
+    state_purge
 }
 
 cmd_restore() {
@@ -329,8 +347,8 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     backup)   printf 'exclude %s\n' "$STATE/data/work" ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove | backup | restore <pasta>" ;;
 esac

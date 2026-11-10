@@ -1,25 +1,26 @@
 # Criando um projeto
 
-O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implemente:
+O `setup.sh` reconhece qualquer pasta com um `project.sh` executável. "Instalar Astro" instala todos na ordem da
+lista `ORDER` do `setup.sh` (`caddy` primeiro, `discord` por último); um projeto fora da lista entra no fim. O
+`project.sh` implementa:
 
 | Comando | Responsabilidade |
 |---|---|
 | `describe` | Imprime uma linha de descrição |
 | `status` | Sai com código 0 se o projeto está instalado |
 | `install` | Pergunta a configuração, prepara o host e sobe os containers |
-| `remove [--purge]` | Remove os containers; com `--purge`, apaga também os dados |
+| `remove` | Desfaz tudo o que o projeto criou: containers, imagens (`images_remove`), serviços, regras do firewall, ajustes do sistema feitos só para ele, a rota do Caddy e `~/.astro/<projeto>` (`state_purge`). Mantém os pacotes e os dados dos discos. Roda mesmo com o projeto pela metade, sem falhar no que não existe. Chamado pelo "Implodir Astro", na ordem inversa da instalação, depois do backup |
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
-| `global-actions` (opcional) | Como `actions`, mas as ações aparecem no menu principal do `setup.sh` (com o projeto instalado) e rodam com `action <id>` |
+| `global-actions` (opcional) | Como `actions`, mas as ações aparecem em Gerenciar Astro → Administração (com o projeto instalado) e rodam com `action <id>` |
 | `restore <pasta>` (opcional) | Troca a configuração pela da pasta extraída do backup (`state_restore`), cuidando do que for do projeto (ex.: carregar o dump do banco), e sobe o serviço de novo |
 | `remote-actions` (opcional) | Ações para o Discord, uma por linha: `id\|Descrição\|sim` (`sim` pede confirmação por botão; senão `nao`). Aparecem como `/astro <projeto>:<id>`. Nomes em inglês (`sync`, `backup-configs`). Os nomes `start`, `stop` e `restart` são do executor (containers `astro-<projeto>*`) |
 | `remote <id> [argumento]` (opcional) | Roda uma ação de `remote-actions` sem perguntas e imprime o resultado em texto (vai para o Discord). O argumento já chega validado (`[A-Za-z0-9._-]`, até 64) |
 | `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <nome> <caminho>` (entra no arquivo do serviço como `<serviço>/<nome>`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
 
 **Estado fora do repositório.** Tudo o que a instalação gera fica em `~/.astro/<projeto>` (`$STATE`): o `.env`
-(`$ENV_FILE`), o `.proxy`, dados e certificados. O `cmd_install` começa com `state_setup <função que para o
-projeto> <itens>`, que cria a pasta e move para ela o que ainda estiver no lugar antigo (`<projeto>/<item>`),
-mantendo donos e permissões (`podman unshare mv`). O compose usa `${ASTRO_STATE}` nos volumes e no `env_file`,
+(`$ENV_FILE`), o `.proxy`, dados e certificados. O `cmd_install` começa com `state_setup`, que cria a pasta
+(`700`), e o `remove` termina com `state_purge`, que a apaga (`podman unshare rm -rf`). O compose usa `${ASTRO_STATE}` nos volumes e no `env_file`,
 e roda pela função `compose` (`podman compose --env-file "$ENV_FILE"`). Um serviço que roda com outro usuário
 guarda a configuração no `~/.astro/<projeto>` desse usuário, legível pelo usuário que instala (ACL) para o
 backup.
@@ -51,16 +52,19 @@ Bibliotecas compartilhadas:
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
-  suspensão, podman-compose, inicialização no boot, SSH e Tailscale). Funções avulsas: `host_upgrade` (dnf ou apt; avisa e marca `HOST_REBOOT` se veio kernel novo; chamada pelo `setup.sh` uma vez
+  suspensão, podman-compose, inicialização no boot, SSH e Tailscale), e `host_undo` desfaz o que é só do Astro
+  (suspensão, portas baixas, rede anunciada no Tailscale, login só por chave no SSH, linger e `podman-restart`;
+  o SSH continua ativo), chamado pelo "Implodir Astro". Funções avulsas: `host_upgrade` (dnf ou apt; avisa e marca `HOST_REBOOT` se veio kernel novo; chamada pelo `setup.sh` uma vez
   antes de instalar, não pelos projetos), `host_no_sleep`,
   `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
-  `host_firewall`, `host_firewall_block_lan PORTA` / `host_firewall_unblock_lan PORTA` (porta acessível só
+  `host_firewall` / `host_firewall_remove` (portas `N/proto` ou serviços), `host_firewall_block_lan PORTA` / `host_firewall_unblock_lan PORTA` (porta acessível só
   pela própria máquina, ex.: atrás do Caddy), `host_tailscale` (instala via dnf/apt se preciso, oferece anunciar a rede local e pede o
   redirecionamento da porta UDP do Tailscale no roteador),
   `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, atualizando o kernel no Fedora e
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
-- `lib/env.sh`: `ASTRO_HOME`, `STATE`, `ENV_FILE`, `compose`, `state_setup` (acima) e `state_restore <pasta> [itens a manter]`,
+- `lib/env.sh`: `ASTRO_HOME`, `STATE`, `ENV_FILE`, `compose`, `state_setup` e `state_purge` (acima), `images_remove`
+  (apaga as imagens do `docker-compose.yml` e os `FROM` do `Dockerfile` do projeto) e `state_restore <pasta> [itens a manter]`,
   que troca `$STATE` pela pasta do backup, mantendo os itens pedidos da configuração atual. `env_get CHAVE [padrão]
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto),
@@ -75,7 +79,7 @@ Bibliotecas compartilhadas:
   Precisa de `lib/ui.sh`.
 - `lib/disk.sh`: discos de dados **da máquina**, montados pelo sistema no boot. Nenhum disco pertence a um
   projeto: o dono é sempre quem instala, e os projetos só escolhem quais usar (pelo caminho em `/srv`).
-  - `disk_manage` é a opção "Discos da máquina" do `setup.sh`: lista os discos (menos o do sistema), com os
+  - `disk_manage` é a etapa "Discos da máquina" do `setup.sh` (na instalação e na Administração): lista os discos (menos o do sistema), com os
     configurados já marcados, pergunta quais são compartilhados e chama o `disk_setup`. Tirar um disco da lista
     pede confirmação.
   - `disk_setup uuid:tipo...` (tipo `privado` ou `compartilhado`) cadastra o TPM nos discos LUKS (pede a senha só
@@ -84,8 +88,9 @@ Bibliotecas compartilhadas:
     sem nome no cabeçalho, copia para lá o rótulo do sistema de arquivos (`cryptsetup config --label`), para o
     disco aparecer com nome na lista mesmo travado. Sem nome nenhum, a lista mostra o dispositivo e o UUID. Deixa os
     caminhos em `DISK_MOUNTS`. Um disco já montado só é remontado se mudarem as opções que não são `x-*`
-    (`uid`, `gid`, `umask`, `context`); em uso, as opções novas valem no próximo boot. Marcas antigas
-    (`# astro:<projeto> <uuid>`) são lidas e regravadas no formato novo (as do sunshine viram compartilhadas).
+    (`uid`, `gid`, `umask`, `context`); em uso, as opções novas valem no próximo boot.
+  - `disk_release_all` (do "Implodir Astro") desmonta todos os discos do Astro, tira as linhas do `fstab` e do
+    `crypttab`, os links de religar e as pastas de `/srv`, e descadastra o TPM dos discos LUKS (a senha continua).
   - **Privado:** pasta principal `770` (dono e grupo de quem instala), `umask=077` em NTFS/exFAT/FAT,
     `x-gvfs-hide` e `x-systemd.before=user@<uid>.service` (monta antes dos containers de quem instala).
   - **Compartilhado:** pasta principal `777`, `umask=000` em NTFS/exFAT/FAT, `x-gvfs-show` (aparece no Arquivos
@@ -99,6 +104,6 @@ Bibliotecas compartilhadas:
   - Disco desligado e religado (cabo, troca de case) volta a montar sozinho: um link em
     `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem (e o `cryptsetup`, no LUKS) ao disco.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
-  - `disk_mounts` lista os discos da máquina (`/srv/<rótulo> tipo`), lidos do `fstab`; `disk_path <uuid>` dá o
-    caminho de um disco (para converter `.env` antigos) e `disk_type <caminho>` o tipo.
+  - `disk_mounts` lista os discos da máquina (`/srv/<rótulo> tipo`), lidos do `fstab`; `disk_type <caminho>` dá
+    o tipo.
   - Discos tirados da lista são desmontados e saem dos dois arquivos. Os dados nunca são apagados.

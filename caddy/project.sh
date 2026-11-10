@@ -9,13 +9,7 @@ source ../lib/env.sh
 
 CONTAINER=astro-caddy
 ROUTES="$STATE/.routes"
-caddyfile() {
-    if [[ -d data && ! -d $STATE/data ]]; then
-        printf '%s' "$PWD/data/etc/Caddyfile"
-    else
-        printf '%s' "$STATE/data/etc/Caddyfile"
-    fi
-}
+CADDYFILE="$STATE/data/etc/Caddyfile"
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
 
 cmd_describe() {
@@ -58,12 +52,10 @@ route_lines() {
 
 project_route_lines() {
     local file owner
-    local -A seen=()
-    for file in "$ASTRO_HOME"/*/.proxy ../*/.proxy; do
+    for file in "$ASTRO_HOME"/*/.proxy; do
         [[ -f $file ]] || continue
-        owner="$(basename "$(dirname "$(readlink -f "$file")")")"
-        [[ $owner != caddy && -z ${seen[$owner]:-} ]] || continue
-        seen[$owner]=1
+        owner="$(basename "$(dirname "$file")")"
+        [[ $owner != caddy ]] || continue
         grep -v '^\s*$' "$file" | sed "s|\$| $owner|"
     done
 }
@@ -153,9 +145,7 @@ render_upstream() {
 render_caddyfile() {
     local domain host upstream index=0 others=()
     domain="$(env_get CADDY_DOMAIN)"
-    local file
-    file="$(caddyfile)"
-    mkdir -p "$(dirname "$file")"
+    mkdir -p "$(dirname "$CADDYFILE")"
     {
         printf '{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n}\n\n*.%s {\n' "$domain"
         while read -r host upstream; do
@@ -174,7 +164,7 @@ render_caddyfile() {
             render_upstream $'\t' "${host#* }"
             printf '}\n'
         done
-    } > "$file"
+    } > "$CADDYFILE"
 }
 
 apply_routes() {
@@ -212,7 +202,7 @@ print_routes() {
 }
 
 cmd_install() {
-    state_setup remove_container .env .routes data
+    state_setup
     configure
 
     ui_step "Host"
@@ -317,28 +307,12 @@ cmd_action() {
 }
 
 cmd_remove() {
-    local purge=false
-    [[ ${1:-} == --purge ]] && purge=true
-
     ui_step "Remoção"
-    if cmd_status; then
-        remove_container
-        ui_ok "container $CONTAINER removido"
-    else
-        ui_info "nenhum container para remover"
-    fi
-
-    if $purge; then
-        if [[ -d $STATE/data ]]; then
-            podman unshare rm -rf "$STATE/data"
-            ui_ok "dados apagados ($STATE/data); o certificado será emitido de novo na próxima instalação"
-        else
-            ui_info "nenhum dado para apagar"
-        fi
-    else
-        ui_info "dados mantidos em $STATE/data"
-    fi
-    ui_info "rotas e token mantidos em $ROUTES e $ENV_FILE"
+    remove_container
+    images_remove
+    ui_ok "container $CONTAINER removido"
+    host_firewall_remove "$(env_get HTTP_PORT 80)/tcp" "$(env_get HTTPS_PORT 443)/tcp" "$(env_get HTTPS_PORT 443)/udp"
+    state_purge
 }
 
 case "${1:-}" in
@@ -347,7 +321,7 @@ case "${1:-}" in
     actions)  cmd_actions ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge] | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | restore <pasta>" ;;
 esac

@@ -4,8 +4,7 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 
 ```bash
 ./project.sh install           # pergunta a configuração, prepara o host e sobe o container
-./project.sh remove            # remove o container, mantém ./data
-./project.sh remove --purge    # remove o container e apaga ./data
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
 ## O que vem customizado
@@ -94,3 +93,9 @@ Depois que o container sobe:
 ```bash
 podman compose logs -f
 ```
+
+## Remoção
+
+`remove` volta o DNS desta máquina para o automático (se ele estava em "só o AdGuard"), reativa o DNS stub do
+`systemd-resolved`, tira a verificação do DNS primário, o container, as imagens, as liberações e o bloqueio da
+porta no firewall e a rota do Caddy, e apaga `~/.astro/adguard`.

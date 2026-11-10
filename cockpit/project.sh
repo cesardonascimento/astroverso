@@ -60,7 +60,7 @@ configure_proxy_mode() {
 }
 
 cmd_install() {
-    state_setup true .env .proxy
+    state_setup
     configure
     local host
     host="$(env_get COCKPIT_HOST)"
@@ -85,21 +85,20 @@ cmd_install() {
 }
 
 cmd_remove() {
-    local purge=false
-    [[ ${1:-} == --purge ]] && purge=true
-
     ui_step "Remoção"
-    if cmd_status; then
-        sudo systemctl disable -q --now cockpit.socket cockpit.service
+    if systemctl list-unit-files cockpit.socket >/dev/null 2>&1 && systemctl is-enabled -q cockpit.socket 2>/dev/null; then
+        sudo systemctl disable -q --now cockpit.socket
+        sudo systemctl stop cockpit.service 2>/dev/null || true
         ui_ok "Cockpit desativado"
-    else
-        ui_info "Cockpit já estava desativado"
     fi
-    proxy_unpublish
-    if $purge && [[ -f $CONF ]]; then
+    if [[ -f $CONF ]]; then
         sudo rm -f "$CONF"
         ui_ok "configuração de proxy do Cockpit apagada"
     fi
+    host_firewall_unblock_lan "$PORT"
+    systemctl --user disable -q --now podman.socket 2>/dev/null || true
+    proxy_unpublish
+    state_purge
     ui_info "pacotes do sistema mantidos (${PACKAGES[*]})"
 }
 
@@ -114,7 +113,7 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
-    remove)   shift; cmd_remove "$@" ;;
+    remove)   cmd_remove ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | remove | restore <pasta>" ;;
 esac
