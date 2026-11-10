@@ -2,12 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=sunshine
+ASTRO_PROJECT=arcade
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
+source ../lib/disk.sh
 
+GAMES_DEFAULT=ristar
 REPO=LizardByte/Sunshine
 WEB_PORT=47990
 STREAM_PORTS=(47984/tcp 47989/tcp 48010/tcp 47998-48000/udp 48002/udp 48010/udp)
@@ -18,9 +20,20 @@ MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
+ESDE_API="https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de"
+ESDE_DOWNLOAD="https://gitlab.com/es-de/emulationstation-de/-/package_files"
+ESDE_BIN=/usr/local/bin/es-de
+ESDE_SHARE=/usr/local/share/astro-arcade
+ESDE_DESKTOP=/usr/local/share/applications/org.es_de.frontend.desktop
+ESDE_ICON=/usr/local/share/icons/hicolor/scalable/apps/org.es_de.frontend.svg
+ESDE_FILES=(usr/share/es-de/resources/systems/linux/es_systems.xml
+    usr/share/applications/org.es_de.frontend.desktop
+    usr/share/icons/hicolor/scalable/apps/org.es_de.frontend.svg)
+RETROARCH_APP=org.libretro.RetroArch
+BROWSE_ROOTS=()
 
 cmd_describe() {
-    echo "Sunshine: streaming de jogos para o Moonlight, em um usuário próprio com login automático"
+    echo "Arcade: ES-DE e RetroArch num usuário de jogos próprio, transmitidos pelo Sunshine para o Moonlight"
 }
 
 gdm_conf() {
@@ -43,7 +56,7 @@ gdm_autologin_user() {
 cmd_status() {
     local user
     user="$(env_get GAMES_USER)"
-    [[ -n $user ]] && command -v sunshine >/dev/null && id "$user" >/dev/null 2>&1
+    [[ -n $user ]] && command -v sunshine >/dev/null && [[ -x $ESDE_BIN ]] && id "$user" >/dev/null 2>&1
 }
 
 as_user() {
@@ -52,12 +65,40 @@ as_user() {
     (cd / && sudo -u "$user" -H "$@")
 }
 
+games_home() {
+    getent passwd "$1" | cut -d: -f6
+}
+
 user_manager_running() {
     [[ $(loginctl show-user "$1" -P State 2>/dev/null) == @(active|online) ]]
 }
 
 user_session_active() {
     [[ $(loginctl show-user "$1" -P State 2>/dev/null) == active ]]
+}
+
+env_put() {
+    sed -i "/^$1=/d" "$ENV_FILE"
+    printf "%s='%s'\n" "$1" "$2" >> "$ENV_FILE"
+}
+
+rom_dirs() {
+    local -n __roms=$1
+    IFS='|' read -ra __roms <<< "$(env_get ROM_DIRS)"
+}
+
+browse_roots() {
+    local mount type others=()
+    BROWSE_ROOTS=()
+    while read -r mount type; do
+        if [[ $type == compartilhado ]]; then
+            BROWSE_ROOTS+=("$mount")
+        else
+            others+=("$mount")
+        fi
+    done < <(disk_mounts | sort)
+    BROWSE_ROOTS+=("${others[@]}")
+    ((${#BROWSE_ROOTS[@]})) || BROWSE_ROOTS=(/)
 }
 
 check_games_user() {
@@ -81,34 +122,110 @@ choose_autologin() {
     local answer=n
     ui_confirm "entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?" "$(env_get AUTOLOGIN yes | sed 's/yes/y/;s/no/n/')" && answer=yes
     [[ $answer == yes ]] || answer=no
-    sed -i '/^AUTOLOGIN=/d' "$ENV_FILE"
-    printf "AUTOLOGIN='%s'\n" "$answer" >> "$ENV_FILE"
+    env_put AUTOLOGIN "$answer"
+}
+
+choose_media() {
+    local force=${1:-false} current path
+    current="$(env_get MEDIA_DIR)"
+    if ! $force && [[ -n $current ]] && ui_confirm "manter a pasta de mídias do ES-DE em $current?" y; then
+        return
+    fi
+    while true; do
+        ui_browse path "Onde está a pasta de mídias do ES-DE (imagens e vídeos)?" "${BROWSE_ROOTS[@]}"
+        path="$(is_path "$path")" && break
+        ui_warn "use uma pasta cujo caminho tenha só letras, números, espaço, ponto, hífen e sublinhado"
+    done
+    env_put MEDIA_DIR "$path"
+}
+
+choose_roms() {
+    local force=${1:-false} current path item dirs=() repeated
+    current="$(env_get ROM_DIRS)"
+    if ! $force && [[ -n $current ]] && ui_confirm "manter as pastas de ROMs (${current//|/, })?" y; then
+        return
+    fi
+    ui_info "cada pasta de ROMs tem uma subpasta por sistema (snes, psx...); a primeira é a principal do ES-DE"
+    while true; do
+        ui_browse path "Onde estão as ROMs?" "${BROWSE_ROOTS[@]}"
+        if ! path="$(is_path "$path")"; then
+            ui_warn "use uma pasta cujo caminho tenha só letras, números, espaço, ponto, hífen e sublinhado"
+            continue
+        fi
+        repeated=false
+        for item in "${dirs[@]}"; do [[ $item == "$path" ]] && repeated=true; done
+        if $repeated; then
+            ui_warn "$path já está na lista"
+        else
+            dirs+=("$path")
+        fi
+        ui_confirm "adicionar outra pasta de ROMs?" n || break
+    done
+    env_put ROM_DIRS "$(IFS='|'; printf '%s' "${dirs[*]}")"
 }
 
 configure() {
     ui_step "Configuração"
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    local saved default user host domain autologin_current
+    saved="$(env_get GAMES_USER)"
+    if [[ -f $ENV_FILE && -n $saved ]] && ! id "$saved" >/dev/null 2>&1; then
+        ui_warn "o usuário de jogos $saved não existe nesta máquina: responda a configuração de novo"
+    elif [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
         sed -i '/^GAMES_DISKS=/d' "$ENV_FILE"
         grep -q '^AUTOLOGIN=' "$ENV_FILE" || choose_autologin
+        grep -q '^MEDIA_DIR=' "$ENV_FILE" || choose_media
+        grep -q '^ROM_DIRS=' "$ENV_FILE" || choose_roms
         return
     fi
-    local user host domain autologin_current
+    default=$GAMES_DEFAULT
+    [[ -n $saved ]] && id "$saved" >/dev/null 2>&1 && default=$saved
     autologin_current="$(env_get AUTOLOGIN yes)"
     domain="$(proxy_domain)"
     while true; do
-        ui_input user "nome do usuário de jogos (criado se não existir)" "$(env_get GAMES_USER jogos)" is_username
+        ui_input user "nome do usuário de jogos (criado se não existir)" "$default" is_username
         check_games_user "$user" && break
     done
     ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine.$(hostname -s)${domain:+.$domain}")" is_hostname
+    local media roms
+    media="$(env_get MEDIA_DIR)"
+    roms="$(env_get ROM_DIRS)"
     (
         umask 077
-        printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\n" "$user" "$host" > "$ENV_FILE.new"
+        printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\nAUTOLOGIN='%s'\n" "$user" "$host" "$autologin_current" > "$ENV_FILE.new"
+        [[ -z $media ]] || printf "MEDIA_DIR='%s'\n" "$media" >> "$ENV_FILE.new"
+        [[ -z $roms ]] || printf "ROM_DIRS='%s'\n" "$roms" >> "$ENV_FILE.new"
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
-    printf "AUTOLOGIN='%s'\n" "$autologin_current" >> "$ENV_FILE"
     choose_autologin
+    choose_media
+    choose_roms
     ui_ok "configuração salva em $ENV_FILE"
+}
+
+migrate_sunshine() {
+    local old="$ASTRO_HOME/sunshine"
+    [[ -d $old && ! -e $STATE ]] || return 0
+    mv "$old" "$STATE"
+    ui_ok "configuração do antigo projeto sunshine movida para $STATE"
+}
+
+install_packages() {
+    local package missing=()
+    for package in flatpak fuse3; do
+        rpm -q "$package" >/dev/null 2>&1 || dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package")
+    done
+    if ((${#missing[@]} == 0)); then
+        ui_ok "flatpak e fuse3 já instalados"
+    elif command -v dnf >/dev/null; then
+        sudo dnf install -y -q "${missing[@]}"
+        ui_ok "instalados via dnf: ${missing[*]}"
+    elif command -v apt-get >/dev/null; then
+        sudo apt-get install -y -qq "${missing[@]}"
+        ui_ok "instalados via apt: ${missing[*]}"
+    else
+        ui_fail "instale manualmente: ${missing[*]}"
+    fi
 }
 
 create_user() {
@@ -122,38 +239,62 @@ create_user() {
     as_user "$user" sh -c 'mkdir -p "$HOME/.config" && printf "yes\n" > "$HOME/.config/gnome-initial-setup-done"'
 }
 
-games_state() {
-    local user=$1 home unit result
-    home="$(getent passwd "$user" | cut -d: -f6)"
+stop_sunshine() {
+    local unit
     for unit in "${UNITS[@]}"; do
-        if [[ -f $unit ]] && user_manager_running "$user"; then
-            sudo systemctl --user -M "$user@" stop "${unit##*/}" 2>/dev/null || true
+        if [[ -f $unit ]] && user_manager_running "$1"; then
+            sudo systemctl --user -M "$1@" "${2:-stop}" "${unit##*/}" 2>/dev/null || true
         fi
     done
-    result="$(as_user "$user" sh -c '
-        new="$HOME/.astro/sunshine"
-        old="$HOME/.config/sunshine"
-        mkdir -p "$HOME/.astro" "$HOME/.config"
-        chmod 700 "$HOME/.astro"
-        if [ -d "$old" ] && [ ! -L "$old" ]; then
-            if [ -e "$new" ]; then
-                echo conflict
-                exit 0
-            fi
-            mv "$old" "$new"
-            echo moved
-        fi
-        mkdir -p "$new"
-        ln -sfn "$new" "$old"
-    ')"
-    case $result in
-        moved)    ui_ok "configuração do Sunshine movida para $home/.astro/sunshine (pareamentos mantidos)" ;;
-        conflict) ui_warn "$home/.config/sunshine e $home/.astro/sunshine existem: mantido o primeiro, confira à mão" ;;
-        *)        ui_ok "configuração do Sunshine em $home/.astro/sunshine" ;;
-    esac
+}
+
+games_acl() {
+    local home
+    home="$(games_home "$1")"
     sudo setfacl -m "u:$USER:x" "$home"
     sudo setfacl -R -m "u:$USER:rX" "$home/.astro"
     sudo find "$home/.astro" -type d -exec setfacl -m "d:u:$USER:rX" {} +
+}
+
+games_state() {
+    local user=$1 home kind name other
+    home="$(games_home "$user")"
+    stop_sunshine "$user"
+    while read -r kind name other; do
+        case $kind in
+            moved)    ui_ok "$name movido para $home/.astro/arcade" ;;
+            conflict) ui_warn "$home/$name e $home/.astro/arcade/$other existem: mantido o segundo, confira o primeiro à mão" ;;
+        esac
+    done < <(as_user "$user" sh -c '
+        base="$HOME/.astro/arcade"
+        mkdir -p "$base"
+        chmod 700 "$HOME/.astro"
+        if [ -d "$HOME/.astro/sunshine" ] && [ ! -e "$base/sunshine" ]; then
+            mv "$HOME/.astro/sunshine" "$base/sunshine"
+            echo "moved .astro/sunshine"
+        fi
+        link() {
+            new="$base/$1"
+            old="$HOME/$2"
+            if [ -d "$old" ] && [ ! -L "$old" ]; then
+                if [ -e "$new" ]; then
+                    echo "conflict $2 $1"
+                else
+                    mv "$old" "$new"
+                    echo "moved $2"
+                fi
+            fi
+            mkdir -p "$new" "$(dirname "$old")"
+            if [ ! -d "$old" ] || [ -L "$old" ]; then
+                ln -sfn "$new" "$old"
+            fi
+        }
+        link sunshine .config/sunshine
+        link es-de ES-DE
+        link retroarch .var/app/org.libretro.RetroArch/config/retroarch
+    ')
+    ui_ok "configuração do usuário de jogos em $home/.astro/arcade (sunshine, es-de, retroarch)"
+    games_acl "$user"
     ui_ok "$USER pode ler $home/.astro (só leitura, para o backup das configurações)"
 }
 
@@ -518,8 +659,207 @@ display_check() {
     ui_info "ligue a TV ou um plugue HDMI fantasma na porta HDMI e feche a tampa; não precisa reinstalar"
 }
 
+install_retroarch() {
+    local log
+    if ! flatpak remotes --system --columns=name | grep -qx flathub; then
+        sudo flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+        ui_ok "repositório Flathub adicionado"
+    fi
+    if flatpak info --system "$RETROARCH_APP" >/dev/null 2>&1; then
+        ui_ok "RetroArch já instalado (Flatpak $RETROARCH_APP)"
+        return
+    fi
+    ui_info "instalando o RetroArch pelo Flathub (alguns minutos na primeira vez)..."
+    if ! log="$(sudo flatpak install -y --noninteractive --system flathub "$RETROARCH_APP" 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao instalar o RetroArch pelo Flathub"
+    fi
+    ui_ok "RetroArch instalado (Flatpak $RETROARCH_APP)"
+}
+
+update_retroarch() {
+    local log
+    if ! log="$(sudo flatpak update -y --noninteractive --system "$RETROARCH_APP" 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_warn "falha ao atualizar o RetroArch"
+        return
+    fi
+    ui_ok "RetroArch atualizado (Flatpak)"
+}
+
+esde_latest() {
+    curl -fsSL -m 30 "$ESDE_API/packages?package_name=ES-DE_Stable&order_by=created_at&sort=desc&per_page=1" | python3 -I -c '
+import json, sys
+package = json.load(sys.stdin)[0]
+print(package["id"], package["version"])
+'
+}
+
+esde_file() {
+    curl -fsSL -m 30 "$ESDE_API/packages/$1/package_files?per_page=100" | python3 -I -c '
+import json, sys
+for item in json.load(sys.stdin):
+    if item["file_name"] == "ES-DE_x64.AppImage":
+        print(item["id"], item["file_sha256"])
+        break
+'
+}
+
+install_esde() {
+    local release package version file id sha current tmp entry
+    release="$(esde_latest)" || ui_fail "não foi possível consultar as versões do ES-DE no GitLab"
+    read -r package version <<< "$release"
+    current="$(cat "$ESDE_SHARE/version" 2>/dev/null || true)"
+    if [[ $current == "$version" && -x $ESDE_BIN && -f $ESDE_SHARE/es_systems.xml ]]; then
+        ui_ok "ES-DE $version já instalado (versão mais recente)"
+        return
+    fi
+    file="$(esde_file "$package")" || ui_fail "não foi possível consultar os arquivos do ES-DE $version"
+    [[ -n $file ]] || ui_fail "o ES-DE $version não tem o ES-DE_x64.AppImage"
+    read -r id sha <<< "$file"
+
+    ui_info "baixando o ES-DE $version..."
+    tmp="$(mktemp -d)"
+    if ! curl -fsSL --retry 3 -o "$tmp/es-de" "$ESDE_DOWNLOAD/$id/download"; then
+        rm -rf "$tmp"
+        ui_fail "falha ao baixar o ES-DE $version"
+    fi
+    if ! printf '%s  %s\n' "$sha" "$tmp/es-de" | sha256sum -c --status; then
+        rm -rf "$tmp"
+        ui_fail "o SHA-256 do ES-DE $version não confere com o publicado no GitLab"
+    fi
+    ui_ok "SHA-256 conferido"
+    chmod 755 "$tmp/es-de"
+    for entry in "${ESDE_FILES[@]}"; do
+        (cd "$tmp" && ./es-de --appimage-extract "$entry" >/dev/null 2>&1) || true
+    done
+    if [[ ! -f $tmp/squashfs-root/${ESDE_FILES[0]} ]]; then
+        rm -rf "$tmp"
+        ui_fail "não foi possível ler a lista de sistemas de dentro do ES-DE $version"
+    fi
+    sudo install -D -m 0755 "$tmp/es-de" "$ESDE_BIN"
+    sudo install -D -m 0644 "$tmp/squashfs-root/${ESDE_FILES[0]}" "$ESDE_SHARE/es_systems.xml"
+    [[ -f $tmp/squashfs-root/${ESDE_FILES[1]} ]] && sudo install -D -m 0644 "$tmp/squashfs-root/${ESDE_FILES[1]}" "$ESDE_DESKTOP"
+    [[ -f $tmp/squashfs-root/${ESDE_FILES[2]} ]] && sudo install -D -m 0644 "$tmp/squashfs-root/${ESDE_FILES[2]}" "$ESDE_ICON"
+    printf '%s\n' "$version" | sudo tee "$ESDE_SHARE/version" >/dev/null
+    if command -v restorecon >/dev/null; then
+        sudo restorecon -q "$ESDE_BIN" "$ESDE_DESKTOP" "$ESDE_ICON" 2>/dev/null || true
+        sudo restorecon -qR "$ESDE_SHARE"
+    fi
+    rm -rf "$tmp"
+    ui_ok "ES-DE $version instalado em $ESDE_BIN, com atalho no menu${current:+ (antes: $current)}"
+}
+
+remove_esde() {
+    [[ -e $ESDE_BIN || -d $ESDE_SHARE ]] || return 0
+    sudo rm -f "$ESDE_BIN" "$ESDE_DESKTOP" "$ESDE_ICON"
+    sudo rm -rf "$ESDE_SHARE"
+    ui_ok "ES-DE removido (programa e atalho do menu)"
+}
+
+emulation() {
+    local user=$1 kind text
+    shift
+    while read -r kind text; do
+        case $kind in
+            ok)   ui_ok "$text" ;;
+            warn) ui_warn "$text" ;;
+            *)    ui_info "$text" ;;
+        esac
+    done < <(as_user "$user" python3 -I - "$@" < scripts/emulation.py)
+}
+
+import_folder() {
+    local user=$1 source=$2 target=$3 pattern excludes=()
+    shift 3
+    for pattern; do excludes+=(--exclude="$pattern"); done
+    ui_info "copiando $source para $target (pode demorar)..."
+    sudo mkdir -p "$target"
+    sudo tar -C "$source" "${excludes[@]}" -cf - . | sudo tar -C "$target" --no-same-owner -xf -
+    sudo chown -R "$user:$(id -gn "$user")" "$target"
+    sudo chmod -R u+rwX,go-w "$target"
+}
+
+has_files() {
+    [[ -n $(ls -A "$1" 2>/dev/null) ]]
+}
+
+load_retroarch() {
+    local user=$1 force=${2:-false} target source
+    target="$(games_home "$user")/.astro/arcade/retroarch"
+    if ! $force; then
+        [[ -e $target/retroarch.cfg ]] && return 0
+        ui_confirm "carregar uma configuração existente do RetroArch (retroarch.cfg, saves, states, BIOS...)?" n || return 0
+    fi
+    ui_browse source "Qual a pasta de configuração do RetroArch?" "${BROWSE_ROOTS[@]}"
+    [[ -e $source/retroarch.cfg ]] || ui_warn "$source não tem retroarch.cfg: copiando o resto assim mesmo"
+    import_folder "$user" "$source" "$target" '*.dll' '*.exe'
+    ui_ok "configuração do RetroArch carregada de $source (sem os .dll e .exe do Windows)"
+}
+
+load_esde() {
+    local user=$1 force=${2:-false} target source
+    target="$(games_home "$user")/.astro/arcade/es-de"
+    if ! $force; then
+        [[ -e $target/settings/es_settings.xml ]] && return 0
+        ui_confirm "carregar uma configuração existente do ES-DE (settings, temas, coleções...)?" n || return 0
+    fi
+    ui_info "é a pasta de dados do ES-DE, com settings/ dentro (no Windows, a pasta ES-DE ao lado do ES-DE.exe)"
+    ui_browse source "Qual a pasta de configuração do ES-DE?" "${BROWSE_ROOTS[@]}"
+    if [[ ! -d $source/settings && -d $source/ES-DE/settings ]]; then
+        source="$source/ES-DE"
+        ui_info "usando $source, que tem a pasta settings/"
+    fi
+    [[ -d $source/settings ]] || ui_warn "$source não tem settings/: copiando assim mesmo"
+    import_folder "$user" "$source" "$target" 'logs'
+    ui_ok "configuração do ES-DE carregada de $source"
+}
+
+load_gamelists() {
+    local user=$1 force=${2:-false} target source
+    target="$(games_home "$user")/.astro/arcade/es-de/gamelists"
+    if ! $force; then
+        has_files "$target" && return 0
+        ui_confirm "carregar gamelists existentes (uma pasta por sistema, com gamelist.xml)?" n || return 0
+    fi
+    ui_browse source "Onde estão as gamelists?" "${BROWSE_ROOTS[@]}"
+    import_folder "$user" "$source" "$target"
+    ui_ok "gamelists carregadas de $source"
+}
+
+check_folders() {
+    local user=$1 path roms=()
+    rom_dirs roms
+    for path in "$(env_get MEDIA_DIR)" "${roms[@]}"; do
+        [[ -n $path ]] || continue
+        if ! as_user "$user" test -r "$path" -a -x "$path"; then
+            ui_warn "$user não lê $path: use uma pasta de um disco compartilhado (\"Discos da máquina\")"
+        fi
+    done
+}
+
+apply_esde() {
+    local user=$1 home roms=()
+    home="$(games_home "$user")"
+    rom_dirs roms
+    check_folders "$user"
+    emulation "$user" settings "$home/.astro/arcade/es-de/settings/es_settings.xml" "${roms[0]}" "$(env_get MEDIA_DIR)"
+    emulation "$user" systems "$ESDE_SHARE/es_systems.xml" "$home/.astro/arcade/es-de/custom_systems" "${roms[@]}"
+}
+
+apply_retroarch() {
+    local user=$1 update=${2:-0} home roms=()
+    home="$(games_home "$user")"
+    rom_dirs roms
+    emulation "$user" retroarch-cfg "$home/.astro/arcade/retroarch/retroarch.cfg"
+    ui_info "conferindo os núcleos do RetroArch dos sistemas encontrados (o primeiro download demora)..."
+    emulation "$user" cores "$ESDE_SHARE/es_systems.xml" "$home/.astro/arcade/retroarch/cores" "$update" "${roms[@]}"
+}
+
 cmd_install() {
+    migrate_sunshine
     state_setup true .env .proxy
+    browse_roots
     configure
     local user host autologin_mode
     user="$(env_get GAMES_USER)"
@@ -530,6 +870,7 @@ cmd_install() {
     host_base
     host_nvidia_driver
     host_intel_media
+    install_packages
 
     ui_step "Usuário de jogos"
     create_user "$user"
@@ -544,6 +885,16 @@ cmd_install() {
         ui_ok "$user entra pela tela de login, com a senha"
     fi
     primary_gpu
+
+    ui_step "ES-DE e RetroArch"
+    install_retroarch
+    install_esde
+    load_retroarch "$user"
+    load_esde "$user"
+    load_gamelists "$user"
+    apply_esde "$user"
+    apply_retroarch "$user"
+    games_acl "$user"
 
     ui_step "Sunshine"
     install_sunshine
@@ -561,8 +912,9 @@ cmd_install() {
     proxy_publish "$host" "https+insecure://host.containers.internal:$WEB_PORT"
 
     ui_step "Acesso"
-    ui_ok "painel: https://$host"
+    ui_ok "painel do Sunshine: https://$host"
     ui_ok "Moonlight: $(host_lan_ip)"
+    ui_ok "ES-DE: no menu de aplicativos de $user (o RetroArch abre pelo ES-DE)"
     if [[ $autologin_mode != yes ]] && ! user_session_active "$user"; then
         $HOST_REBOOT && ui_warn "reinicie a máquina para concluir: sudo systemctl reboot"
         ui_info "o Sunshine roda dentro da sessão de $user: entre com $user na tela para ele começar a transmitir"
@@ -572,6 +924,56 @@ cmd_install() {
         ui_warn "a sessão de $user não está na tela: o Sunshine só transmite e recebe os controles dela"
         ui_info "encerre a outra sessão gráfica (Sair) para a de $user voltar, ou reinicie a máquina"
     fi
+}
+
+cmd_actions() {
+    printf '%s\n' \
+        "retroarch|Carregar uma configuração do RetroArch" \
+        "esde|Carregar uma configuração do ES-DE" \
+        "gamelists|Carregar gamelists" \
+        "folders|Trocar as pastas de ROMs e de mídias" \
+        "update|Atualizar ES-DE, RetroArch e núcleos"
+}
+
+cmd_action() {
+    local user
+    cmd_status || ui_fail "instale o arcade antes"
+    user="$(env_get GAMES_USER)"
+    browse_roots
+    case "${1:-}" in
+        retroarch)
+            ui_step "RetroArch"
+            load_retroarch "$user" true
+            emulation "$user" retroarch-cfg "$(games_home "$user")/.astro/arcade/retroarch/retroarch.cfg"
+            ;;
+        esde)
+            ui_step "ES-DE"
+            load_esde "$user" true
+            apply_esde "$user"
+            ;;
+        gamelists)
+            ui_step "Gamelists"
+            load_gamelists "$user" true
+            ;;
+        folders)
+            ui_step "Pastas"
+            choose_media true
+            choose_roms true
+            apply_esde "$user"
+            apply_retroarch "$user"
+            ;;
+        update)
+            ui_step "Atualização"
+            install_esde
+            update_retroarch
+            apply_esde "$user"
+            apply_retroarch "$user" 1
+            ;;
+        *)
+            ui_fail "ação desconhecida: ${1:-}"
+            ;;
+    esac
+    games_acl "$user"
 }
 
 cmd_remove() {
@@ -587,11 +989,17 @@ cmd_remove() {
         display_switch_off "$user"
         speakers_mute "$user" 0
         if $purge; then
-            as_user "$user" sh -c 'rm -rf "$HOME/.astro/sunshine" "$HOME/.config/sunshine"'
-            ui_ok "configuração do Sunshine apagada (credenciais e aparelhos pareados)"
+            as_user "$user" sh -c '
+                rm -rf "$HOME/.astro/arcade"
+                for link in "$HOME/.config/sunshine" "$HOME/ES-DE" "$HOME/.var/app/org.libretro.RetroArch/config/retroarch"; do
+                    [ -L "$link" ] && rm -f "$link"
+                done
+            '
+            ui_ok "configuração do usuário de jogos apagada (Sunshine, ES-DE e RetroArch)"
         fi
     fi
     autologin_off
+    remove_esde
     if [[ -f $MUTTER_RULE ]]; then
         sudo rm -f "$MUTTER_RULE"
         sudo udevadm control --reload
@@ -604,59 +1012,73 @@ cmd_remove() {
         ui_ok "a tela de login não espera mais a NVIDIA"
     fi
     proxy_unpublish
-    ui_info "mantidos: pacote do Sunshine, driver da NVIDIA e o usuário${user:+ $user} com os jogos"
+    ui_info "mantidos: pacote do Sunshine, RetroArch (Flatpak), driver da NVIDIA e o usuário${user:+ $user}"
 }
 
 cmd_backup() {
-    local user home
+    local user base
     user="$(env_get GAMES_USER)"
     [[ -n $user ]] || return 0
-    home="$(getent passwd "$user" | cut -d: -f6)"
-    if [[ -n $home && -r $home/.astro/sunshine ]]; then
-        printf 'include usuario %s\nexclude %s\n' "$home/.astro/sunshine" "$home/.astro/sunshine/sunshine.log*"
-    else
-        ui_warn "sem leitura em ~$user/.astro/sunshine: rode a instalação do sunshine" >&2
+    base="$(games_home "$user")/.astro/arcade"
+    if [[ ! -r $base ]]; then
+        ui_warn "sem leitura em ~$user/.astro/arcade: rode a instalação do arcade" >&2
+        return 0
+    fi
+    if [[ -d $base/sunshine ]]; then
+        printf 'include sunshine %s\nexclude %s\n' "$base/sunshine" "$base/sunshine/sunshine.log*"
+    fi
+    if [[ -f $base/retroarch/retroarch.cfg ]]; then
+        printf 'include retroarch.cfg %s\n' "$base/retroarch/retroarch.cfg"
+    fi
+    if [[ -f $base/es-de/settings/es_settings.xml ]]; then
+        printf 'include es_settings.xml %s\n' "$base/es-de/settings/es_settings.xml"
     fi
 }
 
 cmd_restore() {
-    local from=$1 user home unit
+    local from=$1 user home base group
     state_restore "$from"
+    if [[ -d $STATE/usuario && ! -e $STATE/sunshine ]]; then
+        podman unshare mv "$STATE/usuario" "$STATE/sunshine"
+    fi
+    [[ -e $STATE/sunshine || -e $STATE/retroarch.cfg || -e $STATE/es_settings.xml ]] || return 0
     user="$(env_get GAMES_USER)"
-    home="$(getent passwd "$user" 2>/dev/null | cut -d: -f6)"
-    if [[ ! -d $STATE/usuario ]]; then
-        return 0
-    fi
+    home="$(games_home "$user" 2>/dev/null || true)"
     if [[ -z $home ]]; then
-        ui_warn "usuário de jogos $user não existe: a configuração dele ficou em $STATE/usuario"
+        ui_warn "usuário de jogos $user não existe: a configuração dele ficou em $STATE"
         return 0
     fi
-    for unit in "${UNITS[@]}"; do
-        if [[ -f $unit ]] && user_manager_running "$user"; then
-            sudo systemctl --user -M "$user@" stop "${unit##*/}" 2>/dev/null || true
-        fi
-    done
-    sudo rm -rf "$home/.astro/sunshine"
-    sudo mkdir -p "$home/.astro"
-    sudo cp -a "$STATE/usuario" "$home/.astro/sunshine"
-    sudo chown -R "$user:" "$home/.astro"
-    podman unshare rm -rf "$STATE/usuario"
+    base="$home/.astro/arcade"
+    group="$(id -gn "$user")"
+    stop_sunshine "$user"
+    if [[ -d $STATE/sunshine ]]; then
+        sudo rm -rf "$base/sunshine"
+        sudo mkdir -p "$base"
+        sudo cp -a "$STATE/sunshine" "$base/sunshine"
+        ui_ok "Sunshine de $user restaurado (pareamentos e painel)"
+    fi
+    if [[ -f $STATE/retroarch.cfg ]]; then
+        sudo install -D -m 0644 "$STATE/retroarch.cfg" "$base/retroarch/retroarch.cfg"
+        ui_ok "retroarch.cfg de $user restaurado"
+    fi
+    if [[ -f $STATE/es_settings.xml ]]; then
+        sudo install -D -m 0644 "$STATE/es_settings.xml" "$base/es-de/settings/es_settings.xml"
+        ui_ok "es_settings.xml de $user restaurado"
+    fi
+    sudo chown -R "$user:$group" "$home/.astro"
+    podman unshare rm -rf "$STATE/sunshine" "$STATE/retroarch.cfg" "$STATE/es_settings.xml"
     games_state "$user"
-    for unit in "${UNITS[@]}"; do
-        if [[ -f $unit ]] && user_manager_running "$user"; then
-            sudo systemctl --user -M "$user@" start "${unit##*/}" 2>/dev/null || true
-        fi
-    done
-    ui_ok "configuração do Sunshine de $user restaurada (pareamentos e painel)"
+    stop_sunshine "$user" start
 }
 
 case "${1:-}" in
     describe) cmd_describe ;;
     status)   cmd_status ;;
-    actions)  ;;
+    actions)  cmd_actions ;;
+    action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
     remove)   shift; cmd_remove "$@" ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove [--purge] | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove [--purge] | backup | restore <pasta>" ;;
 esac

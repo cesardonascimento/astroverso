@@ -1,26 +1,41 @@
-# sunshine
+# arcade
 
-Servidor de streaming de jogos para o [Moonlight](https://moonlight-stream.org). Transmite a tela, o
-áudio e recebe os controles de um usuário próprio para jogos, que entra sozinho no boot. O usuário do
-homelab continua cuidando dos containers em segundo plano.
+Videogame retrô do homelab: o [ES-DE](https://es-de.org) (a vitrine dos jogos, com capas e vídeos) e o
+[RetroArch](https://www.retroarch.com) (os emuladores) num usuário próprio para jogos, transmitidos pelo
+[Sunshine](https://github.com/LizardByte/Sunshine) para o [Moonlight](https://moonlight-stream.org). O Sunshine
+só existe aqui para isso.
+
+O usuário de jogos é a **exceção** do homelab: ele entra sozinho no boot e fica com a tela aberta na TV, e por
+isso é separado do usuário que instala, que lida com dados sensíveis e nunca fica logado. Para todo o resto,
+quem manda é o usuário que instala.
 
 ```bash
-./project.sh install           # instala, configura e publica o painel no Caddy
-./project.sh remove [--purge]  # desativa; --purge apaga também as credenciais e os pareamentos
+./project.sh install           # instala, configura e publica o painel do Sunshine no Caddy
+./project.sh remove [--purge]  # desativa; --purge apaga também a configuração do usuário de jogos
 ```
 
 Como o cockpit, não roda em container: o Sunshine precisa da sessão gráfica, da GPU e de criar
-controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
+controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP; o ES-DE e o RetroArch rodam na
+tela do usuário de jogos.
 
 ## Perguntas da instalação
 
 | Pergunta | Padrão |
 |---|---|
-| Nome do usuário de jogos | `jogos` |
+| Nome do usuário de jogos | `ristar` |
 | Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela? | `S` |
 | Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
+| Onde está a pasta de mídias do ES-DE? | (sem padrão: navegar pelos discos) |
+| Onde estão as ROMs? (uma ou mais pastas) | (sem padrão: navegar pelos discos) |
+| Carregar uma configuração existente do RetroArch? | `N` (só com a configuração local vazia) |
+| Carregar uma configuração existente do ES-DE? | `N` (só com a configuração local vazia) |
+| Carregar gamelists existentes? | `N` (só com as gamelists locais vazias) |
 
-O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`.
+O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`. Se o `.env`
+salvo aponta para um usuário que não existe mais (ex.: renomeado), a instalação pergunta tudo de novo, em vez
+de criá-lo. As pastas são escolhidas navegando pelos discos da máquina (os compartilhados primeiro), com a
+opção de digitar um caminho; as de mídias e ROMs precisam ser legíveis pelo usuário de jogos (discos
+compartilhados).
 
 ## O que a instalação faz
 
@@ -32,18 +47,25 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
 - **Usuário de jogos:** cria o usuário sem `sudo` e pula a tela de boas-vindas do GNOME.
-- **Configuração no `~/.astro` do usuário de jogos:** o Sunshine guarda a configuração (painel, aparelhos
-  pareados, apps) em `~<usuário de jogos>/.astro/sunshine`, e `~/.config/sunshine` vira um atalho para lá
-  (uma configuração antiga é movida, sem perder os pareamentos). As respostas da instalação ficam no
-  `~/.astro/sunshine` de quem instala. Uma ACL dá a quem instala só leitura no `~/.astro` do usuário de jogos,
-  para o backup das configurações (rclone), onde ela entra como `sunshine/usuario`. Na restauração, o Sunshine
-  do usuário de jogos é parado, a pasta volta com o dono certo (`sudo`) e ele sobe de novo.
+- **Configuração no `~/.astro` do usuário de jogos:** tudo fica em `~<usuário de jogos>/.astro/arcade`, e os
+  lugares que os programas esperam viram atalhos para lá:
+
+  | Pasta | Atalho |
+  |---|---|
+  | `sunshine/` (painel, aparelhos pareados, apps) | `~/.config/sunshine` |
+  | `es-de/` (settings, gamelists, custom_systems, temas) | `~/ES-DE` |
+  | `retroarch/` (`retroarch.cfg`, núcleos, saves, states, BIOS) | `~/.var/app/org.libretro.RetroArch/config/retroarch` |
+
+  Uma pasta real que já esteja num desses lugares é movida (sem perder os pareamentos); a antiga
+  `~/.astro/sunshine` vira `~/.astro/arcade/sunshine`. As respostas da instalação ficam no `~/.astro/arcade` de
+  quem instala (o antigo `~/.astro/sunshine` é movido para lá). Uma ACL dá a quem instala só leitura no
+  `~/.astro` do usuário de jogos, para o backup das configurações.
 - **Senha do usuário de jogos:** pedida na instalação (com `chpasswd`, pela entrada padrão). Se ele já tiver
   senha, pergunta se mantém. Ela serve para entrar na tela, trocar de usuário e desbloquear.
 - **Tela do usuário de jogos:** desativa o escurecimento e a suspensão. Com login automático, desativa também o
   bloqueio automático (`lock-enabled false`, `idle-delay 0`); sem ele, a tela bloqueia depois de 5 minutos
   parada. Em nenhum caso o bloqueio manual e a troca de usuário são proibidos (`disable-lock-screen false`).
-- **Discos de jogos:** não são do sunshine. Ficam em "Discos da máquina" como compartilhados: todos os usuários
+- **Discos de jogos:** não são do arcade. Ficam em "Discos da máquina" como compartilhados: todos os usuários
   acessam, eles aparecem no Arquivos e montam antes de qualquer login, inclusive o automático.
 - **Login automático (opcional):** configura o GDM (`custom.conf`) para entrar com o usuário de jogos. Com a
   resposta **N**, tira o login automático dele, e o Sunshine só começa depois que alguém entra com ele na tela.
@@ -74,6 +96,31 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
+- **RetroArch:** instala o Flatpak `org.libretro.RetroArch` do Flathub para o sistema todo (o pacote do
+  Fedora traz poucos núcleos), adicionando o repositório Flathub se faltar. Precisa do `flatpak`.
+- **ES-DE:** baixa o `ES-DE_x64.AppImage` da versão mais recente pela API do GitLab do projeto, confere o
+  SHA-256 publicado lá e instala em `/usr/local/bin/es-de`, com o atalho e o ícone no menu de aplicativos. De
+  dentro do AppImage, guarda em `/usr/local/share/astro-arcade/es_systems.xml` a lista de sistemas da versão
+  instalada. O runtime do AppImage usa o `fusermount3` (pacote `fuse3`), sem a `libfuse` 2. Rodar a instalação
+  de novo (ou a ação "Atualizar") atualiza o ES-DE.
+- **Configurações existentes:** com a pasta local vazia, oferece carregar uma configuração do RetroArch, uma do
+  ES-DE e as gamelists. A cópia (`tar`, com `sudo`) junta o conteúdo da pasta escolhida ao da local e passa tudo
+  para o usuário de jogos. Do RetroArch, pula os `.dll` e `.exe` do Windows; do ES-DE, os `logs`. Escolher a
+  pasta do ES-DE do Windows (a que tem o `ES-DE.exe`) funciona: a instalação usa a `ES-DE/` de dentro dela.
+- **`retroarch.cfg`:** sem arquivo, cria um só com `video_fullscreen = "true"` (o resto vem do padrão do
+  RetroArch). Com um vindo do Windows, apaga as linhas com caminhos do Windows (`:\saves`, `C:\...`) e drivers
+  do Windows (`wasapi`, `xinput`, `dinput`, `winmm`, `d3d*`...), que voltam ao padrão do Linux.
+- **`es_settings.xml`:** grava `ROMDirectory` (a primeira pasta de ROMs) e `MediaDirectory` e apaga outras
+  opções com caminhos do Windows. O resto fica como está.
+- **Várias pastas de ROMs:** o ES-DE tem uma pasta de ROMs só. Os sistemas das outras pastas ganham um bloco em
+  `es-de/custom_systems/es_systems.xml`, copiado da lista da versão instalada com o `<path>` trocado pelo
+  caminho absoluto. Os blocos gerados ficam listados em `custom_systems/.astro-sistemas` e são refeitos a cada
+  instalação e atualização (acompanham a versão do ES-DE); blocos escritos à mão são mantidos. Um sistema em
+  duas pastas fica na primeira, com um aviso; pastas que não são sistemas do ES-DE são listadas.
+- **Núcleos do RetroArch:** para cada sistema com ROMs, baixa o núcleo padrão do ES-DE do buildbot da
+  libretro (a mesma fonte do atualizador do RetroArch, sem checksum publicado) em `retroarch/cores`. Só baixa o
+  que falta; a ação "Atualizar" baixa todos de novo. Lista os sistemas sem núcleo do RetroArch por padrão (ex.:
+  switch, que usa emulador próprio).
 - Habilita o serviço de usuário do Sunshine para o usuário de jogos: ele sobe com a sessão gráfica dele,
   aberta pelo login automático no boot ou quando alguém entra com ele na tela.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
@@ -122,10 +169,28 @@ próprio para ele, também pelo DNS da Cloudflare.
 Reinicie a máquina. O login automático, o driver da NVIDIA e o Sunshine só entram em ação no boot. Sem login
 automático, entre com o usuário de jogos na tela para o Sunshine começar.
 No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de administração.
+O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozinho para cada jogo.
+
+## Ações
+
+| Ação | O que faz |
+|---|---|
+| Carregar uma configuração do RetroArch | Copia uma pasta de configuração para a local (sem `.dll`/`.exe`) e limpa o `retroarch.cfg` |
+| Carregar uma configuração do ES-DE | Copia uma pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
+| Carregar gamelists | Copia uma pasta de gamelists para `es-de/gamelists` |
+| Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
+| Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak e baixa todos os núcleos de novo |
+
+## Backup
+
+No backup das configurações (rclone) entram só o Sunshine (`sunshine/`, sem os logs), o `retroarch.cfg` e o
+`es_settings.xml` do usuário de jogos. Saves, states, BIOS, temas, núcleos e gamelists ficam de fora. Na
+restauração, o Sunshine é parado, os arquivos voltam com o dono certo (`sudo`) e ele sobe de novo. Um backup
+antigo do projeto sunshine (`sunshine/usuario`) também é aceito.
 
 ## Remoção
 
 `remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o
-papel de placa principal e tira a rota do Caddy. O pacote do Sunshine, o driver da NVIDIA, os discos (são da
-máquina) e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
-`~/.config/sunshine` do usuário de jogos.
+papel de placa principal, apaga o ES-DE (programa e atalho) e tira a rota do Caddy. O pacote do Sunshine, o
+RetroArch (Flatpak), o driver da NVIDIA, os discos (são da máquina) e o usuário de jogos são mantidos. `--purge`
+apaga também `~/.astro/arcade` do usuário de jogos (Sunshine, ES-DE e RetroArch) e os atalhos para lá.

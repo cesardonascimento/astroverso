@@ -7,13 +7,13 @@ instalação.
 | Projeto | Para que serve |
 |---|---|
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
+| [**arcade**](arcade/) | **Videogame retrô transmitido pela rede.** Um frontend de jogos (ES-DE) mostra a coleção com capas e vídeos, e os emuladores (RetroArch) rodam os jogos de consoles antigos. Um servidor de streaming (Sunshine) transmite a tela, o som e os controles para a TV, o celular ou o notebook pelo app Moonlight, com pouca latência: quem roda o jogo é o servidor. Tudo fica num usuário próprio para jogos, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro host:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
 | [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos a cada 30 minutos durante o dia. |
-| [**sunshine**](sunshine/) | **Servidor de jogos remoto.** Transmite a tela, o áudio e os controles de um computador para outro aparelho pela rede, com pouca latência: você joga na TV, no celular ou no notebook, mas quem roda o jogo (ou o emulador) é o servidor. Funciona com o app Moonlight. Os jogos ficam em um usuário próprio, que pode entrar sozinho no boot, separado do usuário que cuida do homelab. |
 
 ## Como usar
 
@@ -110,6 +110,52 @@ acesso administrativo ligado).
   o AdGuard responder e volta a usá-lo se tiver ficado preso no secundário.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
   servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
+
+### arcade
+
+O arcade é a única exceção ao "um usuário só": os jogos rodam num usuário próprio, que entra sozinho no boot e
+fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca fica logado.
+
+- **Senha temporária do Secure Boot:** só aparece se a máquina tiver uma placa NVIDIA sem o driver
+  proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
+  aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
+  senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
+- **Nome do usuário de jogos:** o usuário cuja tela é transmitida. É nele que ficam o ES-DE, o RetroArch e as
+  configurações deles. Ele é criado sem `sudo`, para que quem estiver jogando não tenha acesso ao homelab.
+  Por padrão, `ristar`.
+- **Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?** Com **S** (padrão), a máquina liga
+  direto na sessão de jogos, pronta para o Moonlight, e a tela não bloqueia sozinha (dá para bloquear e
+  trocar de usuário à mão). Com **N**, é preciso entrar com ele na tela antes de jogar, e a tela bloqueia
+  depois de 5 minutos parada.
+- **Senha do usuário de jogos:** para entrar na tela, trocar de usuário e desbloquear. Não dá acesso ao
+  `sudo`. Na reinstalação, o assistente pergunta se mantém a atual.
+- **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
+  aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
+- **Onde está a pasta de mídias do ES-DE?** A pasta com as capas, telas e vídeos dos jogos (uma subpasta por
+  sistema). Ela é usada onde está, sem cópia. Escolha com as setas, entrando nas pastas dos discos, ou digite o
+  caminho.
+- **Onde estão as ROMs?** Uma pasta com uma subpasta por sistema (`snes`, `psx`...). Pode escolher mais de uma
+  (ex.: uma por disco): a primeira é a principal do ES-DE, e os sistemas das outras aparecem do mesmo jeito.
+  As ROMs também ficam onde estão.
+- **Carregar uma configuração existente do RetroArch?** Só aparece na primeira vez. Com **S**, você escolhe a
+  pasta de uma instalação antiga (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
+  jogos. Uma configuração do Windows serve: caminhos e drivers do Windows são limpos.
+- **Carregar uma configuração existente do ES-DE?** Igual, para o ES-DE (a pasta `ES-DE` do Windows também
+  serve). As pastas de ROMs e mídias passam a ser as respondidas acima.
+- **Carregar gamelists existentes?** Igual, para as gamelists (a lista de jogos com nomes e descrições).
+
+Depois, as mesmas cópias podem ser feitas pelas ações do projeto, em "Configurar um projeto instalado".
+
+Os discos de jogos (ROMs, emuladores) entram em "Discos da máquina" como **compartilhados**: assim o usuário de
+jogos os acessa e eles aparecem no Arquivos dele.
+
+Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
+ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
+e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
+Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
+cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
+essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos para o usuário de jogos, para a
+máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
 
 ### caddy
 
@@ -215,35 +261,6 @@ Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado,
 sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
 "Sincronizar agora" mostra o aviso e pergunta se libera.
-
-### sunshine
-
-- **Senha temporária do Secure Boot:** só aparece se a máquina tiver uma placa NVIDIA sem o driver
-  proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
-  aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
-  senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
-- **Nome do usuário de jogos:** o usuário cuja tela é transmitida. É nele que ficam os emuladores, os jogos
-  e as configurações. Ele é criado sem `sudo`, para que quem estiver jogando não tenha acesso ao homelab.
-  Por padrão, `jogos`.
-- **Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?** Com **S** (padrão), a máquina liga
-  direto na sessão de jogos, pronta para o Moonlight, e a tela não bloqueia sozinha (dá para bloquear e
-  trocar de usuário à mão). Com **N**, é preciso entrar com ele na tela antes de jogar, e a tela bloqueia
-  depois de 5 minutos parada.
-- **Senha do usuário de jogos:** para entrar na tela, trocar de usuário e desbloquear. Não dá acesso ao
-  `sudo`. Na reinstalação, o assistente pergunta se mantém a atual.
-- **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
-  aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
-
-Os discos de jogos (ROMs, emuladores) entram em "Discos da máquina" como **compartilhados**: assim o usuário de
-jogos os acessa e eles aparecem no Arquivos dele.
-
-Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
-ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
-e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
-Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
-cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
-essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos para o usuário de jogos, para a
-máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
 
 ### Depois de instalar
 

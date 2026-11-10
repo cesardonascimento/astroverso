@@ -207,7 +207,7 @@ disk_permissions() {
     local target=$1 type=$2 mode=770
     [[ $type == compartilhado ]] && mode=777
     mountpoint -q "$target" || return 0
-    if [[ $(stat -c '%u' "$target") != "$(id -u)" ]]; then
+    if [[ $(stat -c '%u:%g' "$target") != "$(id -u):$(id -g)" ]]; then
         sudo chown "$(id -u):$(id -g)" "$target" 2>/dev/null || true
     fi
     if [[ $(stat -c '%a' "$target") != "$mode" ]]; then

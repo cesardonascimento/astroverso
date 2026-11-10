@@ -101,7 +101,7 @@ argumento pode ficar de fora):
    cópia do SQLite do Home Assistant) e o que deixar de fora (bancos em uso, código, caches);
 2. empacota cada `~/.astro/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
    com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O que o projeto
-   inclui de fora vai para uma subpasta com nome fixo (ex.: `sunshine/usuario`, com o `~/.astro/sunshine` do usuário
+   inclui de fora vai para uma subpasta com nome fixo (ex.: `arcade/sunshine`, com o `~/.astro/arcade/sunshine` do usuário
    de jogos, lido por ACL, sem os logs). O `host.env` vira `host/`;
 3. compacta (`zstd`), criptografa com `gpg --symmetric` (AES-256) e grava
    `<pasta escolhida>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, uma pasta por backup;
@@ -119,7 +119,7 @@ Astro/Configurações/
     ...
 ```
 
-A parte de outro usuário (ex.: `sunshine/usuario`) é gravada como do usuário que instala (`--owner=0`): a
+A parte de outro usuário (ex.: `arcade/sunshine`) é gravada como do usuário que instala (`--owner=0`): a
 restauração devolve o dono certo.
 
 Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos

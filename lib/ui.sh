@@ -208,3 +208,94 @@ if [[ ${ASTRO_PLAIN:-} == 1 ]]; then
     ui_warn()  { printf '%s     aviso: %s\n' "$(_ui_tag)" "$*"; }
     ui_error() { printf '%s     erro: %s\n' "$(_ui_tag)" "$*" >&2; }
 fi
+
+_ui_scroll() {
+    local -n __ui_sel=$1
+    local title=$2
+    shift 2
+    local items=("$@") count=$# cursor=0 top=0 rows i key lines
+    rows=$((count < 12 ? count : 12))
+    printf '%s     \033[35m?\033[0m %s \033[2m(↑/↓ e Enter)\033[0m\n' "$(_ui_tag)" "$title" >/dev/tty
+    _ui_cursor_hide
+    while true; do
+        ((cursor < top)) && top=$cursor
+        ((cursor >= top + rows)) && top=$((cursor - rows + 1))
+        for ((i = top; i < top + rows; i++)); do
+            if ((i == cursor)); then
+                printf '\r\033[K%s       \033[36m❯ %s\033[0m\n' "$(_ui_tag)" "${items[i]}"
+            else
+                printf '\r\033[K%s         %s\n' "$(_ui_tag)" "${items[i]}"
+            fi
+        done >/dev/tty
+        lines=$rows
+        if ((count > rows)); then
+            printf '\r\033[K%s         \033[2m%d de %d\033[0m\n' "$(_ui_tag)" $((cursor + 1)) "$count" >/dev/tty
+            lines=$((rows + 1))
+        fi
+        key="$(_ui_read_key)"
+        case $key in
+            up)    cursor=$(((cursor - 1 + count) % count)) ;;
+            down)  cursor=$(((cursor + 1) % count)) ;;
+            enter) break ;;
+        esac
+        printf '\033[%dA' "$lines" >/dev/tty
+    done
+    printf '\033[%dA\033[J' $((lines + 1)) >/dev/tty
+    _ui_cursor_show
+    __ui_sel=$cursor
+}
+
+ui_browse() {
+    local -n __ui_path=$1
+    local __ui_title=$2 __ui_current="" __ui_choice __ui_entry __ui_name __ui_root __ui_entries __ui_labels
+    shift 2
+    local __ui_roots=("$@")
+    while true; do
+        __ui_entries=()
+        __ui_labels=()
+        if [[ -z $__ui_current ]]; then
+            for __ui_entry in "${__ui_roots[@]}"; do
+                __ui_entries+=("$__ui_entry")
+                __ui_labels+=("$__ui_entry")
+            done
+            __ui_entries+=(":digitar")
+            __ui_labels+=("digitar um caminho")
+        else
+            __ui_entries+=(":usar" ":voltar")
+            __ui_labels+=("✔ usar esta pasta" "↩ voltar")
+            while IFS= read -r -d '' __ui_entry; do
+                __ui_name=${__ui_entry##*/}
+                [[ $__ui_name == .* || $__ui_name == '$RECYCLE.BIN' || $__ui_name == 'System Volume Information' || $__ui_name == lost+found ]] && continue
+                __ui_entries+=("$__ui_entry")
+                __ui_labels+=("$__ui_name/")
+            done < <(find "$__ui_current" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | sort -z)
+        fi
+        _ui_scroll __ui_choice "$__ui_title${__ui_current:+ $__ui_current}" "${__ui_labels[@]}"
+        case ${__ui_entries[__ui_choice]} in
+            :usar)
+                __ui_path=$__ui_current
+                break
+                ;;
+            :voltar)
+                for __ui_root in "${__ui_roots[@]}"; do
+                    [[ $__ui_current == "$__ui_root" ]] && __ui_current="" && continue 2
+                done
+                __ui_current=${__ui_current%/*}
+                [[ -n $__ui_current ]] || __ui_current=/
+                ;;
+            :digitar)
+                ui_input __ui_entry "caminho da pasta"
+                __ui_entry=${__ui_entry%/}
+                if [[ $__ui_entry == /* && -d $__ui_entry ]]; then
+                    __ui_path=$__ui_entry
+                    break
+                fi
+                ui_warn "pasta não encontrada: $__ui_entry"
+                ;;
+            *)
+                __ui_current=${__ui_entries[__ui_choice]}
+                ;;
+        esac
+    done
+    printf '%s     \033[35m?\033[0m %s %s\n' "$(_ui_tag)" "$__ui_title" "$__ui_path"
+}
