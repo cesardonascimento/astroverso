@@ -196,6 +196,12 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
 - `rclone bisync` com `--resilient` não pede `--resync` quando as listas somem ("cannot find prior Path1 or Path2
   listings"): tenta para sempre. O `run.sh` detecta essa mensagem e a de "must run --resync" e faz a junção.
+- `IFS=$'\t' read` junta campos vazios seguidos (tab é espaço em branco para o `IFS`) e desloca os valores.
+  Para campos que podem vir vazios, separar com `\x1f`.
+- `${texto: -N}` devolve vazio quando o texto tem menos de N caracteres: testar o tamanho antes.
+- Discord: desligar "Public Bot" exige "Install Link: None" na aba Installation do aplicativo. O link de convite
+  com `client_id` continua funcionando para o dono.
+- `rclone bisync --dry-run` também para no `--max-delete`: para mostrar o que seria apagado, usar `--force`.
 - O repositório do Tailscale para RHEL e derivados é `rhel/<versão>`; para Fedora é `fedora`. No apt, derivados usam o `UBUNTU_CODENAME`.
 
 ## Pendências e ideias combinadas
