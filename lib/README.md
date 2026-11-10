@@ -63,6 +63,11 @@ Bibliotecas compartilhadas:
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
+- `lib/notify.sh`: avisos no Discord (webhook em `DISCORD_WEBHOOK` no `~/.astro/host.env`, `600`; sem webhook,
+  nada é enviado). `notify_problem <chave> <texto>` avisa um problema no máximo uma vez por dia (marca em
+  `~/.local/state/astro/notify/<projeto>-<chave>`); `notify_resolved <chave> <texto>` avisa que ele acabou, só se
+  houve aviso. `notify_send <texto>` manda direto. Nenhuma delas derruba o chamador se o Discord falhar.
+  `notify_configure` é a opção "Notificações no Discord" do menu principal. Precisa de `lib/ui.sh`.
 - `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
   - `disk_choose VAR projeto título [uuids atuais]` lista os discos (sem o do sistema e sem os de outro projeto),
     com os atuais já marcados, e devolve os UUIDs marcados, que o projeto grava no `.env`.

@@ -26,6 +26,7 @@ git clone <url-deste-repositório> ~/Projects/astro
 | Instalar todos | Instala o que ainda não está instalado |
 | Escolher quais instalar | Marca os projetos com Espaço (ou "Todos"); os já instalados são recriados |
 | Configurar um projeto instalado | Ajustes do dia a dia, como adicionar rotas no Caddy |
+| Notificações no Discord | Liga, testa ou desliga os avisos num canal do Discord quando algo precisa da sua atenção |
 | Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
 | Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
 | Reinstalar tudo do zero | Apaga os dados e instala de novo |
@@ -213,6 +214,19 @@ Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a
 cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
 essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos para o usuário de jogos, para a
 máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). Ao terminar, reinicie a máquina.
+
+### Notificações no Discord
+
+Opção do menu principal. Quando algo precisa da sua atenção (por exemplo, a cópia na nuvem parada ou um disco
+que não montou), o astro avisa num canal do seu servidor do Discord. Cada problema é avisado no máximo uma vez
+por dia, e chega outro aviso quando ele se resolve.
+
+- **URL do webhook:** o endereço que deixa o astro escrever no canal. No Discord, abra as configurações do
+  canal (de preferência um só seu, ex.: `#astro`) → **Integrações** → **Webhooks** → **Novo webhook** →
+  **Copiar URL do webhook**. Ela é um segredo (quem tem a URL escreve no canal): não aparece na tela e fica
+  só em `~/.astro/host.env`. O assistente manda uma mensagem de teste antes de salvar.
+
+No celular, deixe as notificações desse canal em "Todas as mensagens".
 
 ### Depois de instalar
 

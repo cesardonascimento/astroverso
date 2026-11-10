@@ -69,6 +69,20 @@ Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: 
   espera.
 - A sincronização para se for apagar mais de 5% dos arquivos (veja acima).
 
+## Avisos no Discord
+
+Com as notificações ligadas (menu principal, "Notificações no Discord"), o rclone avisa, no máximo uma vez
+por dia por problema, e de novo quando ele se resolve:
+
+| Aviso | Quando |
+|---|---|
+| Sincronização parada pelo limite de exclusões | Mais de 5% dos arquivos seriam apagados (libere em "Sincronizar agora") |
+| Sincronização falhando | 3 falhas seguidas (a contagem fica em `FAILURES` no `targets/<nome>.env`) |
+| Estado da sincronização perdido | O rclone vai juntar os dois lados de novo (arquivos apagados podem voltar) |
+| Disco não montado | Nada é copiado nem apagado até ele voltar |
+| Espelho no disco de backup falhou | Rodada das 03:00 |
+| Backup das configurações falhou | Algum serviço não foi salvo |
+
 ## Backup das configurações
 
 À 01:00, antes dos espelhos, o `astro-rclone-config`:

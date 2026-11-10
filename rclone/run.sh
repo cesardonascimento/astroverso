@@ -5,6 +5,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 ASTRO_PROJECT=rclone
 source ../lib/ui.sh
 source ../lib/env.sh
+source ../lib/notify.sh
 source common.sh
 
 MAX_DELETE=5
@@ -23,9 +24,11 @@ lock() {
 
 disk_ready() {
     if mountpoint -q "$1"; then
+        notify_resolved "disco-${1##*/}" "o disco $1 voltou a ser montado: as cópias seguem normalmente"
         return 0
     fi
     ui_warn "$1 não está montado: nada é copiado nem apagado"
+    notify_problem "disco-${1##*/}" "o disco $1 não está montado: nada é copiado nem apagado até ele voltar"
     return 1
 }
 
@@ -61,7 +64,7 @@ import_target() {
 }
 
 bisync_target() {
-    local name=$1 log options=()
+    local name=$1 log failures options=()
     options=(--create-empty-src-dirs --conflict-resolve newer --conflict-loser num --resilient --recover
         --max-lock 2h --max-delete "$MAX_DELETE" --exclude '*.partial')
     if [[ $(target_get "$name" BISYNC_READY) != yes ]]; then
@@ -82,11 +85,19 @@ bisync_target() {
             target_set "$name" TOO_MANY_DELETES yes
             ui_warn "$name: parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados"
             ui_warn "$name: para apagar mesmo assim, use \"Sincronizar agora\" no assistente"
+            notify_problem "$name-exclusoes" "a sincronização do $name parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados. Se foi de propósito (ex.: pasta grande renomeada), libere em \"Sincronizar agora\" no assistente do rclone; se não, confira o que sumiu"
+        else
+            failures=$(( $(target_get "$name" FAILURES) + 1 ))
+            target_set "$name" FAILURES "$failures"
+            if ((failures >= 3)); then
+                notify_problem "$name-falha" "a sincronização do $name falhou $failures vezes seguidas. Veja \"Ver as últimas execuções\" no assistente do rclone"
+            fi
         fi
         if grep -qiE 'must run --resync|cannot find prior' "$log"; then
             target_set "$name" BISYNC_READY no
             ui_warn "$name: o rclone perdeu o estado da sincronização; a próxima rodada junta os dois lados de novo"
             ui_warn "$name: nessa junção, arquivos apagados de um lado só voltam a aparecer"
+            notify_problem "$name-estado" "o rclone perdeu o estado da sincronização do $name e vai juntar os dois lados de novo, sem apagar nada. Arquivos apagados de um lado só podem voltar a aparecer"
         fi
         rm -f "$log"
         ui_error "$name: sincronização falhou, a próxima rodada tenta de novo"
@@ -95,6 +106,10 @@ bisync_target() {
     rm -f "$log"
     target_set "$name" BISYNC_READY yes
     target_set "$name" TOO_MANY_DELETES no
+    target_set "$name" FAILURES 0
+    notify_resolved "$name-exclusoes" "a sincronização do $name voltou a funcionar"
+    notify_resolved "$name-falha" "a sincronização do $name voltou a funcionar"
+    notify_resolved "$name-estado" "a sincronização do $name juntou os dois lados e voltou ao normal"
     ui_ok "$name: sincronização concluída"
 }
 
@@ -131,9 +146,11 @@ local_mirror() {
     if ! podman unshare rclone --config /dev/null sync "$source/" "$backup/atual" --metadata --links \
             --backup-dir "$backup/versoes/$(date +%F)" --exclude '/lost+found/**' "${RCLONE_OPTIONS[@]}"; then
         ui_error "espelho local falhou"
+        notify_problem espelho-local "o espelho de $source no disco de backup ($backup) falhou. Veja \"Ver as últimas execuções\" no assistente do rclone"
         return 1
     fi
     podman unshare find "$backup/versoes" -mindepth 1 -maxdepth 1 -type d -mtime "+$days" -exec rm -rf {} +
+    notify_resolved espelho-local "o espelho no disco de backup voltou a funcionar"
     ui_ok "espelho local concluído; versões com mais de $days dias apagadas"
 }
 
@@ -266,8 +283,12 @@ config_backup() {
     fi
     podman unshare rm -rf "$work"
     ((${#saved[@]})) && ui_ok "versão $version salva e criptografada: ${saved[*]}"
-    ((failed)) || config_prune "$dest" "$(env_get CONFIG_KEEP_DAYS 90)"
-    return "$failed"
+    if ((failed)); then
+        notify_problem backup-config "o backup das configurações falhou em parte (salvos: ${saved[*]:-nenhum}). Veja \"Ver as últimas execuções\" no assistente do rclone"
+        return 1
+    fi
+    notify_resolved backup-config "o backup das configurações voltou a funcionar"
+    config_prune "$dest" "$(env_get CONFIG_KEEP_DAYS 90)"
 }
 
 case "${1:-}" in

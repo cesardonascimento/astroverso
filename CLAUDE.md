@@ -70,6 +70,7 @@ lib/host.sh          host_base (sem suspensão, compose, boot, ssh, tailscale), 
 lib/env.sh           env_get CHAVE [padrão]
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no fstab e crypttab, TPM)
+lib/notify.sh        avisos no Discord: notify_problem / notify_resolved (1 por dia), notify_configure (menu principal)
 <projeto>/project.sh describe | status | actions | action <id> | install | remove [--purge]
                      opcionais: global-actions | backup | restore <pasta>
 ```
@@ -80,7 +81,7 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   o repositório só tem código. `state_setup` (início do `cmd_install`) migra o lugar antigo com `podman unshare mv`.
   Compose com `${ASTRO_STATE}` nos volumes e `env_file`, rodado pela função `compose` (`--env-file`). Serviço que
   roda com outro usuário guarda a configuração no `~/.astro` dele (sunshine), legível por ACL a quem instala.
-  Estado da máquina em `~/.astro/host.env`.
+  Estado da máquina em `~/.astro/host.env` (`600`: guarda o `DISCORD_WEBHOOK`).
 - Backup das configurações (rclone, 01:00, e "Fazer backup agora"): cada `~/.astro/<serviço>` em
   `<destino>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, versões apagadas depois de `CONFIG_KEEP_DAYS` (90).
   "Restaurar uma versão" (rclone, ação global): para o rclone e segura as travas, salva a situação atual
@@ -203,7 +204,8 @@ lib/disk.sh          disk_choose / disk_setup / disk_release (discos de dados no
   - avaliar o modo paralelo do DoH (três provedores veem todas as consultas);
   - conferir no roteador se não há DMZ, UPnP ou redirecionamento de portas.
 - `armazenamento-c` a definir. Até lá, a sessão do usuário de jogos ainda o monta pelo GNOME (com a senha do LUKS).
-- rclone: aviso (e-mail ou notificação) quando uma rodada falhar; hoje só fica no journal.
+- Notificações: outros canais (e-mail pelo SMTP do Proton, Telegram) e avisos de outros projetos (ex.: DNS do
+  AdGuard fora, renovação do certificado do Caddy).
 - Sunshine independente de usuário (ideia combinada, para depois): Sunshine como serviço do sistema com um
   usuário de serviço próprio (`sunshine`, configuração em `/var/lib/sunshine`), subindo no boot; imagem (KMS) e
   controles (`/dev/uinput`, grupo `input`) já valem para qualquer sessão. Som e resolução por um agente em toda

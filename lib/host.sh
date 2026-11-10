@@ -258,9 +258,13 @@ host_tailscale_port_forward() {
         ui_warn "a instalação continua depois do redirecionamento (Ctrl+C para sair)"
     done
     mkdir -p "$(dirname "$HOST_STATE")"
-    grep -v '^TAILSCALE_PORT_FORWARD=' "$HOST_STATE" 2>/dev/null > "$HOST_STATE.new" || true
-    echo "TAILSCALE_PORT_FORWARD=$forward" >> "$HOST_STATE.new"
+    (
+        umask 077
+        grep -v '^TAILSCALE_PORT_FORWARD=' "$HOST_STATE" 2>/dev/null > "$HOST_STATE.new" || true
+        echo "TAILSCALE_PORT_FORWARD=$forward" >> "$HOST_STATE.new"
+    )
     mv "$HOST_STATE.new" "$HOST_STATE"
+    chmod 600 "$HOST_STATE"
     ui_ok "redirecionamento da porta UDP ${forward#*:} confirmado"
 }
 
