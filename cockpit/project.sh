@@ -10,6 +10,7 @@ source ../lib/proxy.sh
 
 CONF=/etc/cockpit/cockpit.conf
 PORT=9090
+PACKAGES=(cockpit cockpit-podman cockpit-storaged cockpit-files)
 
 cmd_describe() {
     echo "Cockpit: painel web da máquina e dos containers"
@@ -33,16 +34,16 @@ configure() {
 }
 
 install_packages() {
-    if rpm -q cockpit cockpit-podman >/dev/null 2>&1 || dpkg -s cockpit cockpit-podman >/dev/null 2>&1; then
+    if rpm -q "${PACKAGES[@]}" >/dev/null 2>&1 || dpkg -s "${PACKAGES[@]}" >/dev/null 2>&1; then
         ui_ok "pacotes do Cockpit já instalados"
     elif command -v dnf >/dev/null; then
-        sudo dnf install -y -q cockpit cockpit-podman
-        ui_ok "Cockpit instalado via dnf"
+        sudo dnf install -y -q "${PACKAGES[@]}"
+        ui_ok "Cockpit instalado via dnf (${PACKAGES[*]})"
     elif command -v apt-get >/dev/null; then
-        sudo apt-get install -y -qq cockpit cockpit-podman
-        ui_ok "Cockpit instalado via apt"
+        sudo apt-get install -y -qq "${PACKAGES[@]}"
+        ui_ok "Cockpit instalado via apt (${PACKAGES[*]})"
     else
-        ui_fail "instale o cockpit e o cockpit-podman manualmente"
+        ui_fail "instale manualmente: ${PACKAGES[*]}"
     fi
 }
 
@@ -99,7 +100,7 @@ cmd_remove() {
         sudo rm -f "$CONF"
         ui_ok "configuração de proxy do Cockpit apagada"
     fi
-    ui_info "pacotes do sistema mantidos (cockpit, cockpit-podman)"
+    ui_info "pacotes do sistema mantidos (${PACKAGES[*]})"
 }
 
 cmd_restore() {
