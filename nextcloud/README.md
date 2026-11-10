@@ -29,8 +29,7 @@ Nenhuma porta é aberta na máquina: o Caddy alcança o `astro-nextcloud` pelo n
 | Endereço do Nextcloud no Caddy | `nextcloud.<domínio do caddy>` |
 | Usuário administrador | `astro` |
 | Pasta dos arquivos | `~/.nextcloud` (no home de quem instala) |
-| Quais discos guardam arquivos do Nextcloud? | (nenhum marcado) |
-| Senha do LUKS de `<disco>` | (só para um disco criptografado que o TPM ainda não destrava) |
+| Quais discos aparecem no Nextcloud? | (nenhum marcado; a lista vem de "Discos da máquina") |
 | Senha do administrador | (sem padrão; só na primeira instalação) |
 
 O usuário administrador só é criado na primeira instalação: trocar a resposta depois não renomeia a conta.
@@ -39,14 +38,12 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 ## O que a instalação faz
 
-- **Discos:** para os containers (para soltar os discos que saírem da lista) e monta cada disco escolhido em `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh`
-  (TPM nos criptografados, nada pede senha no boot). Em cada um:
-  - dono `$USER`, permissão `770` com o grupo zerado na ACL (`group::---`): outros usuários da máquina não entram;
-  - ACL para o `www-data` do container (o UID dele no host vem do `podman unshare`), também como padrão para o
-    que for criado depois. `$USER` e o Nextcloud leem e escrevem nos mesmos arquivos;
-  - `context=system_u:object_r:container_file_t:s0` na montagem: o SELinux libera o container sem reetiquetar o disco;
-  - `x-systemd.before=user@<uid>.service`: no boot, o disco monta antes de os containers subirem;
-  - `x-gvfs-hide`: não aparece no Arquivos.
+- **Discos:** usa os discos escolhidos entre os de "Discos da máquina" (`lib/disk.sh`), que já montam em
+  `/srv/<rótulo>` no boot, antes dos containers, e com `context=system_u:object_r:container_file_t:s0` (o SELinux
+  libera o container sem reetiquetar o disco). Um disco que não está montado, ou foi montado sem essa opção, fica
+  de fora com um aviso. Num disco **privado**, aplica uma ACL para o `www-data` do container (o UID dele no host
+  vem do `podman unshare`), também como padrão para o que for criado depois: `$USER` e o Nextcloud leem e
+  escrevem nos mesmos arquivos. Num disco **compartilhado**, o Nextcloud acessa como qualquer usuário, sem ACL.
 
   O disco entra nos containers em `/mnt/<rótulo>` por um `docker-compose.override.yml` gerado, e no Nextcloud do
   administrador como a pasta `<rótulo>` (app Armazenamento externo, verificação de mudanças a cada acesso). Assim,
@@ -78,7 +75,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo UUID) |
+| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo caminho em `/srv`; um `.env` antigo com UUIDs é convertido) |
 | `~/.astro/nextcloud/docker-compose.override.yml` | Volumes dos discos |
 | `~/.astro/nextcloud/data/secrets/` | Senha do banco |
 | `~/.astro/nextcloud/data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
@@ -107,6 +104,6 @@ de fora: os arquivos do dia a dia ficam nos discos (`armazenamento-a`), que têm
 
 ## Remoção
 
-`remove` derruba os containers, tira a rota do Caddy e libera os discos (saem do `fstab` e do `crypttab` e são
-desmontados), mantendo tudo em `~/.astro/nextcloud`. `--purge` apaga `~/.astro/nextcloud/data`. Uma pasta dos arquivos fora do projeto e os
+`remove` derruba os containers e tira a rota do Caddy, mantendo tudo em `~/.astro/nextcloud`. Os discos continuam
+montados (são da máquina). `--purge` apaga `~/.astro/nextcloud/data`. Uma pasta dos arquivos fora do projeto e os
 arquivos dos discos nunca são apagados.

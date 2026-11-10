@@ -38,38 +38,6 @@ for disk in json.load(sys.stdin)["blockdevices"]:
 '
 }
 
-disk_owner() {
-    sed -n "s|^# astro:\([a-z0-9_-]*\) $1\$|\1|p" "$DISK_FSTAB" | head -1
-}
-
-disk_choose() {
-    local -n __disk_out=$1
-    local project=$2 title=$3 current=" ${4:-} " uuid path fstype label size model inner owner kind preset=""
-    local lines=() uuids=() chosen=() i
-    __disk_out=()
-    while IFS=$'\t' read -r uuid path fstype label size model inner; do
-        owner="$(disk_owner "$uuid")"
-        [[ -z $owner || $owner == "$project" ]] || continue
-        kind=$fstype
-        [[ $label == - ]] && label="${path##*/} (${uuid:0:8})"
-        if [[ $fstype == crypto_LUKS && $inner == - ]]; then
-            kind="criptografado, travado"
-        elif [[ $fstype == crypto_LUKS ]]; then
-            kind="criptografado, $inner"
-        fi
-        lines+=("$(printf '%-20s %8s  %-24s %s' "$label" "$size" "$kind" "$model")")
-        [[ $current == *" $uuid "* ]] && preset+="${#uuids[@]} "
-        uuids+=("$uuid")
-    done < <(disk_scan)
-    if ((${#uuids[@]} == 0)); then
-        ui_info "nenhum disco disponível além do disco do sistema"
-        return 0
-    fi
-    ui_checklist chosen "$title" --selected "$preset" "${lines[@]}"
-    for i in "${chosen[@]}"; do __disk_out+=("${uuids[i]}"); done
-    return 0
-}
-
 disk_read() {
     if [[ -r $1 ]]; then
         cat "$1"
@@ -79,24 +47,48 @@ disk_read() {
 }
 
 disk_block() {
-    disk_read "$1" | awk -v tag="# astro:$2 " '
-        index($0, tag) == 1 { print; keep = 1; next }
-        keep { print; keep = 0 }
-    '
+    disk_read "$1" | awk '/^# astro[: ]/ { print; getline; print }'
     return 0
 }
 
+disk_configured() {
+    disk_block "$DISK_FSTAB" | awk '
+        /^# astro[: ]/ {
+            uuid = $3
+            if ($2 ~ /^astro:/) { split($2, tag, ":"); type = (tag[2] == "sunshine") ? "compartilhado" : "privado" }
+            else { type = ($4 == "compartilhado") ? "compartilhado" : "privado" }
+            getline
+            print uuid, type, $2
+        }
+    '
+}
+
+disk_mounts() {
+    local uuid type target
+    while read -r uuid type target; do
+        printf '%s %s\n' "$target" "$type"
+    done < <(disk_configured)
+}
+
+disk_path() {
+    disk_configured | awk -v uuid="$1" '$1 == uuid { print $3; exit }'
+}
+
+disk_type() {
+    disk_configured | awk -v target="$1" '$3 == target { print $2; exit }'
+}
+
+disk_line() {
+    disk_block "$1" | awk -v uuid="$2" '/^# astro[: ]/ { match_uuid = ($3 == uuid); getline; if (match_uuid) print }'
+}
+
 disk_block_write() {
-    local file=$1 project=$2 current wanted
-    shift 2
+    local file=$1 current wanted
+    shift
     current="$(disk_read "$file")"
     wanted="$(
         if [[ -n $current ]]; then
-            printf '%s\n' "$current" | awk -v tag="# astro:$project " '
-                index($0, tag) == 1 { skip = 1; next }
-                skip { skip = 0; next }
-                { print }
-            '
+            printf '%s\n' "$current" | awk '/^# astro[: ]/ { getline; next } { print }'
         fi
         if (($#)); then
             printf '%s\n' "$@"
@@ -157,24 +149,27 @@ disk_tpm_enroll() {
 }
 
 disk_release_unused() {
-    local project=$1 keep=" $2 " marker uuid target line
+    local keep=" $1 " marker uuid target line
     while read -r marker; do
-        uuid="${marker##* }"
+        uuid="$(awk '{ print $3 }' <<< "$marker")"
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
         target="$(awk '{ print $2 }' <<< "$line")"
         disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
         if mountpoint -q "$target"; then
-            sudo umount "$target"
-            ui_ok "$target desmontado"
+            if sudo umount "$target"; then
+                ui_ok "$target desmontado"
+            else
+                ui_warn "$target está em uso: ele sai do fstab e deixa de montar no próximo boot"
+            fi
         fi
-        if [[ -d $target ]]; then
+        if [[ -d $target ]] && ! mountpoint -q "$target"; then
             sudo chattr -i "$target" 2>/dev/null || true
             sudo rmdir "$target" 2>/dev/null || true
         fi
-    done < <(disk_block "$DISK_FSTAB" "$project")
+    done < <(disk_block "$DISK_FSTAB")
     while read -r marker; do
-        uuid="${marker##* }"
+        uuid="$(awk '{ print $3 }' <<< "$marker")"
         read -r line
         [[ $keep == *" $uuid "* ]] && continue
         target="$(awk '{ print $1 }' <<< "$line")"
@@ -182,29 +177,69 @@ disk_release_unused() {
         if [[ -e /dev/mapper/$target ]]; then
             sudo cryptsetup close "$target" 2>/dev/null || ui_warn "não foi possível travar $target (em uso)"
         fi
-    done < <(disk_block "$DISK_CRYPTTAB" "$project")
+    done < <(disk_block "$DISK_CRYPTTAB")
+}
+
+disk_options() {
+    local fs_type=$1 type=$2 options="context=system_u:object_r:container_file_t:s0"
+    if [[ $type == compartilhado ]]; then
+        options+=",x-gvfs-show,x-systemd.before=systemd-user-sessions.service"
+    else
+        options+=",x-gvfs-hide,x-systemd.before=user@$(id -u).service"
+    fi
+    case $fs_type in
+        ntfs3|exfat|vfat)
+            if [[ $type == compartilhado ]]; then
+                options+=",uid=$(id -u),gid=$(id -g),umask=000"
+            else
+                options+=",uid=$(id -u),gid=$(id -g),umask=077"
+            fi
+            ;;
+    esac
+    printf '%s' "$options"
+}
+
+disk_mount_options() {
+    awk '{ print $4 }' <<< "$1" | tr ',' '\n' | grep -v '^x-' | sort | tr '\n' ','
+}
+
+disk_permissions() {
+    local target=$1 type=$2 mode=770
+    [[ $type == compartilhado ]] && mode=777
+    mountpoint -q "$target" || return 0
+    if [[ $(stat -c '%u' "$target") != "$(id -u)" ]]; then
+        sudo chown "$(id -u):$(id -g)" "$target" 2>/dev/null || true
+    fi
+    if [[ $(stat -c '%a' "$target") != "$mode" ]]; then
+        sudo chmod "$mode" "$target"
+    fi
+    if [[ $type == compartilhado ]]; then
+        ui_ok "$target: compartilhado, todos os usuários da máquina acessam"
+    else
+        ui_ok "$target: privado, só $USER acessa"
+    fi
 }
 
 disk_setup() {
-    local project=$1 options=$2
-    shift 2
-    local uuid device fstype label mapper fs_uuid fs_type name target pass wait_options hotplug=() fstab=() crypttab=() keep=() mounts=()
-    local -A seen=()
+    local arg uuid type device fstype label mapper fs_uuid fs_type name target pass wait_options
+    local hotplug=() fstab=() crypttab=() keep=() mounts=()
+    local -A seen=() old=()
     DISK_MOUNTS=()
-    if (($# == 0)) && [[ -z $(disk_block "$DISK_FSTAB" "$project") ]]; then
-        return 0
-    fi
-    for uuid in "$@"; do
+    while read -r uuid type target; do
+        old[$uuid]="$(disk_line "$DISK_FSTAB" "$uuid")"
+    done < <(disk_configured)
+    for arg in "$@"; do
+        uuid="${arg%%:*}"
+        type="${arg#*:}"
         device="/dev/disk/by-uuid/$uuid"
         if [[ ! -e $device ]]; then
-            local old_fstab old_crypttab
-            old_fstab="$(disk_block "$DISK_FSTAB" "$project" | grep -A1 -x "# astro:$project $uuid" || true)"
-            old_crypttab="$(disk_block "$DISK_CRYPTTAB" "$project" | grep -A1 -x "# astro:$project $uuid" || true)"
-            if [[ -n $old_fstab ]]; then
-                mapfile -t -O "${#fstab[@]}" fstab <<< "$old_fstab"
-                [[ -n $old_crypttab ]] && mapfile -t -O "${#crypttab[@]}" crypttab <<< "$old_crypttab"
+            local old_crypttab
+            if [[ -n ${old[$uuid]:-} ]]; then
+                old_crypttab="$(disk_line "$DISK_CRYPTTAB" "$uuid")"
+                fstab+=("# astro $uuid $type" "${old[$uuid]}")
+                [[ -n $old_crypttab ]] && crypttab+=("# astro $uuid" "$old_crypttab")
                 keep+=("$uuid")
-                DISK_MOUNTS+=("$(tail -1 <<< "$old_fstab" | awk '{ print $2 }')")
+                DISK_MOUNTS+=("$(awk '{ print $2 }' <<< "${old[$uuid]}")")
                 ui_warn "disco $uuid não encontrado: a montagem dele fica configurada e volta quando ele for ligado"
             else
                 ui_warn "disco $uuid não encontrado, pulado"
@@ -222,7 +257,7 @@ disk_setup() {
                 continue
             fi
             hotplug+=("/dev/disk/by-uuid/$uuid systemd-cryptsetup@$(systemd-escape "$mapper").service")
-            crypttab+=("# astro:$project $uuid"
+            crypttab+=("# astro $uuid"
                 "$mapper UUID=$uuid none tpm2-device=auto,headless=true,nofail,x-systemd.device-timeout=10s,x-udisks-auth")
             udevadm settle 2>/dev/null || true
             device="/dev/mapper/$mapper"
@@ -241,26 +276,30 @@ disk_setup() {
         target="$DISK_ROOT/$name"
         [[ $fs_type == ntfs ]] && fs_type=ntfs3
         [[ $fs_type == ext4 || $fs_type == xfs || $fs_type == btrfs ]] && pass=2 || pass=0
-        fstab+=("# astro:$project $uuid"
-            "UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth${options:+,$options} 0 $pass")
+        local line="UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth,$(disk_options "$fs_type" "$type") 0 $pass"
+        fstab+=("# astro $uuid $type" "$line")
         keep+=("$uuid")
         hotplug+=("/dev/disk/by-uuid/$fs_uuid $(systemd-escape -p --suffix=mount "$target")")
-        mounts+=("$device $target $fs_type")
+        local changed=false
+        if [[ -n ${old[$uuid]:-} && $(disk_mount_options "${old[$uuid]}") != "$(disk_mount_options "$line")" ]]; then
+            changed=true
+        fi
+        mounts+=("$device $target $fs_type $type $changed")
         DISK_MOUNTS+=("$target")
     done
 
-    disk_release_unused "$project" "${keep[*]}"
-    disk_block_write "$DISK_CRYPTTAB" "$project" "${crypttab[@]}"
-    disk_block_write "$DISK_FSTAB" "$project" "${fstab[@]}"
+    disk_release_unused "${keep[*]}"
+    disk_block_write "$DISK_CRYPTTAB" "${crypttab[@]}"
+    disk_block_write "$DISK_FSTAB" "${fstab[@]}"
     local link
     for link in "${hotplug[@]}"; do
         disk_hotplug_link "${link% *}" "${link##* }"
     done
     sudo systemctl daemon-reload
 
-    local entry source mounted log already busy
+    local entry source mounted log already busy changed
     for entry in "${mounts[@]}"; do
-        read -r device target fs_type <<< "$entry"
+        read -r device target fs_type type changed <<< "$entry"
         source="$(readlink -f "$device")"
         already=false
         busy=false
@@ -278,8 +317,17 @@ disk_setup() {
             ui_warn "$source está em uso em outra sessão: feche os programas que o usam ou reinicie a máquina"
             continue
         fi
+        if $already && $changed; then
+            if sudo umount "$target" 2>/dev/null; then
+                already=false
+                ui_ok "$target desmontado para aplicar as opções novas"
+            else
+                ui_warn "$target está em uso: as opções novas valem a partir do próximo boot"
+            fi
+        fi
         if $already; then
             ui_ok "$target já montado"
+            disk_permissions "$target" "$type"
             continue
         fi
         if ! mountpoint -q "$target"; then
@@ -290,26 +338,77 @@ disk_setup() {
             printf '%s\n' "$log" | ui_prefix >&2
             if [[ $fs_type == ntfs3 ]]; then
                 ui_info "um NTFS fechado sem desligar direito (Windows, inicialização rápida) fica marcado como sujo:"
-                ui_info "  sudo ntfsfix -d $source   e rode a instalação de novo"
+                ui_info "  sudo ntfsfix -d $source   e rode esta opção de novo"
             fi
             ui_warn "não foi possível montar $target agora; ele fica configurado para o próximo boot"
             continue
         fi
         ui_ok "$source montado em $target (também no boot, sem travar se faltar)"
+        disk_permissions "$target" "$type"
     done
 }
 
-disk_release() {
-    local project=$1
-    disk_release_unused "$project" ""
-    disk_block_write "$DISK_FSTAB" "$project"
-    disk_block_write "$DISK_CRYPTTAB" "$project"
-    sudo systemctl daemon-reload
-    ui_ok "discos liberados do $DISK_FSTAB (os dados continuam nos discos)"
-}
-
-disk_mounts() {
-    awk -v skip="${1:-}" '
-        /^# astro:/ { split($2, tag, ":"); project = tag[2]; getline; if (project != skip) print $2, project }
-    ' "$DISK_FSTAB"
+disk_manage() {
+    local uuid type target path fstype label size model inner kind
+    local lines=() uuids=() chosen=() shared=() args=() removed=() preset="" i
+    local -A current=() targets=()
+    ui_step "Discos da máquina"
+    while read -r uuid type target; do
+        current[$uuid]=$type
+        targets[$uuid]=$target
+    done < <(disk_configured)
+    while IFS=$'\t' read -r uuid path fstype label size model inner; do
+        kind=$fstype
+        [[ $label == - ]] && label="${path##*/} (${uuid:0:8})"
+        if [[ $fstype == crypto_LUKS && $inner == - ]]; then
+            kind="criptografado, travado"
+        elif [[ $fstype == crypto_LUKS ]]; then
+            kind="criptografado, $inner"
+        fi
+        lines+=("$(printf '%-20s %8s  %-24s %s' "$label" "$size" "$kind" "$model")")
+        [[ -n ${current[$uuid]:-} ]] && preset+="${#uuids[@]} "
+        uuids+=("$uuid")
+    done < <(disk_scan)
+    if ((${#uuids[@]} == 0 && ${#current[@]} == 0)); then
+        ui_info "nenhum disco além do disco do sistema"
+        return 0
+    fi
+    ui_info "os discos escolhidos montam no boot em $DISK_ROOT/<rótulo>, sempre com $USER como dono"
+    ui_checklist chosen "Quais discos a máquina monta?" --selected "$preset" "${lines[@]}"
+    local picked=() picked_lines=()
+    for i in "${chosen[@]}"; do
+        picked+=("${uuids[i]}")
+        picked_lines+=("${lines[i]}")
+    done
+    for uuid in "${!current[@]}"; do
+        [[ " ${picked[*]} " == *" $uuid "* ]] && continue
+        if [[ " ${uuids[*]} " == *" $uuid "* ]]; then
+            removed+=("${targets[$uuid]}")
+        else
+            picked+=("$uuid")
+            picked_lines+=("${targets[$uuid]##*/} (desligado)")
+        fi
+    done
+    if ((${#removed[@]})); then
+        ui_warn "deixam de ser montados: ${removed[*]} (os dados continuam nos discos)"
+        ui_warn "projetos que usam esses discos (ex.: nextcloud, rclone) param de encontrá-los"
+        ui_confirm "confirma?" n || { ui_warn "cancelado, nada mudou"; return 0; }
+    fi
+    if ((${#picked[@]})); then
+        preset=""
+        for i in "${!picked[@]}"; do
+            [[ ${current[${picked[i]}]:-} == compartilhado ]] && preset+="$i "
+        done
+        ui_info "privado: só $USER acessa (dados pessoais). compartilhado: todos os usuários da máquina acessam (ex.: jogos)"
+        ui_checklist shared "Quais são compartilhados com todos os usuários?" --selected "$preset" "${picked_lines[@]}"
+        for i in "${!picked[@]}"; do
+            type=privado
+            [[ " ${shared[*]} " == *" $i "* ]] && type=compartilhado
+            args+=("${picked[i]}:$type")
+        done
+    fi
+    disk_setup "${args[@]}"
+    if ((${#DISK_MOUNTS[@]} == 0)); then
+        ui_ok "nenhum disco de dados montado pela máquina"
+    fi
 }

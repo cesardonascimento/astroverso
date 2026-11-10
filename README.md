@@ -27,6 +27,7 @@ git clone <url-deste-repositório> ~/Projects/astro
 | Instalar todos | Instala o que ainda não está instalado |
 | Escolher quais instalar | Marca os projetos com Espaço (ou "Todos"); os já instalados são recriados |
 | Configurar um projeto instalado | Ajustes do dia a dia, como adicionar rotas no Caddy |
+| Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
 | Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
 | Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
 | Reinstalar tudo do zero | Apaga os dados e instala de novo |
@@ -60,6 +61,26 @@ desse usuário.
   autenticados na sua rede Tailscale. Só continua com **S**, e a resposta fica guardada nesta máquina.
 - **Desativar o login por senha no SSH?** Deixa o acesso remoto ao terminal só por chave, bem mais
   difícil de invadir que uma senha. Só aparece se já houver uma chave em `~/.ssh/authorized_keys`.
+
+### Discos da máquina
+
+Os discos de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud,
+rclone) só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
+Fedora o monta para quem está na tela, e de longe ele é acessado pelo Cockpit (Armazenamento e Arquivos, com o
+acesso administrativo ligado).
+
+- **Quais discos a máquina monta?** Marque com Espaço os discos que ficam sempre ligados à máquina. Cada um é
+  montado sozinho a cada boot em `/srv/<rótulo>`, mesmo sem ninguém logado, e volta sozinho se for desligado e
+  religado. Desmarcar um disco o desmonta (os dados continuam nele), depois de confirmar.
+- **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
+  segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca
+  para no boot pedindo senha e pode ser reiniciada de longe. Levado para outro computador, o disco
+  continua travado. Se um dia ele não destravar sozinho (depois de mexer no Secure Boot, por exemplo), rode
+  esta opção de novo: ela pede a senha e cadastra o TPM outra vez.
+- **Quais são compartilhados com todos os usuários?** Os marcados ficam abertos a todos os usuários da
+  máquina e aparecem no Arquivos (ex.: discos de jogos, que o usuário de jogos também usa). Os outros são
+  privados: só o seu usuário entra. Use privado para dados pessoais. A criptografia protege o disco desligado
+  ou levado embora; com a máquina ligada, quem decide o acesso é essa resposta.
 
 ### adguard
 
@@ -139,24 +160,19 @@ pelas integrações, no próprio painel (Tuya, LG, Samsung...).
 - **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, a pasta oculta `.nextcloud`
   no home do seu usuário, fora do projeto. Se ela mudar depois de instalado, o assistente pergunta se pode **mover os arquivos** para a
   pasta nova.
-- **Quais discos guardam arquivos do Nextcloud?** Marque com Espaço os discos de dados que o Nextcloud vai usar.
-  Ao reconfigurar, os discos atuais já vêm marcados: marque um novo para adicionar, desmarque para tirar.
-  Cada um é montado sozinho a cada boot, só o seu usuário e o Nextcloud acessam, e ele aparece no Nextcloud
-  como uma pasta com o nome do disco. Arquivos copiados para o disco por fora também aparecem lá. A escolha
-  fica gravada pelo identificador do disco, então numa máquina nova os mesmos discos são reconhecidos.
-- **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
-  segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca
-  para no boot pedindo senha e pode ser reiniciada de longe. Levado para outro computador, o disco
-  continua travado. Se um dia ele não destravar sozinho (depois de mexer no Secure Boot, por exemplo), rode
-  a instalação de novo: ela pede a senha e cadastra o TPM outra vez.
+- **Quais discos aparecem no Nextcloud?** Marque com Espaço, entre os discos da máquina (veja "Discos da
+  máquina"), os que o Nextcloud vai mostrar. Ao reconfigurar, os atuais já vêm marcados: marque um novo para
+  adicionar, desmarque para tirar. Cada um aparece no Nextcloud como uma pasta com o nome do disco, e arquivos
+  copiados para o disco por fora também aparecem lá. Num disco privado, a primeira vez libera o acesso do
+  Nextcloud arquivo por arquivo e pode demorar uns minutos.
 - **Senha do administrador:** só aparece na primeira instalação, depois que o Nextcloud termina de instalar
   (alguns minutos). Se o Nextcloud a recusar, por ser curta ou já ter vazado em algum site, ele pede outra.
 
 ### rclone
 
-- **Qual disco recebe o espelho noturno?** Marque com Espaço o disco que guarda a cópia local (um só). Ele é
-  montado sozinho a cada boot e só o seu usuário acessa. Deixe vazio para fazer só a cópia na nuvem.
-- **Qual disco copiar para ele toda noite?** O disco de dados que vai ser protegido, por exemplo o do
+- **Qual disco recebe o espelho noturno?** O disco da máquina que guarda a cópia local (de preferência um
+  disco privado). Escolha "Nenhum" para fazer só a cópia na nuvem.
+- **Qual disco copiar para ele toda noite?** O disco da máquina que vai ser protegido, por exemplo o do
   Nextcloud.
 - **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
   pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
@@ -217,10 +233,9 @@ lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos,
   `sudo`. Na reinstalação, o assistente pergunta se mantém a atual.
 - **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
   aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
-- **Quais discos são de jogos?** Marque com Espaço os discos com jogos, ROMs e emuladores (ao reconfigurar, os
-  atuais já vêm marcados). Eles são montados
-  sozinhos a cada boot e ficam acessíveis ao seu usuário e ao usuário de jogos, e a nenhum outro. Os discos
-  já escolhidos pelo Nextcloud não aparecem na lista.
+
+Os discos de jogos (ROMs, emuladores) entram em "Discos da máquina" como **compartilhados**: assim o usuário de
+jogos os acessa e eles aparecem no Arquivos dele.
 
 Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
 ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,

@@ -7,7 +7,6 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
-source ../lib/disk.sh
 
 REPO=LizardByte/Sunshine
 WEB_PORT=47990
@@ -18,7 +17,6 @@ NVIDIA_VENDOR=0x10de
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
-GAMES_GROUP=jogos
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 
 cmd_describe() {
@@ -87,20 +85,11 @@ choose_autologin() {
     printf "AUTOLOGIN='%s'\n" "$answer" >> "$ENV_FILE"
 }
 
-choose_disks() {
-    local disks=()
-    disk_choose disks sunshine "Quais discos são de jogos? (o usuário de jogos e $USER acessam)" "${1:-}"
-    printf "GAMES_DISKS='%s'\n" "${disks[*]}" >> "$ENV_FILE"
-    ui_ok "${#disks[@]} disco(s) de jogos escolhido(s)"
-}
-
 configure() {
     ui_step "Configuração"
-    local current_disks
-    current_disks="$(env_get GAMES_DISKS)"
     if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
-        grep -q '^GAMES_DISKS=' "$ENV_FILE" || choose_disks
+        sed -i '/^GAMES_DISKS=/d' "$ENV_FILE"
         grep -q '^AUTOLOGIN=' "$ENV_FILE" || choose_autologin
         return
     fi
@@ -119,35 +108,7 @@ configure() {
     mv "$ENV_FILE.new" "$ENV_FILE"
     printf "AUTOLOGIN='%s'\n" "$autologin_current" >> "$ENV_FILE"
     choose_autologin
-    choose_disks "$current_disks"
     ui_ok "configuração salva em $ENV_FILE"
-}
-
-games_disks() {
-    local user=$1 uuids=() gid
-    read -ra uuids <<< "$(env_get GAMES_DISKS)"
-    if ((${#uuids[@]})); then
-        if ! getent group "$GAMES_GROUP" >/dev/null; then
-            sudo groupadd "$GAMES_GROUP"
-            ui_ok "grupo $GAMES_GROUP criado"
-        fi
-        if ! id -nG "$user" | grep -qw "$GAMES_GROUP"; then
-            sudo usermod -aG "$GAMES_GROUP" "$user"
-            HOST_REBOOT=true
-            ui_ok "$user entra no grupo $GAMES_GROUP (vale a partir do próximo login)"
-        fi
-        gid="$(getent group "$GAMES_GROUP" | cut -d: -f3)"
-    fi
-    disk_setup sunshine "uid=$(id -u),gid=${gid:-0},umask=007,x-gvfs-show,x-systemd.before=user@$(id -u "$user").service" "${uuids[@]}"
-    local path
-    for path in "${DISK_MOUNTS[@]}"; do
-        if mountpoint -q "$path" && [[ $(stat -c %a "$path") != 770 ]]; then
-            sudo chmod 770 "$path"
-            ui_ok "pasta principal de $path fechada para quem não é do grupo $GAMES_GROUP"
-        fi
-    done
-    ((${#uuids[@]})) && ui_ok "discos de jogos: só $USER e o grupo $GAMES_GROUP acessam"
-    return 0
 }
 
 create_user() {
@@ -582,7 +543,6 @@ cmd_install() {
     else
         ui_ok "$user entra pela tela de login, com a senha"
     fi
-    games_disks "$user"
     primary_gpu
 
     ui_step "Sunshine"
@@ -632,9 +592,6 @@ cmd_remove() {
         fi
     fi
     autologin_off
-    if [[ -n $(disk_block "$DISK_FSTAB" sunshine) ]]; then
-        disk_release sunshine
-    fi
     if [[ -f $MUTTER_RULE ]]; then
         sudo rm -f "$MUTTER_RULE"
         sudo udevadm control --reload
@@ -647,7 +604,7 @@ cmd_remove() {
         ui_ok "a tela de login não espera mais a NVIDIA"
     fi
     proxy_unpublish
-    ui_info "mantidos: pacote do Sunshine, driver da NVIDIA, o grupo $GAMES_GROUP e o usuário${user:+ $user} com os jogos"
+    ui_info "mantidos: pacote do Sunshine, driver da NVIDIA e o usuário${user:+ $user} com os jogos"
 }
 
 cmd_backup() {

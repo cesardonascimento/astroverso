@@ -71,15 +71,25 @@ Bibliotecas compartilhadas:
   avisa que ele acabou, só se houve aviso. `notify_send <texto> [botões]` manda direto. Cada botão é
   `"Rótulo|<projeto>:<ação>|<argumento>"` e roda a ação como o `/astro`. Nenhuma delas derruba o chamador.
   Precisa de `lib/ui.sh`.
-- `lib/disk.sh`: discos de dados de um projeto, montados pelo sistema no boot.
-  - `disk_choose VAR projeto título [uuids atuais]` lista os discos (sem o do sistema e sem os de outro projeto),
-    com os atuais já marcados, e devolve os UUIDs marcados, que o projeto grava no `.env`.
-  - `disk_setup projeto opções uuid...` cadastra o TPM nos discos LUKS (pede a senha só se o TPM ainda não
-    destravar), escreve as linhas do projeto no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um comentário
-    `# astro:<projeto> <uuid>`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Num LUKS2
+- `lib/disk.sh`: discos de dados **da máquina**, montados pelo sistema no boot. Nenhum disco pertence a um
+  projeto: o dono é sempre quem instala, e os projetos só escolhem quais usar (pelo caminho em `/srv`).
+  - `disk_manage` é a opção "Discos da máquina" do `setup.sh`: lista os discos (menos o do sistema), com os
+    configurados já marcados, pergunta quais são compartilhados e chama o `disk_setup`. Tirar um disco da lista
+    pede confirmação.
+  - `disk_setup uuid:tipo...` (tipo `privado` ou `compartilhado`) cadastra o TPM nos discos LUKS (pede a senha só
+    se o TPM ainda não destravar), escreve as linhas no `/etc/crypttab` e no `/etc/fstab` (cada uma depois de um
+    comentário `# astro <uuid> [tipo]`), desmonta o que a sessão gráfica montou e monta em `/srv/<rótulo>`. Num LUKS2
     sem nome no cabeçalho, copia para lá o rótulo do sistema de arquivos (`cryptsetup config --label`), para o
     disco aparecer com nome na lista mesmo travado. Sem nome nenhum, a lista mostra o dispositivo e o UUID. Deixa os
-    caminhos em `DISK_MOUNTS`. As `opções` são acrescentadas às da montagem (ex.: `uid=`, `context=`).
+    caminhos em `DISK_MOUNTS`. Um disco já montado só é remontado se mudarem as opções que não são `x-*`
+    (`uid`, `gid`, `umask`, `context`); em uso, as opções novas valem no próximo boot. Marcas antigas
+    (`# astro:<projeto> <uuid>`) são lidas e regravadas no formato novo (as do sunshine viram compartilhadas).
+  - **Privado:** pasta principal `770` (dono e grupo de quem instala), `umask=077` em NTFS/exFAT/FAT,
+    `x-gvfs-hide` e `x-systemd.before=user@<uid>.service` (monta antes dos containers de quem instala).
+  - **Compartilhado:** pasta principal `777`, `umask=000` em NTFS/exFAT/FAT, `x-gvfs-show` (aparece no Arquivos
+    de todos) e `x-systemd.before=systemd-user-sessions.service` (monta antes de qualquer login). Arquivos
+    criados pelo Linux guardam a permissão de quem os criou.
+  - Todos levam `context=system_u:object_r:container_file_t:s0`: o SELinux libera os containers sem reetiquetar.
   - Toda montagem leva `nofail` e `x-udisks-auth`. Disco comum: espera de 10s. Disco LUKS: `headless=true` no
     `crypttab` e, no `fstab`, `x-systemd.requires=` do serviço do `cryptsetup` com espera de 5min (o TPM pode
     levar quase um minuto no boot; disco ausente falha em 10s pelo `crypttab`). Nada
@@ -87,6 +97,6 @@ Bibliotecas compartilhadas:
   - Disco desligado e religado (cabo, troca de case) volta a montar sozinho: um link em
     `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem (e o `cryptsetup`, no LUKS) ao disco.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
-  - `disk_mounts [projeto a ignorar]` lista as montagens do astro (`/srv/<rótulo> projeto`), lidas do `fstab`.
-  - Discos tirados da lista são desmontados e saem dos dois arquivos. `disk_release projeto` libera todos.
-    Os dados nunca são apagados.
+  - `disk_mounts` lista os discos da máquina (`/srv/<rótulo> tipo`), lidos do `fstab`; `disk_path <uuid>` dá o
+    caminho de um disco (para converter `.env` antigos) e `disk_type <caminho>` o tipo.
+  - Discos tirados da lista são desmontados e saem dos dois arquivos. Os dados nunca são apagados.

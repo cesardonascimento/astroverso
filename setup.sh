@@ -5,6 +5,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 ASTRO_PROJECT=astro
 source lib/ui.sh
 source lib/host.sh
+source lib/disk.sh
 
 trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
@@ -165,25 +166,27 @@ while true; do
         "Instalar todos (pula os já instalados)" \
         "Escolher quais instalar" \
         "Configurar um projeto instalado" \
+        "Discos da máquina" \
         "${GLOBAL_LABELS[@]}" \
         "Reinstalar tudo do zero (apaga os dados)" \
         "Remover todos os containers" \
         "Sair"
 
     globals=${#GLOBAL_IDS[@]}
-    if ((choice >= 3 && choice < 3 + globals)); then
-        read -r name id <<< "${GLOBAL_IDS[choice - 3]}"
+    if ((choice >= 4 && choice < 4 + globals)); then
+        read -r name id <<< "${GLOBAL_IDS[choice - 4]}"
         project "$name" action "$id" || true
         echo
         continue
     fi
-    ((choice >= 3 + globals)) && choice=$((choice - globals))
+    ((choice >= 4 + globals)) && choice=$((choice - globals))
     case $choice in
         0) install_all || true ;;
         1) install_selected || true ;;
         2) configure_project || true ;;
-        3) reinstall_all || true ;;
-        4) remove_all || true ;;
+        3) disk_manage || true ;;
+        4) reinstall_all || true ;;
+        5) remove_all || true ;;
         *) ui_info "até mais!"; break ;;
     esac
     echo

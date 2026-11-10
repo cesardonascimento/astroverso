@@ -6,15 +6,15 @@ mesmo sem ninguém logado.
 
 ```bash
 ./project.sh install           # disco de backup, agendamentos e (opcional) o primeiro armazenamento em nuvem
-./project.sh remove [--purge]  # tira os agendamentos e libera o disco; --purge apaga também os logins da nuvem
+./project.sh remove [--purge]  # tira os agendamentos; --purge apaga também os logins da nuvem
 ```
 
 ## Perguntas da instalação
 
 | Pergunta | Padrão |
 |---|---|
-| Qual disco recebe o espelho noturno? | (nenhum marcado: só nuvem) |
-| Qual disco copiar para ele toda noite? | o primeiro disco de dados de outro projeto |
+| Qual disco recebe o espelho noturno? | o atual, ou "Nenhum (só nuvem)" |
+| Qual disco copiar para ele toda noite? | o atual, ou o primeiro dos outros discos da máquina |
 | Por quantos dias guardar o que for apagado ou alterado | `30` |
 | Adicionar um armazenamento em nuvem agora? | `S` |
 
@@ -169,7 +169,7 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/rclone/.env` | Disco de backup (UUID e onde montou), disco copiado, dias de versões e a pasta do backup das configurações |
+| `~/.astro/rclone/.env` | Disco de backup (`BACKUP_MOUNT`), disco copiado, dias de versões e a pasta do backup das configurações |
 | `~/.astro/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
 | `~/.astro/rclone/data/targets/<nome>.env` | Serviço, disco, pasta, o estado da primeira cópia e o da sincronização (`BISYNC_READY`, `TOO_MANY_DELETES`, `BISYNC_FORCE`) |
 | `~/.cache/rclone/bisync/` | Listas de arquivos da última sincronização (fora do backup; se sumirem, a próxima rodada junta os dois lados) |

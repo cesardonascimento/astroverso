@@ -19,7 +19,6 @@ controles virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 | Nome do usuário de jogos | `jogos` |
 | Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela? | `S` |
 | Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
-| Quais discos são de jogos? | (nenhum marcado) |
 
 O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`.
 
@@ -44,12 +43,8 @@ O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistem
 - **Tela do usuário de jogos:** desativa o escurecimento e a suspensão. Com login automático, desativa também o
   bloqueio automático (`lock-enabled false`, `idle-delay 0`); sem ele, a tela bloqueia depois de 5 minutos
   parada. Em nenhum caso o bloqueio manual e a troca de usuário são proibidos (`disable-lock-screen false`).
-- **Discos de jogos:** cria o grupo `jogos` com o usuário de jogos e monta cada disco escolhido em
-  `/srv/<rótulo>` pelo `fstab`, com as regras de `lib/disk.sh` (nada pede senha no boot). NTFS usa o driver do
-  kernel (`ntfs3`). Dono `$USER`, grupo `jogos`, `umask=007`: os dois leem e escrevem, os outros usuários não
-  entram. A pasta principal de cada disco recebe `chmod 770`, porque o `ntfs3` usa a permissão gravada no disco
-  (atributos do WSL) no lugar do `umask`; a permissão fica gravada no disco. O disco aparece no Arquivos (`x-gvfs-show`) e monta antes da sessão do usuário de jogos. Um NTFS
-  marcado como sujo (desligado sem fechar no Windows) não monta: a instalação mostra o `ntfsfix` para corrigir.
+- **Discos de jogos:** não são do sunshine. Ficam em "Discos da máquina" como compartilhados: todos os usuários
+  acessam, eles aparecem no Arquivos e montam antes de qualquer login, inclusive o automático.
 - **Login automático (opcional):** configura o GDM (`custom.conf`) para entrar com o usuário de jogos. Com a
   resposta **N**, tira o login automático dele, e o Sunshine só começa depois que alguém entra com ele na tela.
   Com login automático e senha, o chaveiro do GNOME não é destravado no boot: programas que guardam senhas
@@ -131,7 +126,6 @@ No primeiro acesso ao painel, o Sunshine pede para criar o usuário e a senha de
 ## Remoção
 
 `remove` desativa o serviço, o login automático e a troca de resolução, reativa os alto-falantes, devolve à Intel o
-papel de placa principal, libera os discos de jogos (saem do `fstab` e são desmontados) e tira a rota do Caddy. O
-pacote do Sunshine, o driver da NVIDIA, o grupo `jogos`, os arquivos dos discos e o usuário de jogos (com os jogos e
-os emuladores) são mantidos. `--purge` apaga também
+papel de placa principal e tira a rota do Caddy. O pacote do Sunshine, o driver da NVIDIA, os discos (são da
+máquina) e o usuário de jogos (com os jogos e os emuladores) são mantidos. `--purge` apaga também
 `~/.config/sunshine` do usuário de jogos.

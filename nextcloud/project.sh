@@ -16,7 +16,7 @@ SECRETS="$STATE/data/secrets"
 CONFIG="$STATE/data/html/config/config.php"
 OVERRIDE="$STATE/docker-compose.override.yml"
 MOVE_FROM=""
-DISK_OPTIONS="x-gvfs-hide,x-systemd.before=user@$(id -u).service,context=system_u:object_r:container_file_t:s0"
+NC_DISKS=()
 
 cmd_describe() {
     echo "Nextcloud: nuvem própria para arquivos, fotos, contatos e agenda"
@@ -40,10 +40,41 @@ installed() {
     podman unshare grep -qs "'installed' => true" "$CONFIG"
 }
 
+disks_as_paths() {
+    local item path paths=()
+    for item in $1; do
+        if [[ $item == /* ]]; then
+            paths+=("$item")
+        else
+            path="$(disk_path "$item")"
+            [[ -n $path ]] && paths+=("$path")
+        fi
+    done
+    printf '%s' "${paths[*]}"
+}
+
+choose_disks() {
+    local current=" $1 " target type paths=() labels=() chosen=() picked=() preset="" i
+    while read -r target type; do
+        [[ $current == *" $target "* ]] && preset+="${#paths[@]} "
+        paths+=("$target")
+        labels+=("$(printf '%-28s %s' "$target" "$type")")
+    done < <(disk_mounts)
+    if ((${#paths[@]} == 0)); then
+        ui_info "nenhum disco da máquina em $DISK_ROOT: cadastre em \"Discos da máquina\", no menu principal"
+    else
+        ui_checklist chosen "Quais discos aparecem no Nextcloud?" --selected "$preset" "${labels[@]}"
+        for i in "${chosen[@]}"; do picked+=("${paths[i]}"); done
+    fi
+    sed -i '/^DISKS=/d' "$ENV_FILE"
+    printf "DISKS='%s'\n" "${picked[*]}" >> "$ENV_FILE"
+    ui_ok "${#picked[@]} disco(s) no Nextcloud"
+}
+
 configure() {
     ui_step "Configuração"
     local current_disks
-    current_disks="$(env_get DISKS)"
+    current_disks="$(disks_as_paths "$(env_get DISKS)")"
     if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
     else
@@ -70,10 +101,11 @@ configure() {
         ui_ok "configuração salva em $ENV_FILE"
     fi
     if ! grep -q '^DISKS=' "$ENV_FILE"; then
-        local disks=()
-        disk_choose disks nextcloud "Quais discos guardam arquivos do Nextcloud? (só $USER e o Nextcloud acessam)" "$current_disks"
-        printf "DISKS='%s'\n" "${disks[*]}" >> "$ENV_FILE"
-        ui_ok "${#disks[@]} disco(s) escolhido(s) para o Nextcloud"
+        choose_disks "$current_disks"
+    elif [[ $(env_get DISKS) != "$current_disks" ]]; then
+        sed -i '/^DISKS=/d' "$ENV_FILE"
+        printf "DISKS='%s'\n" "$current_disks" >> "$ENV_FILE"
+        ui_ok "discos do Nextcloud gravados pelo caminho: $current_disks"
     fi
 }
 
@@ -82,18 +114,24 @@ container_uid() {
 }
 
 storage() {
-    local uuids=() path wid service
-    read -ra uuids <<< "$(env_get DISKS)"
-    if cmd_status; then
-        remove_containers
-        ui_ok "containers parados para soltar os discos (sobem de novo logo adiante)"
-    fi
-    disk_setup nextcloud "$DISK_OPTIONS" "${uuids[@]}"
+    local paths=() path wid service
+    read -ra paths <<< "$(env_get DISKS)"
+    NC_DISKS=()
     wid="$(container_uid 33)"
-    for path in "${DISK_MOUNTS[@]}"; do
-        mountpoint -q "$path" || continue
-        sudo chown "$USER:" "$path"
-        sudo chmod 770 "$path"
+    for path in "${paths[@]}"; do
+        if ! mountpoint -q "$path"; then
+            ui_warn "$path não está montado: fica fora do Nextcloud (veja \"Discos da máquina\", no menu principal)"
+            continue
+        fi
+        if ! findmnt -no OPTIONS "$path" | grep -q container_file_t; then
+            ui_warn "$path foi montado sem a liberação para containers: rode \"Discos da máquina\", no menu principal"
+            continue
+        fi
+        NC_DISKS+=("$path")
+        if [[ $(disk_type "$path") == compartilhado ]]; then
+            ui_ok "$path: compartilhado, o Nextcloud acessa como qualquer usuário"
+            continue
+        fi
         if ! getfacl -cp "$path" 2>/dev/null | grep -qx "default:user:$wid:rwx"; then
             ui_info "liberando $path para o Nextcloud (pode demorar se o disco já tiver muitos arquivos)..."
             sudo setfacl -R -m "u:$wid:rwX,u:$USER:rwX" "$path"
@@ -101,7 +139,7 @@ storage() {
         fi
         ui_ok "$path: só $USER e o Nextcloud acessam"
     done
-    if ((${#DISK_MOUNTS[@]} == 0)); then
+    if ((${#NC_DISKS[@]} == 0)); then
         rm -f "$OVERRIDE"
         return
     fi
@@ -109,7 +147,7 @@ storage() {
         printf 'services:\n'
         for service in nextcloud nextcloud-cron; do
             printf '  %s:\n    volumes:\n' "$service"
-            for path in "${DISK_MOUNTS[@]}"; do
+            for path in "${NC_DISKS[@]}"; do
                 printf '      - %s:/mnt/%s\n' "$path" "${path##*/}"
             done
         done
@@ -118,7 +156,7 @@ storage() {
 
 external_storage() {
     local admin=$1 path id datadir wanted=() log
-    for path in "${DISK_MOUNTS[@]}"; do wanted+=("/mnt/${path##*/}"); done
+    for path in "${NC_DISKS[@]}"; do wanted+=("/mnt/${path##*/}"); done
     if ((${#wanted[@]} == 0)) && ! occ app:list --enabled 2>/dev/null | grep -q 'files_external:'; then
         return
     fi
@@ -311,8 +349,8 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "Nextcloud: https://$host (usuário $admin)"
     ui_info "no celular e no computador, use o app do Nextcloud com esse endereço"
-    if ((${#DISK_MOUNTS[@]})); then
-        ui_warn "só as pastas dos discos (${DISK_MOUNTS[*]##*/}) entram no backup; o resto do Nextcloud ($files) não"
+    if ((${#NC_DISKS[@]})); then
+        ui_warn "a pasta dos arquivos ($files) não entra em nenhum backup; os discos (${NC_DISKS[*]##*/}) podem entrar pelo rclone"
         ui_info "no envio automático de fotos do app do celular, escolha uma pasta dentro de um desses discos"
     fi
 }
@@ -331,10 +369,8 @@ cmd_remove() {
         ui_info "nenhum container para remover"
     fi
     proxy_unpublish
-    if [[ -n $(disk_block "$DISK_FSTAB" nextcloud) ]]; then
-        disk_release nextcloud
-    fi
     rm -f "$OVERRIDE"
+    ui_info "os discos continuam montados (\"Discos da máquina\", no menu principal)"
 
     if ! $purge; then
         ui_info "dados mantidos em $STATE/data${files:+ e $files}"

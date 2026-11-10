@@ -98,23 +98,26 @@ cmd_global_actions() {
 }
 
 data_disks() {
-    disk_mounts rclone
+    local skip=${1:-} mount type
+    while read -r mount type; do
+        [[ $mount == "$skip" ]] || printf '%s %s\n' "$mount" "$type"
+    done < <(disk_mounts)
 }
 
 pick_data_disk() {
     local -n __pick_out=$1
-    local title=$2 default=${3:-} mount owner mounts=() labels=() choice
-    while read -r mount owner; do
+    local title=$2 default=${3:-} skip=${4:-} mount type mounts=() labels=() choice
+    while read -r mount type; do
         if [[ $mount == "$default" ]]; then
             mounts=("$mount" "${mounts[@]}")
-            labels=("$mount  (do $owner)" "${labels[@]}")
+            labels=("$mount  ($type)" "${labels[@]}")
         else
             mounts+=("$mount")
-            labels+=("$mount  (do $owner)")
+            labels+=("$mount  ($type)")
         fi
-    done < <(data_disks)
+    done < <(data_disks "$skip")
     if ((${#mounts[@]} == 0)); then
-        ui_fail "nenhum disco de dados montado pelo astro: instale antes um projeto com discos (ex.: nextcloud)"
+        ui_fail "nenhum disco da máquina em $DISK_ROOT: cadastre em \"Discos da máquina\", no menu principal"
     fi
     ui_menu choice "$title" "${labels[@]}"
     __pick_out=${mounts[choice]}
@@ -122,29 +125,35 @@ pick_data_disk() {
 
 configure() {
     ui_step "Configuração"
-    local current_disks
-    current_disks="$(env_get BACKUP_DISKS)"
     if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+        sed -i '/^BACKUP_DISKS=/d' "$ENV_FILE"
         ui_ok "configuração existente mantida"
         return
     fi
     RECONFIGURE=true
-    local disks=() source="" days backup
+    local mount type mounts=("") labels=("Nenhum (só nuvem)") choice current backup_mount source="" days backup
     backup="$(env_get CONFIG_BACKUP)"
-    disk_choose disks rclone "Qual disco recebe o espelho noturno? (deixe vazio para só nuvem)" "$current_disks"
-    if ((${#disks[@]} > 1)); then
-        ui_warn "use um disco só; ficou o primeiro marcado"
-        disks=("${disks[0]}")
-    fi
-    if ((${#disks[@]})); then
-        pick_data_disk source "Qual disco copiar para ele toda noite?" "$(env_get SOURCE)"
+    current="$(env_get BACKUP_MOUNT)"
+    while read -r mount type; do
+        if [[ $mount == "$current" ]]; then
+            mounts=("$mount" "${mounts[@]}")
+            labels=("$mount  ($type)" "${labels[@]}")
+        else
+            mounts+=("$mount")
+            labels+=("$mount  ($type)")
+        fi
+    done < <(disk_mounts)
+    ui_menu choice "Qual disco recebe o espelho noturno?" "${labels[@]}"
+    backup_mount=${mounts[choice]}
+    if [[ -n $backup_mount ]]; then
+        pick_data_disk source "Qual disco copiar para ele toda noite?" "$(env_get SOURCE)" "$backup_mount"
         ui_input days "por quantos dias guardar o que for apagado ou alterado" "$(env_get KEEP_DAYS 30)" is_number
     else
         days=30
     fi
     (
         umask 077
-        printf "BACKUP_DISKS='%s'\nSOURCE='%s'\nKEEP_DAYS='%s'\nCONFIG_BACKUP='%s'\n" "${disks[*]}" "$source" "$days" "$backup" > "$ENV_FILE.new"
+        printf "BACKUP_MOUNT='%s'\nSOURCE='%s'\nKEEP_DAYS='%s'\nCONFIG_BACKUP='%s'\n" "$backup_mount" "$source" "$days" "$backup" > "$ENV_FILE.new"
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     ui_ok "configuração salva em $ENV_FILE"
@@ -165,19 +174,16 @@ install_rclone() {
 }
 
 backup_disk() {
-    local uuids=() mount
-    read -ra uuids <<< "$(env_get BACKUP_DISKS)"
-    disk_setup rclone "x-gvfs-hide,x-systemd.before=user@$(id -u).service" "${uuids[@]}"
-    mount="${DISK_MOUNTS[0]:-}"
-    sed -i '/^BACKUP_MOUNT=/d' "$ENV_FILE"
-    printf "BACKUP_MOUNT='%s'\n" "$mount" >> "$ENV_FILE"
+    local mount
+    mount="$(env_get BACKUP_MOUNT)"
     [[ -n $mount ]] || return 0
-    if mountpoint -q "$mount"; then
-        sudo chown "$USER:" "$mount"
-        sudo chmod 700 "$mount"
-        mkdir -p "$mount/atual" "$mount/versoes"
-        ui_ok "$mount: só $USER acessa (atual/ e versoes/)"
+    if ! mountpoint -q "$mount"; then
+        ui_warn "$mount não está montado: o espelho fica parado até ele voltar (veja \"Discos da máquina\", no menu principal)"
+        return 0
     fi
+    [[ $(disk_type "$mount") == compartilhado ]] && ui_warn "$mount é compartilhado: todos os usuários da máquina leem o espelho"
+    mkdir -p "$mount/atual" "$mount/versoes"
+    ui_ok "espelho noturno em $mount (atual/ e versoes/)"
 }
 
 write_unit() {
@@ -288,7 +294,7 @@ action_add() {
         [[ -f $TARGETS/$name.env ]] || break
         ui_warn "já existe um armazenamento chamado $name"
     done
-    pick_data_disk disk "Em qual disco guardar a cópia de $(provider_describe)?" "$(env_get SOURCE)"
+    pick_data_disk disk "Em qual disco guardar a cópia de $(provider_describe)?" "$(env_get SOURCE)" "$(env_get BACKUP_MOUNT)"
     while true; do
         ui_input folder "pasta dentro de $disk (nunca a raiz do disco)" "$name" is_folder
         folder_in_use "$disk" "$folder" || break
@@ -613,9 +619,6 @@ cmd_remove() {
     done
     systemctl --user daemon-reload
     ui_ok "agendamentos removidos"
-    if [[ -n $(disk_block "$DISK_FSTAB" rclone) ]]; then
-        disk_release rclone
-    fi
     if $purge && [[ -d data ]]; then
         rm -rf data
         ui_ok "configuração da nuvem apagada (rclone/data: logins e armazenamentos)"
