@@ -59,7 +59,7 @@ def ajuda():
     if not acoes:
         return "o catálogo de comandos ainda não foi gerado no servidor"
     linhas = [f"`{a['id']}`{' ⚠️' if a.get('confirmar') else ''} — {a['descricao']}" for a in acoes.values()]
-    return "**Comandos** (`/astro comando:<nome> argumento:<opcional>`; ⚠️ pede confirmação)\n" + "\n".join(linhas)
+    return "**Comandos** (`/astro command:<nome> argument:<opcional>`; ⚠️ pede confirmação)\n" + "\n".join(linhas)
 
 
 async def executar(acao, arg, usuario):
@@ -182,11 +182,12 @@ bot = Bot()
 
 
 @bot.tree.command(name="astro", description="Comandos do servidor astro")
-@app_commands.describe(comando="ex.: rclone:sincronizar (comece a digitar para ver a lista)", argumento="opcional, ex.: proton")
-async def astro(interacao: discord.Interaction, comando: str, argumento: str = ""):
+@app_commands.describe(command="ex.: rclone:sync (comece a digitar para ver a lista)", argument="opcional, ex.: proton")
+async def astro(interacao: discord.Interaction, command: str, argument: str = ""):
+    comando, argumento = command, argument
     if not await bot.autorizado(interacao):
         return
-    if comando == "ajuda":
+    if comando == "help":
         await interacao.response.send_message(ajuda(), ephemeral=True)
         return
     item = catalogo().get(comando)
@@ -205,9 +206,9 @@ async def astro(interacao: discord.Interaction, comando: str, argumento: str = "
     await interacao.followup.send(resultado(comando, argumento, dados))
 
 
-@astro.autocomplete("comando")
+@astro.autocomplete("command")
 async def completar(interacao: discord.Interaction, atual: str):
-    opcoes = [{"id": "ajuda", "descricao": "lista os comandos"}] + list(catalogo().values())
+    opcoes = [{"id": "help", "descricao": "lista os comandos"}] + list(catalogo().values())
     return [
         app_commands.Choice(name=f"{a['id']} — {a['descricao']}"[:100], value=a["id"])
         for a in opcoes if atual.lower() in a["id"].lower()

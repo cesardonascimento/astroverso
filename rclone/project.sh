@@ -42,10 +42,10 @@ cmd_actions() {
 
 cmd_remote_actions() {
     printf '%s\n' \
-        "sincronizar|Sincronizar com a nuvem agora|nao" \
-        "ver-exclusoes|Ver o que a sincronização apagaria (teste sem efeito; argumento: armazenamento)|nao" \
-        "liberar-exclusoes|Liberar as exclusões acima do limite na próxima sincronização (argumento: armazenamento)|sim"
-    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup|Fazer backup das configurações agora|nao"
+        "sync|Sincronizar com a nuvem agora|nao" \
+        "show-deletes|Ver o que a sincronização apagaria (teste sem efeito; argumento: armazenamento)|nao" \
+        "allow-deletes|Liberar as exclusões acima do limite na próxima sincronização (argumento: armazenamento)|sim"
+    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup-configs|Fazer backup das configurações agora|nao"
     return 0
 }
 
@@ -66,22 +66,22 @@ remote_target() {
 cmd_remote() {
     local name
     case "${1:-}" in
-        sincronizar)
+        sync)
             systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
             echo "sincronização iniciada em segundo plano; se der problema, o aviso chega aqui"
             ;;
-        ver-exclusoes)
+        show-deletes)
             remote_target name "${2:-}"
             echo "teste sem efeito em $name (listar a nuvem leva alguns minutos):"
             ./run.sh preview "$name"
             ;;
-        liberar-exclusoes)
+        allow-deletes)
             remote_target name "${2:-}"
             target_set "$name" BISYNC_FORCE yes
             systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
             echo "exclusões liberadas em $name; sincronização iniciada em segundo plano"
             ;;
-        backup)
+        backup-configs)
             [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
             systemctl --user start --no-block "$UNIT_PREFIX-config.service"
             echo "backup das configurações iniciado em segundo plano; se der problema, o aviso chega aqui"
@@ -338,10 +338,20 @@ action_remove() {
 
 action_status() {
     ui_step "Armazenamentos em nuvem"
-    local name at
+    local name at failures
     for name in $(target_names); do
         if [[ $(target_get "$name" IMPORT_DONE) == yes ]]; then
-            ui_ok "$name: $(target_get "$name" DISK)/$(target_get "$name" FOLDER), primeira cópia concluída"
+            failures="$(target_get "$name" FAILURES)"
+            ui_ok "$name: $(target_get "$name" DISK)/$(target_get "$name" FOLDER) ↔ nuvem"
+            if [[ $(target_get "$name" TOO_MANY_DELETES) == yes ]]; then
+                ui_warn "$name: sincronização parada: mais de 5% dos arquivos seriam apagados (libere em \"Sincronizar agora\")"
+            elif ((${failures:-0} >= 3)); then
+                ui_warn "$name: a sincronização falhou $failures vezes seguidas (veja as mensagens abaixo)"
+            elif [[ $(target_get "$name" BISYNC_READY) != yes ]]; then
+                ui_info "$name: a próxima sincronização junta os dois lados, sem apagar nada"
+            else
+                ui_ok "$name: sincronização em dia"
+            fi
         else
             at="$(target_get "$name" IMPORT_AT)"
             [[ $at == manual ]] && at="aguardando \"Sincronizar agora\"" || at="a partir de $(date -d "@$at" '+%d/%m %H:%M')"
@@ -390,7 +400,7 @@ cmd_install() {
     if [[ -n $(target_names) ]]; then
         local name
         for name in $(target_names); do
-            ui_ok "$name ↔ $(target_get "$name" DISK)/$(target_get "$name" FOLDER)"
+            ui_ok "$name ↔ $(target_get "$name" DISK)/$(target_get "$name" FOLDER), sincronizados nos dois sentidos"
         done
     elif ui_confirm "adicionar um armazenamento em nuvem agora?" y; then
         action_add
@@ -403,6 +413,9 @@ cmd_install() {
 
     ui_step "Agendamentos"
     schedules
+    if ! podman container exists astro-discord 2>/dev/null; then
+        ui_info "para receber avisos com botões quando algo der errado, instale também o projeto discord"
+    fi
 }
 
 config_backup_setup() {

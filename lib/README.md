@@ -12,7 +12,7 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável que implem
 | `action <id>` | Executa uma ação listada em `actions` |
 | `global-actions` (opcional) | Como `actions`, mas as ações aparecem no menu principal do `setup.sh` (com o projeto instalado) e rodam com `action <id>` |
 | `restore <pasta>` (opcional) | Troca a configuração pela da pasta extraída do backup (`state_restore`), cuidando do que for do projeto (ex.: carregar o dump do banco), e sobe o serviço de novo |
-| `remote-actions` (opcional) | Ações para o Discord, uma por linha: `id\|Descrição\|sim` (`sim` pede confirmação por botão; senão `nao`). Aparecem como `/astro <projeto>:<id>`. Os nomes `iniciar`, `parar` e `reiniciar` são do executor (containers `astro-<projeto>*`) |
+| `remote-actions` (opcional) | Ações para o Discord, uma por linha: `id\|Descrição\|sim` (`sim` pede confirmação por botão; senão `nao`). Aparecem como `/astro <projeto>:<id>`. Nomes em inglês (`sync`, `backup-configs`). Os nomes `start`, `stop` e `restart` são do executor (containers `astro-<projeto>*`) |
 | `remote <id> [argumento]` (opcional) | Roda uma ação de `remote-actions` sem perguntas e imprime o resultado em texto (vai para o Discord). O argumento já chega validado (`[A-Za-z0-9._-]`, até 64) |
 | `backup` (opcional) | Prepara cópias consistentes (ex.: dump de banco) e imprime, uma por linha, `exclude <caminho>` (fora do backup das configurações), `include <nome> <caminho>` (entra no arquivo do serviço como `<serviço>/<nome>`) ou `add <caminho>` (entra mesmo dentro de um `exclude`). Chamado pelo rclone à 01:00 |
 

@@ -311,6 +311,10 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "Nextcloud: https://$host (usuário $admin)"
     ui_info "no celular e no computador, use o app do Nextcloud com esse endereço"
+    if ((${#DISK_MOUNTS[@]})); then
+        ui_warn "só as pastas dos discos (${DISK_MOUNTS[*]##*/}) entram no backup; o resto do Nextcloud ($files) não"
+        ui_info "no envio automático de fotos do app do celular, escolha uma pasta dentro de um desses discos"
+    fi
 }
 
 cmd_remove() {

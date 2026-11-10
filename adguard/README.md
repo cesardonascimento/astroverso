@@ -15,7 +15,7 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 | Versão base | `adguard/adguardhome:v0.107.80` (fixada na 1ª linha do `Dockerfile`) |
 | Assistente de instalação | Pulado: a config já vem pronta |
 | Login do painel | Perguntado na instalação (senha guardada como hash bcrypt) |
-| Upstreams | DoH Cloudflare, Quad9 e Google em modo **paralelo** |
+| Upstreams | DoH Cloudflare; DoH Google só se o Cloudflare falhar (`fallback_dns`). Bootstrap `1.1.1.1`, `1.0.0.1` e `8.8.8.8` |
 | Cache | 32 MB, otimista, TTL mín. 60s |
 | Segurança | DNSSEC + Safe Browsing ligados |
 | Listas | AdGuard DNS, AdAway, OISD Big, HaGeZi PRO, HaGeZi TIF (StevenBlack incluída, desligada) |

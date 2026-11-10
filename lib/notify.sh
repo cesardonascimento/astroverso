@@ -35,8 +35,12 @@ notify_problem() {
         return 0
     fi
     mkdir -p "$NOTIFY_FLAGS"
-    if notify_send "⚠️ $text" "$@"; then
+    local status=0
+    notify_send "⚠️ $text" "$@" || status=$?
+    if ((status == 0)); then
         touch "$flag"
+    elif ((status == 2)); then
+        ui_info "aviso não enviado (projeto discord não instalado): $text"
     fi
     return 0
 }

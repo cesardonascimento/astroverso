@@ -34,7 +34,8 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 | `fila/saida/<n>.json` | `notify_send` (qualquer projeto) | Aviso e botões, enviados pelo bot ao canal |
 | `fila/tmp/` | todos | Arquivos em escrita: só entram nas outras pastas prontos (`mv`) |
 
-1. `/astro comando:<projeto>:<ação> argumento:<opcional>` ou um botão de um aviso.
+1. `/astro command:<projeto>:<ação> argument:<opcional>` ou um botão de um aviso. Os nomes dos comandos são
+   sempre em inglês.
 2. O bot confere se quem pediu está em `DISCORD_USERS`. Ações marcadas pedem confirmação (botões Confirmar e
    Cancelar).
 3. O bot grava o pedido. O `astro-discord-runner.path` (systemd do usuário) acorda o executor (`runner.sh run`).
@@ -46,14 +47,14 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 
 | Comando | Confirmação | O que faz |
 |---|---|---|
-| `ajuda` | | Lista os comandos |
-| `host:estado` | | Containers do astro, espaço nos discos, kernel novo pendente e próximos agendamentos |
-| `<projeto>:iniciar` | | `podman start` nos containers `astro-<projeto>*` |
-| `<projeto>:parar` | sim | `podman stop`. Com `restart: always`, o container fica parado até `iniciar`, mesmo depois de reiniciar a máquina |
-| `<projeto>:reiniciar` | sim | `podman restart` |
-| `<projeto>:<ação>` | conforme o projeto | Ações de `remote-actions` do projeto (ex.: `rclone:sincronizar`; ver o README de cada um) |
+| `help` | | Lista os comandos |
+| `host:status` | | Containers do astro, espaço nos discos, kernel novo pendente e próximos agendamentos |
+| `<projeto>:start` | | `podman start` nos containers `astro-<projeto>*` |
+| `<projeto>:stop` | sim | `podman stop`. Com `restart: always`, o container fica parado até o `start`, mesmo depois de reiniciar a máquina |
+| `<projeto>:restart` | sim | `podman restart` |
+| `<projeto>:<ação>` | conforme o projeto | Ações de `remote-actions` do projeto (ex.: `rclone:sync`; ver o README de cada um) |
 
-O próprio bot não aparece em `iniciar`/`parar`/`reiniciar`: parado, ele não voltaria pelo Discord.
+O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltaria pelo Discord.
 
 ## Ações (Configurar um projeto instalado)
 

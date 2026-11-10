@@ -9,14 +9,14 @@ source ../lib/env.sh
 FILA="$STATE/fila"
 TIMEOUT=600
 SELF=discord
-CONTAINER_OPS="iniciar parar reiniciar"
+CONTAINER_OPS="start stop restart"
 
 project_containers() {
     podman ps -a --format '{{.Names}}' | grep -E "^astro-$1(-[a-z0-9-]+)?$" | sort -r || true
 }
 
 catalog_lines() {
-    echo "host:estado|Estado da máquina: containers, discos e próximos agendamentos|nao"
+    echo "host:status|Estado da máquina: containers, discos e próximos agendamentos|nao"
     local file name
     for file in ../*/project.sh; do
         name="$(basename "$(dirname "$file")")"
@@ -24,9 +24,9 @@ catalog_lines() {
         "$file" status >/dev/null 2>&1 </dev/null || continue
         if [[ $name != "$SELF" && -n $(project_containers "$name") ]]; then
             printf '%s\n' \
-                "$name:iniciar|Inicia os containers do $name|nao" \
-                "$name:parar|Para os containers do $name (ficam parados até iniciar de novo, mesmo depois de reiniciar a máquina)|sim" \
-                "$name:reiniciar|Reinicia os containers do $name|sim"
+                "$name:start|Inicia os containers do $name|nao" \
+                "$name:stop|Para os containers do $name (ficam parados até o start, mesmo depois de reiniciar a máquina)|sim" \
+                "$name:restart|Reinicia os containers do $name|sim"
         fi
         if grep -q '^    remote-actions)' "$file"; then
             "$file" remote-actions 2>/dev/null </dev/null | sed "s/^/$name:/" || true
@@ -92,9 +92,9 @@ container_op() {
         return 1
     fi
     case $op in
-        iniciar)   podman start "${names[@]}" >/dev/null ;;
-        parar)     podman stop "${names[@]}" >/dev/null ;;
-        reiniciar) podman restart "${names[@]}" >/dev/null ;;
+        start)   podman start "${names[@]}" >/dev/null ;;
+        stop)    podman stop "${names[@]}" >/dev/null ;;
+        restart) podman restart "${names[@]}" >/dev/null ;;
     esac
     podman ps -a --format '{{.Names}}: {{.Status}}' | grep -E "^astro-$project(-[a-z0-9-]+)?:" || true
 }
@@ -130,7 +130,7 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
     ui_info "pedido de $name ($user): $action${arg:+ $arg}"
     project="${action%%:*}"
     op="${action#*:}"
-    if [[ $action == host:estado ]]; then
+    if [[ $action == host:status ]]; then
         output="$(host_status 2>&1)" || status=$?
     elif [[ $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
         output="$(container_op "$project" "$op" 2>&1)" || status=$?

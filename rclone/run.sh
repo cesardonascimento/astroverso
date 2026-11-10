@@ -86,13 +86,13 @@ bisync_target() {
             ui_warn "$name: parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados"
             ui_warn "$name: para apagar mesmo assim, use \"Sincronizar agora\" no assistente"
             notify_problem "$name-exclusoes" "a sincronização do $name parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados. Se foi de propósito (ex.: pasta grande renomeada), libere as exclusões; se não, confira o que sumiu" \
-                "Ver o que seria apagado|rclone:ver-exclusoes|$name" "Liberar exclusões|rclone:liberar-exclusoes|$name"
+                "Ver o que seria apagado|rclone:show-deletes|$name" "Liberar exclusões|rclone:allow-deletes|$name"
         else
             failures=$(( $(target_get "$name" FAILURES) + 1 ))
             target_set "$name" FAILURES "$failures"
             if ((failures >= 3)); then
                 notify_problem "$name-falha" "a sincronização do $name falhou $failures vezes seguidas. Veja \"Ver as últimas execuções\" no assistente do rclone" \
-                    "Tentar de novo|rclone:sincronizar|"
+                    "Tentar de novo|rclone:sync|"
             fi
         fi
         if grep -qiE 'must run --resync|cannot find prior' "$log"; then
@@ -320,7 +320,7 @@ config_backup() {
     ((${#saved[@]})) && ui_ok "versão $version salva e criptografada: ${saved[*]}"
     if ((failed)); then
         notify_problem backup-config "o backup das configurações falhou em parte (salvos: ${saved[*]:-nenhum}). Veja \"Ver as últimas execuções\" no assistente do rclone" \
-            "Tentar de novo|rclone:backup|"
+            "Tentar de novo|rclone:backup-configs|"
         return 1
     fi
     notify_resolved backup-config "o backup das configurações voltou a funcionar"

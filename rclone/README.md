@@ -83,14 +83,15 @@ se resolve:
 | Espelho no disco de backup falhou | Rodada das 03:00 |
 | Backup das configurações falhou | Algum serviço não foi salvo. Botão "Tentar de novo" |
 
-Comandos no Discord (`/astro rclone:<ação> [armazenamento]`; com um só armazenamento, ele pode ficar de fora):
+Comandos no Discord (`/astro command:rclone:<ação> argument:<armazenamento>`; com um só armazenamento, o
+argumento pode ficar de fora):
 
 | Ação | O que faz |
 |---|---|
-| `sincronizar` | Começa uma sincronização em segundo plano |
-| `ver-exclusoes` | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
-| `liberar-exclusoes` | Com confirmação: libera o limite na próxima sincronização e a começa |
-| `backup` | Backup das configurações agora |
+| `sync` | Começa uma sincronização em segundo plano |
+| `show-deletes` | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
+| `allow-deletes` | Com confirmação: libera o limite na próxima sincronização e a começa |
+| `backup-configs` | Backup das configurações agora |
 
 ## Backup das configurações
 
