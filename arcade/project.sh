@@ -32,6 +32,7 @@ ESDE_FILES=(usr/share/es-de/resources/systems/linux/es_systems.xml
     usr/share/applications/org.es_de.frontend.desktop
     usr/share/icons/hicolor/scalable/apps/org.es_de.frontend.svg)
 RETROARCH_APP=org.libretro.RetroArch
+RETROARCH_GL_BRANCH=1.4
 BROWSE_ROOTS=()
 
 cmd_describe() {
@@ -315,6 +316,8 @@ desktop_settings() {
         gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing
+        gsettings set org.gnome.software download-updates false
+        gsettings set org.gnome.software download-updates-notify false
     ' sh "$lock" "$idle" >/dev/null 2>&1
     if [[ $autologin == yes ]]; then
         ui_ok "$user sem bloqueio automático de tela (bloquear e trocar de usuário à mão continuam funcionando)"
@@ -322,6 +325,7 @@ desktop_settings() {
         ui_ok "$user com bloqueio de tela depois de 5 minutos parado"
     fi
     ui_ok "escurecimento e suspensão desativados para $user"
+    ui_ok "Central de Programas de $user sem downloads automáticos (ele não instala atualizações)"
 }
 
 gdm_render() {
@@ -429,12 +433,12 @@ install_sunshine() {
 grant_capture() {
     local bin
     bin="$(readlink -f "$(command -v sunshine)")"
-    if getcap "$bin" | grep -q cap_sys_admin; then
-        ui_ok "Sunshine já autorizado a capturar a tela"
+    if getcap "$bin" | grep -q cap_sys_admin && getcap "$bin" | grep -q cap_sys_nice; then
+        ui_ok "Sunshine já autorizado a capturar a tela, com prioridade alta na placa de vídeo"
         return
     fi
-    sudo setcap cap_sys_admin+p "$bin"
-    ui_ok "Sunshine autorizado a capturar a tela (KMS)"
+    sudo setcap cap_sys_admin,cap_sys_nice+p "$bin"
+    ui_ok "Sunshine autorizado a capturar a tela (KMS) e com prioridade alta na placa de vídeo"
 }
 
 sunshine_unit() {
@@ -631,6 +635,30 @@ install_retroarch() {
         ui_fail "falha ao instalar o RetroArch pelo Flathub"
     fi
     ui_ok "RetroArch instalado (Flatpak $RETROARCH_APP)"
+}
+
+retroarch_gl() {
+    local version ref old log
+    nvidia_pci >/dev/null || return 0
+    version="$(cat /sys/module/nvidia/version 2>/dev/null)" || version=""
+    [[ -n $version ]] || version="$(host_nvidia_version)" || return 0
+    ref="org.freedesktop.Platform.GL.nvidia-${version//./-}"
+    if flatpak info --system "$ref//$RETROARCH_GL_BRANCH" >/dev/null 2>&1; then
+        ui_ok "RetroArch já usa o driver da NVIDIA $version (Flatpak)"
+    else
+        ui_info "instalando no Flatpak o driver da NVIDIA $version, igual ao da máquina..."
+        if ! log="$(sudo flatpak install -y --noninteractive --system flathub "$ref//$RETROARCH_GL_BRANCH" 2>&1)"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_warn "falha ao instalar $ref: o RetroArch não vai usar a NVIDIA"
+            return 0
+        fi
+        ui_ok "RetroArch usa o driver da NVIDIA $version (Flatpak)"
+    fi
+    while read -r old; do
+        [[ -n $old && $old != "$ref" ]] || continue
+        sudo flatpak uninstall -y --noninteractive --system "$old//$RETROARCH_GL_BRANCH" >/dev/null 2>&1 || true
+        ui_ok "driver antigo da NVIDIA tirado do Flatpak (${old#org.freedesktop.Platform.GL.nvidia-})"
+    done < <(flatpak list --system --runtime --columns=application 2>/dev/null | grep '^org\.freedesktop\.Platform\.GL\.nvidia-[0-9]' || true)
 }
 
 update_retroarch() {
@@ -842,6 +870,7 @@ cmd_install() {
 
     ui_step "ES-DE e RetroArch"
     install_retroarch
+    retroarch_gl
     install_esde
     load_retroarch "$user"
     load_esde "$user"
@@ -920,6 +949,7 @@ cmd_action() {
             ui_step "Atualização"
             install_esde
             update_retroarch
+            retroarch_gl
             apply_esde "$user"
             apply_retroarch "$user" 1
             ;;

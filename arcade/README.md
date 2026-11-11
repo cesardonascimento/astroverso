@@ -46,7 +46,9 @@ compartilhados).
   na tela azul do MOK: Enroll MOK → Continue → Yes → senha → Reboot.
 - **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
-- **Usuário de jogos:** cria o usuário sem `sudo` e pula a tela de boas-vindas do GNOME.
+- **Usuário de jogos:** cria o usuário sem `sudo` e pula a tela de boas-vindas do GNOME. A Central de Programas
+  dele fica sem downloads automáticos: ele não pode instalar atualizações, e os downloads disputavam a internet
+  com o stream.
 - **Configuração no `~/.astro` do usuário de jogos:** tudo fica em `~<usuário de jogos>/.astro/arcade`, e os
   lugares que os programas esperam viram atalhos para lá:
 
@@ -80,8 +82,9 @@ compartilhados).
   [github.com/LizardByte/Sunshine/releases](https://github.com/LizardByte/Sunshine/releases), confere o
   SHA-256 publicado pelo GitHub e instala. Se a versão instalada já for a mais recente, não baixa nada.
   Rodar a instalação de novo atualiza o Sunshine.
-- Dá ao binário a permissão `cap_sys_admin`, necessária para capturar a tela pelo KMS. Ela é refeita a
-  cada instalação, porque uma atualização do pacote a apaga.
+- Dá ao binário as permissões `cap_sys_admin`, necessária para capturar a tela pelo KMS, e `cap_sys_nice`,
+  para o Sunshine ter prioridade alta na placa de vídeo enquanto o jogo também a usa. Elas são refeitas a cada
+  instalação, porque uma atualização do pacote as apaga.
 - **Tela no HDMI:** confere se há uma tela ligada na saída da NVIDIA (TV, monitor ou plugue HDMI
   fantasma). Se não houver, avisa: o stream sai pela Intel, sem NVENC, e só com a tampa aberta.
 - **Captura pelo KMS:** grava `capture = kms` no `sunshine.conf`. Sem isso, o Sunshine também tenta o portal
@@ -98,6 +101,10 @@ compartilhados).
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - **RetroArch:** instala o Flatpak `org.libretro.RetroArch` do Flathub para o sistema todo (o pacote do
   Fedora traz poucos núcleos), adicionando ou ativando o repositório Flathub se ele faltar ou vier desativado. Precisa do `flatpak`.
+  Com placa NVIDIA, instala no Flatpak o driver GL da mesma versão do driver da máquina
+  (`org.freedesktop.Platform.GL.nvidia-<versão>`) e tira os antigos: sem ele, o RetroArch não usa a NVIDIA.
+  Isso é refeito na instalação e na ação "Atualizar ES-DE, RetroArch e núcleos". Depois de uma atualização do
+  driver (pela atualização do sistema), rode uma delas.
 - **ES-DE:** baixa o `ES-DE_x64.AppImage` da versão mais recente pela API do GitLab do projeto, confere o
   SHA-256 publicado lá e instala em `/usr/local/bin/es-de`, com o atalho e o ícone no menu de aplicativos. De
   dentro do AppImage, guarda em `/usr/local/share/astro-arcade/es_systems.xml` a lista de sistemas da versão
@@ -179,7 +186,7 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 | Carregar uma configuração do ES-DE | Copia uma pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
 | Carregar gamelists | Copia uma pasta de gamelists para `es-de/gamelists` |
 | Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
-| Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak e baixa todos os núcleos de novo |
+| Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak (com o driver GL da NVIDIA igual ao da máquina) e baixa todos os núcleos de novo |
 
 ## Backup
 
