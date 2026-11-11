@@ -45,6 +45,7 @@ cmd_remote_actions() {
         "show-deletes|Ver o que a sincronização apagaria (teste sem efeito; argumento: armazenamento)|nao" \
         "allow-deletes|Liberar as exclusões acima do limite na próxima sincronização (argumento: armazenamento)|sim"
     [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup-configs|Fazer backup das configurações agora|nao"
+    [[ -n $(env_get BACKUP_MOUNT) ]] && echo "mirror|Espelhar agora no disco de backup (sincroniza com a nuvem antes, como às 03:00)|nao"
     return 0
 }
 
@@ -84,6 +85,11 @@ cmd_remote() {
             [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
             systemctl --user start --no-block "$UNIT_PREFIX-config.service"
             echo "backup das configurações iniciado em segundo plano; se der problema, o aviso chega aqui"
+            ;;
+        mirror)
+            [[ -n $(env_get BACKUP_MOUNT) ]] || ui_fail "disco de backup não configurado"
+            systemctl --user start --no-block "$UNIT_PREFIX-local.service"
+            echo "espelho em $(env_get BACKUP_MOUNT) iniciado em segundo plano (depois da sincronização com a nuvem); o início e o fim chegam aqui"
             ;;
         *) ui_fail "ação desconhecida: ${1:-}" ;;
     esac

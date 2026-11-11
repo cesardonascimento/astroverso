@@ -68,7 +68,7 @@ silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
 | Rotina | Início | Sucesso | Falha |
 |---|---|---|---|
 | Backup das configurações (01:00) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
-| Rodada das 03:00 (nuvem e espelho) | sim | sim, com o resumo e o tempo | sim, com o erro |
+| Rodada das 03:00 (nuvem e espelho; também `/astro rclone:mirror`) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
 | Sincronização com a nuvem (a cada 30 minutos, "Sincronizar agora" e o botão do Discord; inclui a primeira cópia) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
 | Disco não montado, exclusões acima de 5%, estado perdido | — | quando volta ao normal | uma vez por dia, com os botões de cada caso |
 
@@ -112,6 +112,7 @@ argumento pode ficar de fora):
 | `show-deletes` | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
 | `allow-deletes` | Com confirmação: libera o limite na próxima sincronização e a começa |
 | `backup-configs` | Backup das configurações agora |
+| `mirror` | A rodada das 03:00 agora: sincroniza com a nuvem e espelha o disco no disco de backup (só com disco de backup) |
 
 ## Backup das configurações
 

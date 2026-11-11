@@ -368,7 +368,7 @@ config_backup() {
 
 case "${1:-}" in
     tick)    lock skip; routine "sincronização com a nuvem" rclone:sync run_targets tick ;;
-    local)   lock wait; routine "rodada das 03:00 (nuvem e espelho no disco de backup)" "" local_run ;;
+    local)   lock wait; routine "rodada das 03:00 (nuvem e espelho no disco de backup)" rclone:mirror local_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
     config)  lock wait "$CONFIG_LOCK"; routine "backup das configurações" rclone:backup-configs config_backup "${2:-}" ;;
     *)       ui_fail "uso: $0 tick | local | config [rótulo] | preview <armazenamento>" ;;
