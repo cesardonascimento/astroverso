@@ -223,6 +223,9 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
   `auto noauto`) e pode separá-las da marca `# astro`. O `lib/disk.sh` reconhece as linhas do Astro também pela
   assinatura (`fstab`: destino em `/srv/` com `x-udisks-auth` e `container_file_t`; `crypttab`: `luks-*` com
   `headless=true`) e só emparelha marca e linha quando a linha tem o UUID da marca (`\x2d` no LUKS).
+- A tela de login (GDM) tem a própria configuração de energia e, no padrão do Fedora, suspende depois de ~15 min
+  sem ninguém logado, mesmo na tomada. O `host_no_sleep` grava `/etc/dconf/db/gdm.d/95-astro-power` (`dconf
+  update`); com os alvos mascarados, ela só mostra "The system will suspend now!" e o logind recusa.
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
 - `rclone bisync` com `--resilient` não pede `--resync` quando as listas somem ("cannot find prior Path1 or Path2
   listings"): tenta para sempre. O `run.sh` detecta essa mensagem e a de "must run --resync" e faz a junção.

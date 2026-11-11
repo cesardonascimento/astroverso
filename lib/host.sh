@@ -3,6 +3,7 @@ export PODMAN_COMPOSE_WARNING_LOGS=false
 HOST_PORTS_CONF=/etc/sysctl.d/99-astro.conf
 HOST_FORWARD_CONF=/etc/sysctl.d/99-astro-tailscale.conf
 HOST_SSH_CONF=/etc/ssh/sshd_config.d/10-astro.conf
+HOST_GDM_POWER=/etc/dconf/db/gdm.d/95-astro-power
 
 host_compose() {
     if podman compose version >/dev/null 2>&1; then
@@ -216,7 +217,16 @@ host_no_sleep() {
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing 2>/dev/null || true
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type nothing 2>/dev/null || true
     fi
-    ui_ok "suspensão e hibernação desativadas, inclusive ao fechar a tampa"
+
+    local wanted
+    wanted="$(printf '%s\n' '[org/gnome/settings-daemon/plugins/power]' \
+        "sleep-inactive-ac-type='nothing'" "sleep-inactive-battery-type='nothing'")"
+    if [[ -d ${HOST_GDM_POWER%/*} ]] && command -v dconf >/dev/null \
+        && [[ $(cat "$HOST_GDM_POWER" 2>/dev/null) != "$wanted" ]]; then
+        printf '%s\n' "$wanted" | sudo tee "$HOST_GDM_POWER" >/dev/null
+        sudo dconf update
+    fi
+    ui_ok "suspensão e hibernação desativadas, inclusive ao fechar a tampa e na tela de login"
 }
 
 host_upgrade() {
@@ -253,6 +263,10 @@ host_undo() {
         && gsettings list-schemas 2>/dev/null | grep -qx org.gnome.settings-daemon.plugins.power; then
         gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 2>/dev/null || true
         gsettings reset org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 2>/dev/null || true
+    fi
+    if [[ -f $HOST_GDM_POWER ]]; then
+        sudo rm -f "$HOST_GDM_POWER"
+        sudo dconf update
     fi
     ui_ok "suspensão e tampa de volta ao padrão do sistema"
 

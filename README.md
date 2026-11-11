@@ -58,7 +58,7 @@ desse usuário.
 
 ### Máquina
 
-Feita uma vez, no início, para todos os projetos: suspensão desligada, podman-compose, início dos containers no
+Feita uma vez, no início, para todos os projetos: suspensão desligada (inclusive na tela de login), podman-compose, início dos containers no
 boot, SSH e Tailscale.
 
 - **Anunciar a rede local no Tailscale?** Transforma o servidor em ponte para a rede de casa: de fora,
