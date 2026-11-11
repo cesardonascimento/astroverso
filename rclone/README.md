@@ -56,6 +56,10 @@ mexem pela nuvem (ex.: uma pasta compartilhada com outras pessoas). O `rclone bi
 
 Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: pode passar dos 5%.
 
+A cópia e a sincronização com a nuvem rodam por `podman unshare`, como o espelho no disco: assim o rclone consegue
+acertar a data e substituir arquivos que o Nextcloud gravou no disco (donos do container). Uma falha na primeira
+cópia avisa no Discord (uma vez por dia), com o botão "Tentar de novo"; outro aviso chega quando ela termina.
+
 ## Travas
 
 - Nada roda se o disco não estiver montado. Sem o disco, a pasta fica vazia, e espelhar uma pasta vazia

@@ -229,6 +229,9 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
 - O Flatpak só usa a NVIDIA com a extensão `org.freedesktop.Platform.GL.nvidia-<versão>` igual à do driver
   carregado. Depois de uma atualização do driver, a antiga não serve, e o app cai para a Intel/CPU (stutter no
   stream). A Central de Programas de um usuário sem `sudo` tenta instalar a nova e falha ("Deploy not allowed").
+- Arquivos gravados pelo Nextcloud num disco (ex.: envio de fotos do celular) ficam com o `www-data` do container
+  como dono (`524320` no host). A ACL deixa quem instala gravar, mas só o dono muda a data (`chtimes: operation
+  not permitted`): o rclone da nuvem roda por `podman unshare` (`rclone_owner`), como o espelho do disco.
 - O Brave e o Chrome no Linux ignoram as CAs do sistema (usam o repositório NSS próprio).
 - `rclone bisync` com `--resilient` não pede `--resync` quando as listas somem ("cannot find prior Path1 or Path2
   listings"): tenta para sempre. O `run.sh` detecta essa mensagem e a de "must run --resync" e faz a junção.

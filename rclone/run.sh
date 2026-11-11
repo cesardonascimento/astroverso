@@ -13,6 +13,10 @@ CONFIG_KEY="${ASTRO_BACKUP_KEY:-$CONFIG_KEY}"
 MAX_DELETE=5
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
+rclone_owner() {
+    podman unshare rclone --config "$RCLONE_CONF" "$@"
+}
+
 lock() {
     [[ ${ASTRO_LOCKED:-} == 1 ]] && return 0
     exec 9>"${2:-$LOCK}"
@@ -56,12 +60,20 @@ import_target() {
     fi
     mkdir -p "$LOCAL"
     ui_step "$name: primeira cópia $REMOTE → $LOCAL (continua de onde parou)"
-    if ! rclone_run copy "$REMOTE" "$LOCAL" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}"; then
+    local log error
+    log="$(mktemp)"
+    if ! rclone_owner copy "$REMOTE" "$LOCAL" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 | tee "$log"; then
+        error="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -oE '(Failed to copy|ERROR) *: .*' | tail -1)" || true
+        rm -f "$log"
         ui_error "$name: primeira cópia interrompida, a próxima rodada continua"
+        notify_problem "$name-importacao" "a primeira cópia do $name (nuvem → disco) parou com erro${error:+: $error}. A próxima rodada continua de onde parou" \
+            "Tentar de novo|rclone:sync|"
         return 1
     fi
+    rm -f "$log"
     target_set "$name" IMPORT_DONE yes
     target_set "$name" BISYNC_READY no
+    notify_resolved "$name-importacao" "a primeira cópia do $name terminou; a sincronização nos dois sentidos começa na próxima rodada"
     ui_ok "$name: primeira cópia concluída; a sincronização nos dois sentidos está ativa"
 }
 
@@ -81,7 +93,7 @@ bisync_target() {
         target_set "$name" BISYNC_FORCE no
     fi
     log="$(mktemp)"
-    if ! rclone_run bisync "$LOCAL" "$REMOTE" "${options[@]}" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 \
+    if ! rclone_owner bisync "$LOCAL" "$REMOTE" "${options[@]}" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 \
             | tee "$log"; then
         if grep -qi 'too many deletes' "$log"; then
             target_set "$name" TOO_MANY_DELETES yes
@@ -125,7 +137,7 @@ preview_target() {
     [[ $(target_get "$name" BISYNC_READY) == yes ]] || ui_fail "$name ainda não tem uma sincronização completa para comparar"
     local log
     log="$(mktemp)"
-    if ! rclone_run bisync "$LOCAL" "$REMOTE" --dry-run --force --resilient --recover --max-lock 2h --exclude '*.partial' \
+    if ! rclone_owner bisync "$LOCAL" "$REMOTE" --dry-run --force --resilient --recover --max-lock 2h --exclude '*.partial' \
             --log-level NOTICE "${PROVIDER_OPTIONS[@]}" > "$log" 2>&1; then
         sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -E 'ERROR|critical' | tail -5
         rm -f "$log"
