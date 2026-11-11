@@ -960,6 +960,7 @@ cmd_install() {
     capture_settings "$user"
     origin_settings "$user" "$host"
     display_switch "$user"
+    emulation "$user" sunshine-apps "$(games_home "$user")/.astro/arcade/sunshine/apps.json" "$ESDE_BIN"
     speakers_setup "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"

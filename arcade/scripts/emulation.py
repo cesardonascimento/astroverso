@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 import sys
@@ -185,6 +186,39 @@ def cores(bundled_path, cores_dir, update, rom_dirs):
         say("info", f"sem núcleo do RetroArch por padrão (emulador próprio, fica para depois): {', '.join(without)}")
 
 
+SUNSHINE_DEFAULTS = {"Low Res Desktop", "Steam Big Picture"}
+
+
+def sunshine_apps(path, esde_bin):
+    data = {"env": {"PATH": "$(PATH):$(HOME)/.local/bin"}, "apps": []}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    before = json.dumps(data, sort_keys=True)
+    apps = [app for app in data.get("apps", []) if app.get("name") not in SUNSHINE_DEFAULTS]
+    if not any(app.get("name") == "Desktop" for app in apps):
+        apps.insert(0, {"name": "Desktop", "image-path": "desktop.png"})
+    esde = {"name": "ES-DE", "cmd": esde_bin, "auto-detach": "true", "wait-all": "true"}
+    cover = os.path.join(os.path.dirname(path), "covers", "es-de.png")
+    if os.path.exists(cover):
+        esde["image-path"] = cover
+    apps = [app for app in apps if app.get("name") != "ES-DE"]
+    desktop = next(i for i, app in enumerate(apps) if app.get("name") == "Desktop")
+    apps.insert(desktop + 1, esde)
+    data["apps"] = apps
+    if json.dumps(data, sort_keys=True) == before:
+        say("ok", "apps do Sunshine já configurados (Desktop e ES-DE)")
+        return
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".new", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(path + ".new", path)
+    say("ok", "apps do Sunshine: " + ", ".join(app.get("name", "?") for app in apps))
+    if "image-path" not in esde:
+        say("info", f"sem capa do ES-DE: coloque uma imagem PNG em pé (2:3) em {cover} e reinstale o arcade")
+
+
 def main():
     command, args = sys.argv[1], sys.argv[2:]
     if command == "settings":
@@ -193,6 +227,8 @@ def main():
         retroarch_cfg(*args)
     elif command == "systems":
         custom_systems(args[0], args[1], args[2:])
+    elif command == "sunshine-apps":
+        sunshine_apps(*args)
     elif command == "cores":
         cores(args[0], args[1], args[2], args[3:])
     else:

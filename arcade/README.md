@@ -99,6 +99,10 @@ compartilhados).
   `astro-arcade-speakers` no usuário de jogos, que sobe com a sessão dele e deixa mudas as saídas de som internas
   (alto-falante e fone; HDMI fica de fora) com o `wpctl`. Assim funciona desde o primeiro boot, sem rodar a
   instalação de novo. Durante o stream, o som vai para a saída virtual do Sunshine e não é afetado.
+- **Apps no Moonlight:** o `apps.json` do Sunshine fica com **Desktop** e **ES-DE** (`/usr/local/bin/es-de`,
+  `auto-detach`). Os apps de fábrica que não servem aqui ("Low Res Desktop", com `xrandr`, e "Steam Big Picture")
+  saem; um app criado pelo painel é mantido. A capa do ES-DE é `~/.config/sunshine/covers/es-de.png` do usuário de
+  jogos (PNG em pé, 2:3), usada se existir; ela entra no backup das configurações com a pasta do Sunshine.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
