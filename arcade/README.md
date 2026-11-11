@@ -27,8 +27,11 @@ tela do usuário de jogos.
 | Endereço do Sunshine no Caddy | `sunshine.<nome-da-máquina>.<domínio do caddy>` |
 | Onde está a pasta de mídias do ES-DE? | (sem padrão: navegar pelos discos) |
 | Onde estão as ROMs? (uma ou mais pastas) | (sem padrão: navegar pelos discos) |
-| Carregar uma configuração existente do RetroArch? | `N` (só com a configuração local vazia) |
-| Carregar uma configuração existente do ES-DE? | `N` (só com a configuração local vazia) |
+| Guardar o RetroArch e o ES-DE todas as noites? | `S` |
+| Pasta do backup do RetroArch e do ES-DE | `Arcade` ao lado da pasta do backup das configurações do rclone (ex.: `<disco>/proton/Astro/Arcade`), ou `<primeiro disco privado>/Astro/Arcade` |
+| Restaurar o RetroArch/ES-DE do backup em `<pasta>`? | `S` (só com a configuração local vazia e o backup com arquivos) |
+| Carregar uma configuração existente do RetroArch? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
+| Carregar uma configuração existente do ES-DE? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
 | Carregar gamelists existentes? | `N` (só com as gamelists locais vazias) |
 
 O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`. Se o `.env`
@@ -182,17 +185,34 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 
 | Ação | O que faz |
 |---|---|
-| Carregar uma configuração do RetroArch | Copia uma pasta de configuração para a local (sem `.dll`/`.exe`) e limpa o `retroarch.cfg` |
-| Carregar uma configuração do ES-DE | Copia uma pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
+| Carregar uma configuração do RetroArch | Copia o backup (se houver) ou outra pasta de configuração para a local (sem `.dll`/`.exe`) e limpa o `retroarch.cfg` |
+| Carregar uma configuração do ES-DE | Copia o backup (se houver) ou outra pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
 | Carregar gamelists | Copia uma pasta de gamelists para `es-de/gamelists` |
 | Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
 | Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak (com o driver GL da NVIDIA igual ao da máquina) e baixa todos os núcleos de novo |
 
 ## Backup
 
-No backup das configurações (rclone) entram só o Sunshine (`sunshine/`, sem os logs), o `retroarch.cfg` e o
-`es_settings.xml` do usuário de jogos. Saves, states, BIOS, temas, núcleos e gamelists ficam de fora. Na
-restauração, o Sunshine é parado, os arquivos voltam com o dono certo (`sudo`) e ele sobe de novo.
+No backup das configurações (rclone, criptografado) entram só o Sunshine (`sunshine/`, sem os logs), o
+`retroarch.cfg` e o `es_settings.xml` do usuário de jogos. Na restauração, o Sunshine é parado, os arquivos voltam
+com o dono certo (`sudo`) e ele sobe de novo.
+
+O resto vai para a **pasta do backup do RetroArch e do ES-DE** (`ARCADE_BACKUP`), uma cópia comum, sem
+criptografia, feita pelo comando `backup` do projeto, que o rclone chama à 01:00 (e no "Fazer backup agora" e no
+"Implodir Astro"). É um `rclone sync` incremental de `~<usuário de jogos>/.astro/arcade`, lido pela ACL, sem `sudo`:
+
+| Pasta | O que entra |
+|---|---|
+| `retroarch/` | `retroarch.cfg`, `saves/`, `states/`, `system/` (BIOS), `config/` (overrides e remaps), `playlists/`, `screenshots/`, `records/` |
+| `es-de/` | `settings/`, `collections/`, `gamelists/`, `themes/` |
+
+Núcleos, assets, shaders, `custom_systems` e logs ficam de fora: o Astro e os programas os refazem. Dentro da
+pasta da nuvem, a cópia segue para ela e para o disco de backup nas rodadas das 03:00 (com as versões delas). Uma
+falha (disco desmontado, rclone ausente) marca o backup das configurações como falho, e o "Implodir Astro" não
+continua.
+
+Na instalação, com a configuração local vazia e o backup com arquivos, o assistente oferece restaurar dele. As
+ações "Carregar uma configuração do RetroArch/ES-DE" também oferecem o backup primeiro.
 
 ## Remoção
 

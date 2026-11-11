@@ -150,6 +150,13 @@ fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca 
 - **Onde estão as ROMs?** Uma pasta com uma subpasta por sistema (`snes`, `psx`...). Pode escolher mais de uma
   (ex.: uma por disco): a primeira é a principal do ES-DE, e os sistemas das outras aparecem do mesmo jeito.
   As ROMs também ficam onde estão.
+- **Guardar o RetroArch e o ES-DE todas as noites?** Copia, toda noite à 01:00, o que é seu no RetroArch
+  (configuração, saves, states, BIOS, capturas e gravações) e no ES-DE (configuração, coleções, gamelists e
+  temas) para uma pasta comum. Por padrão, **S**.
+  - **Pasta do backup do RetroArch e do ES-DE:** por padrão, `Arcade` ao lado do backup das configurações do
+    rclone, dentro da pasta da nuvem: assim a cópia segue para a nuvem e para o disco de backup.
+- **Restaurar o RetroArch/ES-DE do backup?** Só aparece numa instalação nova, com o backup cheio. Com **S** (padrão),
+  tudo volta como estava, inclusive saves e gamelists.
 - **Carregar uma configuração existente do RetroArch?** Só aparece na primeira vez. Com **S**, você escolhe a
   pasta de outra instalação (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
   jogos. Uma configuração do Windows serve: caminhos e drivers do Windows são limpos.

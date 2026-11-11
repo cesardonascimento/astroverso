@@ -34,6 +34,12 @@ ESDE_FILES=(usr/share/es-de/resources/systems/linux/es_systems.xml
 RETROARCH_APP=org.libretro.RetroArch
 RETROARCH_GL_BRANCH=1.4
 BROWSE_ROOTS=()
+ARCADE_BACKUP_FILTER=(
+    "+ /retroarch/retroarch.cfg" "+ /retroarch/saves/**" "+ /retroarch/states/**" "+ /retroarch/system/**"
+    "+ /retroarch/config/**" "+ /retroarch/playlists/**" "+ /retroarch/screenshots/**" "+ /retroarch/records/**"
+    "+ /es-de/settings/**" "+ /es-de/collections/**" "+ /es-de/gamelists/**" "+ /es-de/themes/**"
+    "- *"
+)
 
 cmd_describe() {
     echo "Arcade: ES-DE e RetroArch num usuário de jogos próprio, transmitidos pelo Sunshine para o Moonlight"
@@ -93,6 +99,12 @@ rom_dirs() {
 browse_roots() {
     local mount type others=()
     BROWSE_ROOTS=()
+ARCADE_BACKUP_FILTER=(
+    "+ /retroarch/retroarch.cfg" "+ /retroarch/saves/**" "+ /retroarch/states/**" "+ /retroarch/system/**"
+    "+ /retroarch/config/**" "+ /retroarch/playlists/**" "+ /retroarch/screenshots/**" "+ /retroarch/records/**"
+    "+ /es-de/settings/**" "+ /es-de/collections/**" "+ /es-de/gamelists/**" "+ /es-de/themes/**"
+    "- *"
+)
     while read -r mount type; do
         if [[ $type == compartilhado ]]; then
             BROWSE_ROOTS+=("$mount")
@@ -167,6 +179,48 @@ choose_roms() {
     env_put ROM_DIRS "$(IFS='|'; printf '%s' "${dirs[*]}")"
 }
 
+backup_default() {
+    local dest disk
+    dest="$(env_get CONFIG_BACKUP "" "$ASTRO_HOME/rclone/.env")"
+    if [[ -n $dest ]]; then
+        printf '%s/Arcade' "${dest%/*}"
+        return 0
+    fi
+    disk="$(disk_mounts | awk '$2 == "privado" { print $1; exit }')"
+    [[ -z $disk ]] || printf '%s/Astro/Arcade' "$disk"
+    return 0
+}
+
+choose_backup() {
+    local dest default
+    default="$(env_get ARCADE_BACKUP "$(backup_default)")"
+    ui_info "toda noite, à 01:00, o RetroArch (configuração, saves, states, BIOS, capturas e gravações) e o ES-DE"
+    ui_info "(configuração, coleções, gamelists e temas) são copiados para uma pasta, que também serve para restaurar"
+    if ! ui_confirm "guardar o RetroArch e o ES-DE todas as noites?" y; then
+        env_put ARCADE_BACKUP ""
+        ui_info "sem backup do RetroArch e do ES-DE"
+        return
+    fi
+    while true; do
+        ui_input dest "pasta do backup do RetroArch e do ES-DE" "$default" is_path
+        if mkdir -p "$dest" 2>/dev/null && [[ -w $dest ]]; then
+            break
+        fi
+        ui_warn "não foi possível gravar em $dest: escolha outra pasta"
+    done
+    env_put ARCADE_BACKUP "$dest"
+    ui_ok "backup do RetroArch e do ES-DE em $dest"
+}
+
+backup_folder() {
+    local dir
+    dir="$(env_get ARCADE_BACKUP)"
+    if [[ -n $dir ]] && has_files "$dir/$1"; then
+        printf '%s' "$dir/$1"
+    fi
+    return 0
+}
+
 configure() {
     ui_step "Configuração"
     local saved default user host domain autologin_current
@@ -175,6 +229,7 @@ configure() {
         ui_warn "o usuário de jogos $saved não existe nesta máquina: responda a configuração de novo"
     elif [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
         ui_ok "configuração existente mantida"
+        grep -q '^ARCADE_BACKUP=' "$ENV_FILE" || choose_backup
         return
     fi
     default=$GAMES_DEFAULT
@@ -186,19 +241,22 @@ configure() {
         check_games_user "$user" && break
     done
     ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine.$(hostname -s)${domain:+.$domain}")" is_hostname
-    local media roms
+    local media roms backup
     media="$(env_get MEDIA_DIR)"
     roms="$(env_get ROM_DIRS)"
+    backup="$(env_get ARCADE_BACKUP)"
     (
         umask 077
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\nAUTOLOGIN='%s'\n" "$user" "$host" "$autologin_current" > "$ENV_FILE.new"
         [[ -z $media ]] || printf "MEDIA_DIR='%s'\n" "$media" >> "$ENV_FILE.new"
         [[ -z $roms ]] || printf "ROM_DIRS='%s'\n" "$roms" >> "$ENV_FILE.new"
+        [[ -z $backup ]] || printf "ARCADE_BACKUP='%s'\n" "$backup" >> "$ENV_FILE.new"
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     choose_autologin
     choose_media
     choose_roms
+    choose_backup
     ui_ok "configuração salva em $ENV_FILE"
 }
 
@@ -769,27 +827,43 @@ has_files() {
 }
 
 load_retroarch() {
-    local user=$1 force=${2:-false} target source
+    local user=$1 force=${2:-false} target source="" backup
     target="$(games_home "$user")/.astro/arcade/retroarch"
+    backup="$(backup_folder retroarch)"
     if ! $force; then
         [[ -e $target/retroarch.cfg ]] && return 0
-        ui_confirm "carregar uma configuração existente do RetroArch (retroarch.cfg, saves, states, BIOS...)?" n || return 0
+        if [[ -n $backup ]] && ui_confirm "restaurar o RetroArch do backup em $backup?" y; then
+            source=$backup
+        elif ! ui_confirm "carregar uma configuração existente do RetroArch (retroarch.cfg, saves, states, BIOS...)?" n; then
+            return 0
+        fi
+    elif [[ -n $backup ]] && ui_confirm "carregar o RetroArch do backup em $backup?" y; then
+        source=$backup
     fi
-    ui_browse source "Qual a pasta de configuração do RetroArch?" "${BROWSE_ROOTS[@]}"
+    [[ -n $source ]] || ui_browse source "Qual a pasta de configuração do RetroArch?" "${BROWSE_ROOTS[@]}"
     [[ -e $source/retroarch.cfg ]] || ui_warn "$source não tem retroarch.cfg: copiando o resto assim mesmo"
     import_folder "$user" "$source" "$target" '*.dll' '*.exe'
     ui_ok "configuração do RetroArch carregada de $source (sem os .dll e .exe do Windows)"
 }
 
 load_esde() {
-    local user=$1 force=${2:-false} target source
+    local user=$1 force=${2:-false} target source="" backup
     target="$(games_home "$user")/.astro/arcade/es-de"
+    backup="$(backup_folder es-de)"
     if ! $force; then
         [[ -e $target/settings/es_settings.xml ]] && return 0
-        ui_confirm "carregar uma configuração existente do ES-DE (settings, temas, coleções...)?" n || return 0
+        if [[ -n $backup ]] && ui_confirm "restaurar o ES-DE do backup em $backup (com gamelists e temas)?" y; then
+            source=$backup
+        elif ! ui_confirm "carregar uma configuração existente do ES-DE (settings, temas, coleções...)?" n; then
+            return 0
+        fi
+    elif [[ -n $backup ]] && ui_confirm "carregar o ES-DE do backup em $backup (com gamelists e temas)?" y; then
+        source=$backup
     fi
-    ui_info "é a pasta de dados do ES-DE, com settings/ dentro (no Windows, a pasta ES-DE ao lado do ES-DE.exe)"
-    ui_browse source "Qual a pasta de configuração do ES-DE?" "${BROWSE_ROOTS[@]}"
+    if [[ -z $source ]]; then
+        ui_info "é a pasta de dados do ES-DE, com settings/ dentro (no Windows, a pasta ES-DE ao lado do ES-DE.exe)"
+        ui_browse source "Qual a pasta de configuração do ES-DE?" "${BROWSE_ROOTS[@]}"
+    fi
     if [[ ! -d $source/settings && -d $source/ES-DE/settings ]]; then
         source="$source/ES-DE"
         ui_info "usando $source, que tem a pasta settings/"
@@ -1019,6 +1093,29 @@ cmd_remove() {
     ui_info "mantidos: pacote do Sunshine, RetroArch (Flatpak) e driver da NVIDIA"
 }
 
+arcade_sync() {
+    local base=$1 dest disk log
+    dest="$(env_get ARCADE_BACKUP)"
+    [[ -n $dest ]] || return 0
+    disk="$(cut -d/ -f1-3 <<< "$dest")"
+    if [[ $disk == "$DISK_ROOT"/* ]] && ! mountpoint -q "$disk"; then
+        ui_error "$disk não está montado: o backup do RetroArch e do ES-DE não foi feito"
+        return 1
+    fi
+    if ! command -v rclone >/dev/null; then
+        ui_error "o backup do RetroArch e do ES-DE precisa do rclone: instale o Astro de novo"
+        return 1
+    fi
+    mkdir -p "$dest"
+    if ! log="$(rclone --config /dev/null sync "$base" "$dest" --skip-links --log-level ERROR \
+            --filter-from <(printf '%s\n' "${ARCADE_BACKUP_FILTER[@]}") 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix
+        ui_error "o backup do RetroArch e do ES-DE em $dest falhou"
+        return 1
+    fi
+    ui_ok "RetroArch e ES-DE copiados para $dest"
+}
+
 cmd_backup() {
     local user base
     user="$(env_get GAMES_USER)"
@@ -1028,6 +1125,7 @@ cmd_backup() {
         ui_warn "sem leitura em ~$user/.astro/arcade: rode a instalação do arcade" >&2
         return 0
     fi
+    arcade_sync "$base" >&2 || return 1
     if [[ -d $base/sunshine ]]; then
         printf 'include sunshine %s\nexclude %s\n' "$base/sunshine" "$base/sunshine/sunshine.log*"
     fi
