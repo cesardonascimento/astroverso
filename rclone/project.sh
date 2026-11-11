@@ -219,7 +219,7 @@ timer_unit() {
     printf 'Persistent=true\n\n[Install]\nWantedBy=timers.target\n'
 }
 
-schedules() {
+write_units() {
     mkdir -p "$UNIT_DIR"
     write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "sincronização com a nuvem" tick)"
     write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "sincronização com a nuvem" "${TICK_CALENDAR[@]}")"
@@ -228,6 +228,10 @@ schedules() {
     write_unit "$UNIT_PREFIX-config.service" "$(service_unit "backup das configurações" config)"
     write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "backup das configurações" "$CONFIG_CALENDAR")"
     systemctl --user daemon-reload
+}
+
+schedules() {
+    write_units
     systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer"
     ui_ok "nuvem: sincronização nos dois sentidos a cada 30 minutos, das 08:00 às 20:00, e às 03:00"
     if [[ -n $(env_get CONFIG_BACKUP) ]]; then
@@ -406,6 +410,7 @@ cmd_install() {
 
     ui_step "Host"
     install_rclone
+    write_units
 
     ui_step "Disco de backup"
     backup_disk
