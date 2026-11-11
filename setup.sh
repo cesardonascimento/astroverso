@@ -305,6 +305,16 @@ manage() {
     done
 }
 
+dev_mode() {
+    local history="$HOME/.claude/projects/${PWD//[^A-Za-z0-9]/-}"
+    ui_step "Modo desenvolvimento"
+    ui_info "abrindo o Claude Code em $PWD (para sair: /exit; para voltar ao assistente: astro)"
+    if compgen -G "$history/*.jsonl" >/dev/null; then
+        exec claude --continue
+    fi
+    exec claude
+}
+
 ui_step "Astro: ${#PROJECTS[@]} projeto(s): ${PROJECTS[*]}"
 while true; do
     if installed_any; then
@@ -312,11 +322,15 @@ while true; do
     else
         install_label="Instalar Astro"
     fi
-    ui_menu choice "O que você quer fazer?" "$install_label" "Gerenciar Astro" "Sair"
-    case $choice in
-        0) install_astro || true ;;
-        1) manage || true ;;
-        *) ui_info "até mais!"; break ;;
+    options=("$install_label" "Gerenciar Astro")
+    command -v claude >/dev/null && options+=("Modo desenvolvimento")
+    options+=("Sair")
+    ui_menu choice "O que você quer fazer?" "${options[@]}"
+    case ${options[choice]} in
+        "Gerenciar Astro")      manage || true ;;
+        "Modo desenvolvimento") dev_mode ;;
+        "Sair")                 ui_info "até mais!"; break ;;
+        *)                      install_astro || true ;;
     esac
     echo
 done

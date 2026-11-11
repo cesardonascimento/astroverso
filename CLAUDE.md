@@ -65,7 +65,8 @@ domínio, contas) fica em `CLAUDE.local.md`, fora do git.
 
 ```
 setup.sh             assistente: Instalar/Reinstalar Astro (host_upgrade na primeira vez, discos, projetos na ordem ORDER),
-                     Gerenciar Astro (ações dos projetos) → Administração (discos, ações globais, Implodir Astro)
+                     Gerenciar Astro (ações dos projetos) → Administração (discos, ações globais, Implodir Astro),
+                     Modo desenvolvimento (só com o comando claude: exec claude --continue na pasta do repositório)
 lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e Espaço)
 lib/host.sh          host_base (comando astro, sem suspensão, compose, boot, ssh, tailscale) / host_undo, firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão], state_setup / state_purge, images_remove, validadores
