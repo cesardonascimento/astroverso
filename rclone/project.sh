@@ -11,7 +11,7 @@ source common.sh
 
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT_PREFIX=astro-rclone
-TICK_CALENDAR=("*-*-* 08..19:00/30:00" "*-*-* 20:00:00")
+TICK_CALENDAR=("*-*-* 08..20/2:00:00")
 CONFIG_CALENDAR="*-*-* 01:00:00"
 LOCAL_CALENDAR="*-*-* 03:00:00"
 RECONFIGURE=false
@@ -54,7 +54,7 @@ cmd_help() {
     printf '%s\n' \
         "$group|Backup: local ⬅️ nuvem|download inicial: traz tudo da nuvem para o disco, sem apagar nada|uma vez, ao cadastrar a nuvem|backup:cloud|10" \
         "$group|Backup: local ↔️ nuvem|mesclagem: junta disco e nuvem, sem apagar nada|depois do download inicial, ou se o estado se perder|backup:cloud|20" \
-        "$group|Backup: local 🔄 nuvem|sincronização: o que é criado, alterado ou apagado de um lado vai para o outro|de 30 em 30 min, das 08:00 às 20:00|backup:cloud|30" \
+        "$group|Backup: local 🔄 nuvem|sincronização: o que é criado, alterado ou apagado de um lado vai para o outro|de 2 em 2 horas, das 08:00 às 20:00, fora dos streams do Sunshine|backup:cloud|30" \
         "$group|Backup: local 🔄 nuvem (teste)|mostra o que a sincronização apagaria, sem efeito|quando chegar um aviso de exclusões|backup:cloud-check|40" \
         "$group|Backup: local 🔄 nuvem (liberar exclusões)|libera o limite de 5% numa rodada; pede confirmação|depois de conferir o teste|backup:cloud-force|50"
     [[ -n $(env_get BACKUP_MOUNT) ]] && echo "$group|Backup: local ➡️ backup diário|cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes)|03:00|backup:daily|60"
@@ -64,6 +64,12 @@ cmd_help() {
             "$group|Backup: configurações ⬅️ local|restaura uma versão das configurações|pelo assistente (Administração)|-|90"
     fi
     return 0
+}
+
+cloud_now() {
+    mkdir -p "$STATE"
+    touch "$STATE/.agora"
+    systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
 }
 
 remote_target() {
@@ -84,7 +90,7 @@ cmd_remote() {
     local name
     case "${1:-}" in
         backup:cloud)
-            systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+            cloud_now
             echo "Backup: local 🔄 nuvem iniciado em segundo plano; o início e o fim chegam aqui"
             ;;
         backup:cloud-check)
@@ -95,7 +101,7 @@ cmd_remote() {
         backup:cloud-force)
             remote_target name "${2:-}"
             target_set "$name" BISYNC_FORCE yes
-            systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+            cloud_now
             echo "exclusões liberadas em $name; Backup: local 🔄 nuvem iniciado em segundo plano"
             ;;
         backup:daily)
@@ -230,7 +236,7 @@ write_unit() {
 }
 
 service_unit() {
-    printf '[Unit]\nDescription=astro rclone: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s %s\n' \
+    printf '[Unit]\nDescription=astro rclone: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTRO_PLAIN=1\nNice=19\nCPUSchedulingPolicy=idle\nIOSchedulingClass=idle\nExecStart=%s %s\n' \
         "$1" "$PWD/run.sh" "$2"
 }
 
@@ -255,7 +261,7 @@ write_units() {
 schedules() {
     write_units
     systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer"
-    ui_ok "nuvem: sincronização nos dois sentidos a cada 30 minutos, das 08:00 às 20:00, e às 03:00"
+    ui_ok "Backup: local 🔄 nuvem de 2 em 2 horas, das 08:00 às 20:00, e às 03:00, com prioridade baixa e pausa durante os streams do Sunshine"
     if [[ -n $(env_get CONFIG_BACKUP) ]]; then
         systemctl --user enable -q --now "$UNIT_PREFIX-config.timer"
         ui_ok "configurações: backup criptografado à 01:00 em $(env_get CONFIG_BACKUP)"
@@ -307,7 +313,7 @@ schedule_import() {
     if [[ $at == manual ]]; then
         ui_ok "primeira cópia fica para quando você escolher \"Sincronizar agora\""
     elif ((at <= $(date +%s))); then
-        systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+        cloud_now
         ui_ok "primeira cópia começou em segundo plano (acompanhe em \"Ver as últimas execuções\")"
     else
         systemctl --user stop "$UNIT_PREFIX-import-$name.timer" 2>/dev/null || true
@@ -343,7 +349,7 @@ action_add() {
     target_set "$name" REMOTE_PATH ""
     ui_ok "$(provider_describe) ↔ $disk/$folder"
     ui_warn "depois da primeira cópia, $disk/$folder e a nuvem ficam iguais: o que for criado, alterado ou apagado"
-    ui_warn "de um lado vai para o outro (a cada 30 minutos, das 08:00 às 20:00, e às 03:00)"
+    ui_warn "de um lado vai para o outro (de 2 em 2 horas, das 08:00 às 20:00, e às 03:00)"
     schedule_import "$name"
 }
 
@@ -421,7 +427,7 @@ action_now() {
             fi
         fi
     done
-    systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
+    cloud_now
     ui_ok "rodada iniciada em segundo plano (sincronização nos dois sentidos ou primeira cópia pendente)"
     ui_info "acompanhe em \"Ver as últimas execuções\" ou com: journalctl --user -fu $UNIT_PREFIX-tick"
 }

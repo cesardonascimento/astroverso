@@ -13,7 +13,7 @@ instalação.
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
 | [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
-| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos a cada 30 minutos durante o dia. |
+| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
 
 ## Como usar
 
@@ -47,7 +47,7 @@ mostra esta lista.
 |---|---|---|---|
 | Backup: local ⬅️ nuvem | download inicial: traz tudo da nuvem para o disco, sem apagar nada | uma vez, ao cadastrar a nuvem | `backup:cloud` (roda a fase atual) |
 | Backup: local ↔️ nuvem | mesclagem: junta disco e nuvem, sem apagar nada | depois do download inicial, ou se o estado se perder | `backup:cloud` (roda a fase atual) |
-| Backup: local 🔄 nuvem | sincronização: o que é criado, alterado ou apagado de um lado vai para o outro | de 30 em 30 min, das 08:00 às 20:00 | `backup:cloud` |
+| Backup: local 🔄 nuvem | sincronização: o que é criado, alterado ou apagado de um lado vai para o outro | de 2 em 2 horas, das 08:00 às 20:00 (pula durante os streams do Sunshine) | `backup:cloud` |
 | Backup: local 🔄 nuvem (teste) | mostra o que a sincronização apagaria, sem efeito | quando chegar um aviso de exclusões | `backup:cloud-check` |
 | Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
 | Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
@@ -295,7 +295,7 @@ O espelho noturno copia um disco inteiro para outro disco da máquina, toda noit
   a hora (ex.: `2026-11-10_010000/nextcloud/nextcloud.tar.zst.gpg`); as mais antigas que isso são apagadas. Por
   padrão, `90`.
 
-Os horários: sincronização com a nuvem a cada 30 minutos, das 08:00 às 20:00; 01:00 backup das configurações;
+Os horários: sincronização com a nuvem de 2 em 2 horas, das 08:00 às 20:00 (pulada enquanto houver um stream do Sunshine); 01:00 backup das configurações;
 03:00 uma última sincronização com a nuvem e o espelho no disco de backup.
 
 **Restaurar uma versão** (Gerenciar Astro → Administração): mostra as versões da mais nova para a mais antiga e os serviços de

@@ -11,10 +11,54 @@ source common.sh
 CONFIG_KEY="${ASTRO_BACKUP_KEY:-$CONFIG_KEY}"
 
 MAX_DELETE=5
+STREAM_MARK=/tmp/astro-sunshine-stream
+STREAM_MAX_AGE=21600
+NOW_MARK="$STATE/.agora"
+PAUSE_FLAG="${XDG_RUNTIME_DIR:-/tmp}/astro-rclone-pausa"
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
 rclone_owner() {
     podman unshare rclone --config "$RCLONE_CONF" "$@"
+}
+
+stream_since() {
+    [[ -f $STREAM_MARK ]] || return 1
+    local started
+    started="$(stat -c %Y "$STREAM_MARK")"
+    (($(date +%s) - started < STREAM_MAX_AGE)) || return 1
+    printf '%s' "$started"
+}
+
+stream_watch() {
+    local start=$1 since
+    while sleep 15; do
+        since="$(stream_since)" || continue
+        ((since >= start)) || continue
+        touch "$PAUSE_FLAG"
+        pkill -INT -u "$USER" -f "rclone --config $RCLONE_CONF (copy|bisync)" || true
+        return 0
+    done
+}
+
+cloud_run() {
+    local watcher status=0
+    if stream_since >/dev/null && [[ ! -f $NOW_MARK ]]; then
+        ui_info "stream do Sunshine em andamento: rodada pulada (a próxima tenta de novo)"
+        return 0
+    fi
+    rm -f "$NOW_MARK" "$PAUSE_FLAG"
+    lock skip
+    stream_watch "$(date +%s)" 9>&- &
+    watcher=$!
+    routine "$(cloud_title)" backup:cloud run_targets tick || status=$?
+    kill "$watcher" 2>/dev/null || true
+    wait "$watcher" 2>/dev/null || true
+    if [[ -f $PAUSE_FLAG ]]; then
+        rm -f "$PAUSE_FLAG"
+        find "$HOME/.cache/rclone/bisync" -name '*.lck' -delete 2>/dev/null || true
+        return 0
+    fi
+    return "$status"
 }
 
 duration() {
@@ -42,6 +86,8 @@ routine() {
     if ((status == 0)); then
         summary="$(sed -n 's/^\[rclone\] *ok: //p' "$log" | tail -3 | paste -sd '|' | sed 's/|/; /g')"
         notify_info "✅ $title terminou em $(duration $(($(date +%s) - start)))${summary:+: $summary}"
+    elif [[ -f $PAUSE_FLAG ]]; then
+        notify_info "⏸️ $title pausado: um stream do Sunshine começou. Continua de onde parou na próxima rodada"
     else
         summary="$(sed -n 's/^\[rclone\] *erro: //p' "$log" | tail -3 | paste -sd '|' | sed 's/|/; /g')"
         if [[ -n $retry ]]; then
@@ -379,7 +425,7 @@ config_backup() {
 }
 
 case "${1:-}" in
-    tick)    lock skip; routine "$(cloud_title)" backup:cloud run_targets tick ;;
+    tick)    cloud_run ;;
     local)   lock wait; routine "Backup: local ➡️ backup diário" backup:daily local_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
     config)  lock wait "$CONFIG_LOCK"; routine "Backup: configurações ➡️ local" backup:configs config_backup "${2:-}" ;;

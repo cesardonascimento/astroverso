@@ -33,7 +33,7 @@ Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 
 | Unidade | Quando | O que faz |
 |---|---|---|
-| `astro-rclone-tick` | a cada 30 minutos, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
+| `astro-rclone-tick` | de 2 em 2 horas, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
 | `astro-rclone-config` | 01:00 | Backup das configurações: cada `~/.astro/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
 | `astro-rclone-local` | 03:00 | Uma sincronização com a nuvem e, em seguida (mesmo se ela falhar), o espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
 | `astro-rclone-import-<nome>` | o horário escolhido | Temporário (`systemd-run`): começa a primeira cópia agendada. Se a máquina reiniciar antes, a primeira cópia começa na sincronização seguinte |
@@ -69,12 +69,23 @@ silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
 |---|---|---|---|
 | Backup: configurações ➡️ local (01:00, e `backup:configs`) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
 | Backup: local ➡️ backup diário (03:00, e `backup:daily`) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
-| Backup: local ⬅️/↔️/🔄 nuvem (de 30 em 30 min, `backup:cloud` e "Backup: local 🔄 nuvem (agora)"; o nome mostra a fase) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
+| Backup: local ⬅️/↔️/🔄 nuvem (de 2 em 2 horas, `backup:cloud` e "Backup: local 🔄 nuvem (agora)"; o nome mostra a fase) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
 | Disco não montado, exclusões acima de 5%, estado perdido | — | quando volta ao normal | uma vez por dia, com os botões de cada caso |
 
 Só as execuções pelo systemd (agendadas, "Backup: local 🔄 nuvem (agora)" e os comandos e botões do Discord)
 avisam. Uma rodada pulada porque a anterior ainda está rodando não avisa. O "Backup: configurações ➡️ local
 (agora)" do assistente mostra tudo na tela.
+
+## Prioridade e streams do Sunshine
+
+- As rotinas rodam com prioridade mínima (`Nice=19`, `CPUSchedulingPolicy=idle`, `IOSchedulingClass=idle`): só usam a
+  CPU e o disco que sobrarem. Listar a Proton inteira a cada rodada é pesado (cada nome é decifrado), e assim jogos,
+  ES-DE e Sunshine sempre vêm primeiro.
+- Durante um stream do Sunshine (marcador `/tmp/astro-sunshine-stream`, criado e apagado pelo
+  `astro-sunshine-display` do arcade), a sincronização com a nuvem pula as rodadas agendadas. Se um stream começar
+  no meio de uma rodada, ela é interrompida (`SIGINT`, com aviso ⏸️ no Discord) e a próxima continua de onde parou.
+  Um marcador com mais de 6 horas é ignorado. O "agora" manual (`backup:cloud` e o menu) roda mesmo com stream.
+  O backup das configurações (01:00) e o backup diário (03:00) não pausam.
 
 ## Travas
 
@@ -85,7 +96,7 @@ avisam. Uma rodada pulada porque a anterior ainda está rodando não avisa. O "B
   prazo escolhido (só o que existia no espelho das 03:00 anterior).
 - A primeira cópia continua de onde parou depois de uma queda de internet, reboot ou falta de luz: o rclone
   pula o que já está igual e grava cada arquivo com nome temporário até terminar.
-- Uma rodada por vez (`flock`): a sincronização de 30 minutos pula a vez se outra estiver rodando; a das 03:00
+- Uma rodada por vez (`flock`): a sincronização de 2 em 2 horas pula a vez se outra estiver rodando; a das 03:00
   espera.
 - A sincronização para se for apagar mais de 5% dos arquivos (veja acima).
 

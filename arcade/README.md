@@ -104,7 +104,9 @@ compartilhados).
   saem; um app criado pelo painel é mantido. A capa do ES-DE é `~/.config/sunshine/covers/es-de.png` do usuário de
   jogos (PNG em pé, 2:3), usada se existir; ela entra no backup das configurações com a pasta do Sunshine.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
-  o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos.
+  o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf` do usuário de jogos. No início
+  de cada stream ele também cria `/tmp/astro-sunshine-stream`, apagado no fim: com ele, o rclone não sincroniza
+  com a nuvem durante o jogo.
   Se o usuário já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - **RetroArch:** instala o Flatpak `org.libretro.RetroArch` do Flathub para o sistema todo (o pacote do
   Fedora traz poucos núcleos), adicionando ou ativando o repositório Flathub se ele faltar ou vier desativado. Precisa do `flatpak`.
