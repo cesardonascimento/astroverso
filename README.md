@@ -10,7 +10,7 @@ instalação.
 | [**arcade**](arcade/) | **Videogame retrô transmitido pela rede.** Um frontend de jogos (ES-DE) mostra a coleção com capas e vídeos, e os emuladores (RetroArch) rodam os jogos de consoles antigos. Um servidor de streaming (Sunshine) transmite a tela, o som e os controles para a TV, o celular ou o notebook pelo app Moonlight, com pouca latência: quem roda o jogo é o servidor. Tudo fica num usuário próprio para jogos, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
-| [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro host:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
+| [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
 | [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos a cada 30 minutos durante o dia. |
@@ -34,9 +34,31 @@ numa nova entrada pelo SSH).
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, pergunta quais etapas já concluídas refazer: as outras são puladas, e as interrompidas ou com falha sempre rodam. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
-| Gerenciar Astro → Administração → Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
-| Gerenciar Astro → Administração → Restaurar uma versão das configurações | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
+| Gerenciar Astro → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
+| Gerenciar Astro → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
 | Gerenciar Astro → Administração → Implodir Astro | Faz um backup das configurações e desfaz tudo o que o Astro criou na máquina (veja abaixo) |
+
+## Operações e comandos do Discord
+
+Os nomes abaixo aparecem iguais nos menus, nos avisos do Discord e nos logs. No Discord, `/astro command:help`
+mostra esta lista.
+
+| Nome | O que é | Quando | Comando no Discord |
+|---|---|---|---|
+| Backup: local ⬅️ nuvem | download inicial: traz tudo da nuvem para o disco, sem apagar nada | uma vez, ao cadastrar a nuvem | `backup:cloud` (roda a fase atual) |
+| Backup: local ↔️ nuvem | mesclagem: junta disco e nuvem, sem apagar nada | depois do download inicial, ou se o estado se perder | `backup:cloud` (roda a fase atual) |
+| Backup: local 🔄 nuvem | sincronização: o que é criado, alterado ou apagado de um lado vai para o outro | de 30 em 30 min, das 08:00 às 20:00 | `backup:cloud` |
+| Backup: local 🔄 nuvem (teste) | mostra o que a sincronização apagaria, sem efeito | quando chegar um aviso de exclusões | `backup:cloud-check` |
+| Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
+| Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
+| Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
+| Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade` | 01:00, junto com o das configurações | `backup:arcade` |
+| Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
+| Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
+| Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
+| Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |
+| Serviço: reiniciar | reinicia os containers | quando quiser | `<projeto>:restart` (pede confirmação) |
+| Ajuda | esta lista | quando quiser | `help` |
 
 ## Respondendo a instalação
 
@@ -206,8 +228,8 @@ para a máquina não fazer barulho ligada o dia todo (o som do stream não é af
 - **IDs dos usuários autorizados:** quem pode usar os comandos e os botões (**botão direito no seu nome →
   Copiar ID do usuário**). Os outros recebem "sem permissão".
 
-No fim, chega uma mensagem de teste com um botão "Estado da máquina". No Discord, digite `/astro` e escolha um
-comando (comece por `help`; os nomes são em inglês, ex.: `rclone:sync`). Comandos que param ou apagam algo pedem confirmação. No celular, deixe as
+No fim, chega uma mensagem de teste com um botão "Máquina: estado". No Discord, digite `/astro` e escolha um
+comando (comece por `help`, que mostra a lista de operações; os nomes são em inglês, ex.: `backup:cloud`). Comandos que param ou apagam algo pedem confirmação. No celular, deixe as
 notificações do canal em "Todas as mensagens".
 
 ### homeassistant
@@ -286,7 +308,7 @@ Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado,
 (pelo Nextcloud, pelo app da nuvem ou por quem tem uma pasta compartilhada com você) vai para o outro na
 sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
-"Sincronizar agora" mostra o aviso e pergunta se libera.
+"Backup: local 🔄 nuvem (agora)", no menu do rclone, mostra o aviso e pergunta se libera.
 
 ### Implodir Astro
 

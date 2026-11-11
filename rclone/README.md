@@ -52,7 +52,7 @@ mexem pela nuvem (ex.: uma pasta compartilhada com outras pessoas). O `rclone bi
 | Arquivo alterado dos dois lados entre duas rodadas | Fica o mais novo; o outro é guardado ao lado como `<nome>.conflict1` (`--conflict-resolve newer --conflict-loser num`) |
 | Rodada interrompida (internet, reboot) | A seguinte continua sozinha (`--resilient --recover`) |
 | Primeira rodada, ou estado perdido | Junta os dois lados sem apagar nada (`--resync --resync-mode newer`, o mais novo vence). Arquivos apagados de um lado só voltam a aparecer |
-| Mais de 5% dos arquivos para apagar | A rodada para sem apagar nada (`--max-delete 5`) e as seguintes também. "Sincronizar agora" mostra o aviso e pergunta se libera as exclusões naquela rodada (`--force`) |
+| Mais de 5% dos arquivos para apagar | A rodada para sem apagar nada (`--max-delete 5`) e as seguintes também. "Backup: local 🔄 nuvem (agora)" mostra o aviso e pergunta se libera as exclusões naquela rodada (`--force`) |
 
 Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: pode passar dos 5%.
 
@@ -67,14 +67,14 @@ silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
 
 | Rotina | Início | Sucesso | Falha |
 |---|---|---|---|
-| Backup das configurações (01:00) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
-| Rodada das 03:00 (nuvem e espelho; também `/astro rclone:mirror`) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
-| Sincronização com a nuvem (a cada 30 minutos, "Sincronizar agora" e o botão do Discord; inclui a primeira cópia) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
+| Backup: configurações ➡️ local (01:00, e `backup:configs`) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
+| Backup: local ➡️ backup diário (03:00, e `backup:daily`) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
+| Backup: local ⬅️/↔️/🔄 nuvem (de 30 em 30 min, `backup:cloud` e "Backup: local 🔄 nuvem (agora)"; o nome mostra a fase) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
 | Disco não montado, exclusões acima de 5%, estado perdido | — | quando volta ao normal | uma vez por dia, com os botões de cada caso |
 
-Só as execuções pelo systemd (agendadas, "Sincronizar agora" e os botões do Discord) avisam. Uma rodada pulada
-porque a anterior ainda está rodando não avisa. O "Fazer backup das configurações agora" do assistente mostra tudo
-na tela.
+Só as execuções pelo systemd (agendadas, "Backup: local 🔄 nuvem (agora)" e os comandos e botões do Discord)
+avisam. Uma rodada pulada porque a anterior ainda está rodando não avisa. O "Backup: configurações ➡️ local
+(agora)" do assistente mostra tudo na tela.
 
 ## Travas
 
@@ -103,16 +103,16 @@ se resolve:
 | Espelho no disco de backup falhou | Rodada das 03:00 |
 | Backup das configurações falhou | Algum serviço não foi salvo. Botão "Tentar de novo" |
 
-Comandos no Discord (`/astro command:rclone:<ação> argument:<armazenamento>`; com um só armazenamento, o
-argumento pode ficar de fora):
+Comandos no Discord (`/astro command:<comando> argument:<armazenamento>`; com um só armazenamento, o argumento
+pode ficar de fora). A lista completa, com as outras operações, está no README da raiz e no `/astro command:help`:
 
-| Ação | O que faz |
-|---|---|
-| `sync` | Começa uma sincronização em segundo plano |
-| `show-deletes` | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
-| `allow-deletes` | Com confirmação: libera o limite na próxima sincronização e a começa |
-| `backup-configs` | Backup das configurações agora |
-| `mirror` | A rodada das 03:00 agora: sincroniza com a nuvem e espelha o disco no disco de backup (só com disco de backup) |
+| Comando | Operação | O que faz |
+|---|---|---|
+| `backup:cloud` | Backup: local ⬅️/↔️/🔄 nuvem | Roda agora a fase atual, em segundo plano |
+| `backup:cloud-check` | Backup: local 🔄 nuvem (teste) | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
+| `backup:cloud-force` | Backup: local 🔄 nuvem (liberar exclusões) | Com confirmação: libera o limite na próxima rodada e a começa |
+| `backup:daily` | Backup: local ➡️ backup diário | A rodada das 03:00 agora (só com disco de backup) |
+| `backup:configs` | Backup: configurações ➡️ local | Backup das configurações agora (e o do Arcade, junto) |
 
 ## Backup das configurações
 
@@ -160,7 +160,7 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Ação | O que faz |
 |---|---|
 | Ver as últimas execuções | Estado de cada armazenamento, próximos agendamentos e as últimas mensagens |
-| Sincronizar agora | Roda a sincronização já (ou a primeira cópia pendente). Se a última parou por excesso de exclusões, pergunta se libera |
+| Backup: local 🔄 nuvem (agora) | Roda a fase atual já (download inicial, mesclagem ou sincronização). Se a última parou por excesso de exclusões, pergunta se libera |
 | Adicionar armazenamento em nuvem | As perguntas acima |
 | Reconectar a um armazenamento em nuvem | Refaz o login (ex.: depois de ligar a verificação em duas etapas) |
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
@@ -169,8 +169,8 @@ Em Gerenciar Astro → Administração (ações globais do rclone):
 
 | Ação | O que faz |
 |---|---|
-| Fazer backup das configurações agora | Roda o backup das configurações na hora |
-| Restaurar uma versão das configurações | Veja abaixo |
+| Backup: configurações ➡️ local (agora) | Roda o backup das configurações na hora |
+| Backup: configurações ⬅️ local (restaurar uma versão) | Veja abaixo |
 
 ## Restaurar uma versão
 

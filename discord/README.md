@@ -47,12 +47,17 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 
 | Comando | Confirmação | O que faz |
 |---|---|---|
-| `help` | | Lista os comandos |
-| `host:status` | | Containers do astro, espaço nos discos, kernel novo pendente e próximos agendamentos |
+| `help` | | Lista as operações do astro por grupo (nome, o que é, quando roda e o comando), em uma ou mais mensagens só para quem pediu |
+| `machine:status` | | Máquina: estado. Containers do astro, espaço nos discos, kernel novo pendente e próximos agendamentos |
 | `<projeto>:start` | | `podman start` nos containers `astro-<projeto>*` |
 | `<projeto>:stop` | sim | `podman stop`. Com `restart: always`, o container fica parado até o `start`, mesmo depois de reiniciar a máquina |
 | `<projeto>:restart` | sim | `podman restart` |
-| `<projeto>:<ação>` | conforme o projeto | Ações de `remote-actions` do projeto (ex.: `rclone:sync`; ver o README de cada um) |
+| ações dos projetos | conforme o projeto | `remote-actions` de cada projeto, com o prefixo do projeto (`<projeto>:<ação>`) ou com um nome próprio, como `backup:cloud` (rclone) e `backup:arcade` (arcade); ver o README de cada um |
+
+O catálogo (`fila/catalogo.json`) guarda, para cada comando, o projeto que o atende, a ação e o tipo (`host`,
+`container` ou `remote`). A ajuda (`fila/ajuda.json`) junta as linhas do comando opcional `help` de cada projeto
+(grupo, nome, o que é, quando, comando, ordem) com as da máquina e dos serviços. As duas são refeitas pelo
+executor a cada rodada.
 
 O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltaria pelo Discord.
 
@@ -60,7 +65,7 @@ O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltar
 
 | Ação | O que faz |
 |---|---|
-| Enviar uma mensagem de teste | Aviso com o botão "Estado da máquina", pelo caminho completo (fila, bot, executor) |
+| Enviar uma mensagem de teste | Aviso com o botão "Máquina: estado", pelo caminho completo (fila, bot, executor) |
 | Listar os comandos disponíveis no Discord | Refaz e mostra o catálogo |
 
 ## Arquivos gerados

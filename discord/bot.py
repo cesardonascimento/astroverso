@@ -16,6 +16,7 @@ RESPOSTAS = FILA / "respostas"
 SAIDA = FILA / "saida"
 TMP = FILA / "tmp"
 CATALOGO = FILA / "catalogo.json"
+AJUDA = FILA / "ajuda.json"
 TOKEN = os.environ["DISCORD_TOKEN"]
 CANAL = int(os.environ["DISCORD_CHANNEL"])
 USUARIOS = {int(x) for x in os.environ.get("DISCORD_USERS", "").replace(",", " ").split()}
@@ -55,11 +56,33 @@ def resultado(acao, arg, dados):
 
 
 def ajuda():
-    acoes = catalogo()
-    if not acoes:
-        return "o catálogo de comandos ainda não foi gerado no servidor"
-    linhas = [f"`{a['id']}`{' ⚠️' if a.get('confirmar') else ''} — {a['descricao']}" for a in acoes.values()]
-    return "**Comandos** (`/astro command:<nome> argument:<opcional>`; ⚠️ pede confirmação)\n" + "\n".join(linhas)
+    try:
+        itens = json.loads(AJUDA.read_text())
+    except (OSError, ValueError):
+        itens = []
+    if not itens:
+        acoes = catalogo()
+        if not acoes:
+            return ["o catálogo de comandos ainda não foi gerado no servidor"]
+        return ["**Comandos**\n" + "\n".join(f"`{a['id']}` — {a['descricao']}" for a in acoes.values())]
+    blocos = ["**Operações do astro** (`/astro command:<comando> argument:<opcional>`)"]
+    grupo = None
+    for item in itens:
+        if item.get("grupo") != grupo:
+            grupo = item.get("grupo")
+            blocos.append(f"\n__{grupo}__")
+        comando = item.get("comando") or ""
+        comando = f"`{comando}`" if comando and comando != "-" else "só pelo assistente"
+        blocos.append(f"**{item['nome']}** — {item['descricao']}\n  ⏱ {item['quando']} · 💬 {comando}")
+    mensagens, atual = [], ""
+    for bloco in blocos:
+        if len(atual) + len(bloco) + 1 > 1900:
+            mensagens.append(atual)
+            atual = ""
+        atual += ("\n" if atual else "") + bloco
+    if atual:
+        mensagens.append(atual)
+    return mensagens
 
 
 async def executar(acao, arg, usuario):
@@ -183,17 +206,20 @@ bot = Bot()
 
 
 @bot.tree.command(name="astro", description="Comandos do servidor astro")
-@app_commands.describe(command="ex.: rclone:sync (comece a digitar para ver a lista)", argument="opcional, ex.: proton")
+@app_commands.describe(command="ex.: backup:cloud (comece a digitar; help mostra tudo)", argument="opcional, ex.: proton")
 async def astro(interacao: discord.Interaction, command: str, argument: str = ""):
     comando, argumento = command, argument
     if not await bot.autorizado(interacao):
         return
     if comando == "help":
-        await interacao.response.send_message(ajuda(), ephemeral=True)
+        mensagens = ajuda()
+        await interacao.response.send_message(mensagens[0], ephemeral=True)
+        for mensagem in mensagens[1:]:
+            await interacao.followup.send(mensagem, ephemeral=True)
         return
     item = catalogo().get(comando)
     if not item:
-        await interacao.response.send_message(f"comando desconhecido: `{comando}`\n\n{ajuda()}", ephemeral=True)
+        await interacao.response.send_message(f"comando desconhecido: `{comando}` (veja `/astro command:help`)", ephemeral=True)
         return
     if not ARGUMENTO.match(argumento):
         await interacao.response.send_message("argumento inválido (só letras, números, ponto, hífen e _)", ephemeral=True)
@@ -209,7 +235,7 @@ async def astro(interacao: discord.Interaction, command: str, argument: str = ""
 
 @astro.autocomplete("command")
 async def completar(interacao: discord.Interaction, atual: str):
-    opcoes = [{"id": "help", "descricao": "lista os comandos"}] + list(catalogo().values())
+    opcoes = [{"id": "help", "descricao": "Ajuda: todas as operações, quando rodam e os comandos"}] + list(catalogo().values())
     return [
         app_commands.Choice(name=f"{a['id']} — {a['descricao']}"[:100], value=a["id"])
         for a in opcoes if atual.lower() in a["id"].lower()

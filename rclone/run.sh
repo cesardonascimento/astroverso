@@ -54,6 +54,18 @@ routine() {
     return "$status"
 }
 
+cloud_title() {
+    local name
+    name="$(target_names | head -1)"
+    if [[ -n $name && $(target_get "$name" IMPORT_DONE) != yes ]]; then
+        printf '%s' "Backup: local ⬅️ nuvem"
+    elif [[ -n $name && $(target_get "$name" BISYNC_READY) != yes ]]; then
+        printf '%s' "Backup: local ↔️ nuvem"
+    else
+        printf '%s' "Backup: local 🔄 nuvem"
+    fi
+}
+
 lock() {
     [[ ${ASTRO_LOCKED:-} == 1 ]] && return 0
     exec 9>"${2:-$LOCK}"
@@ -96,7 +108,7 @@ import_target() {
         return 0
     fi
     mkdir -p "$LOCAL"
-    ui_step "$name: primeira cópia $REMOTE → $LOCAL (continua de onde parou)"
+    ui_step "Backup: local ⬅️ nuvem ($name): download inicial $REMOTE → $LOCAL (continua de onde parou)"
     local log error
     log="$(mktemp)"
     if ! rclone_owner copy "$REMOTE" "$LOCAL" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 | tee "$log"; then
@@ -116,10 +128,10 @@ bisync_target() {
     options=(--create-empty-src-dirs --conflict-resolve newer --conflict-loser num --resilient --recover
         --max-lock 2h --max-delete "$MAX_DELETE" --exclude '*.partial')
     if [[ $(target_get "$name" BISYNC_READY) != yes ]]; then
-        ui_step "$name: primeira sincronização $LOCAL ↔ $REMOTE (junta os dois lados, sem apagar nada)"
+        ui_step "Backup: local ↔️ nuvem ($name): mesclagem $LOCAL ↔ $REMOTE (junta os dois lados, sem apagar nada)"
         options+=(--resync --resync-mode newer)
     else
-        ui_step "$name: sincronizando $LOCAL ↔ $REMOTE"
+        ui_step "Backup: local 🔄 nuvem ($name): sincronização $LOCAL ↔ $REMOTE"
     fi
     if [[ $(target_get "$name" BISYNC_FORCE) == yes ]]; then
         ui_warn "$name: exclusões liberadas nesta rodada, sem o limite de $MAX_DELETE%"
@@ -134,7 +146,7 @@ bisync_target() {
             ui_warn "$name: parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados"
             ui_warn "$name: para apagar mesmo assim, use \"Sincronizar agora\" no assistente"
             notify_problem "$name-exclusoes" "a sincronização do $name parou sem apagar nada: mais de $MAX_DELETE% dos arquivos seriam apagados. Se foi de propósito (ex.: pasta grande renomeada), libere as exclusões; se não, confira o que sumiu" \
-                "Ver o que seria apagado|rclone:show-deletes|$name" "Liberar exclusões|rclone:allow-deletes|$name"
+                "Ver o que seria apagado|backup:cloud-check|$name" "Liberar exclusões|backup:cloud-force|$name"
         else
             failures=$(( $(target_get "$name" FAILURES) + 1 ))
             target_set "$name" FAILURES "$failures"
@@ -220,7 +232,7 @@ local_mirror() {
     fi
     disk_ready "$source" || return 1
     disk_ready "$backup" || return 1
-    ui_step "espelho $source → $backup/atual (alterados e apagados vão para $backup/versoes/$(date +%F))"
+    ui_step "Backup: local ➡️ backup diário: $source → $backup/atual (alterados e apagados vão para $backup/versoes/$(date +%F))"
     if ! podman unshare rclone --config /dev/null sync "$source/" "$backup/atual" --metadata --links \
             --backup-dir "$backup/versoes/$(date +%F)" --exclude '/lost+found/**' "${RCLONE_OPTIONS[@]}"; then
         ui_error "espelho local falhou"
@@ -333,7 +345,7 @@ config_backup() {
     mkdir -p "$work/gnupg"
     chmod 700 "$work/gnupg"
     version="$(date +%F_%H%M%S)${label:+_$label}"
-    ui_step "backup das configurações → $dest/$version/<serviço>/<serviço>.tar.zst.gpg"
+    ui_step "Backup: configurações ➡️ local: $dest/$version/<serviço>/<serviço>.tar.zst.gpg"
     local dir service saved=() failed=0
     for dir in "$ASTRO_HOME"/*/; do
         service="$(basename "$dir")"
@@ -367,9 +379,9 @@ config_backup() {
 }
 
 case "${1:-}" in
-    tick)    lock skip; routine "sincronização com a nuvem" rclone:sync run_targets tick ;;
-    local)   lock wait; routine "rodada das 03:00 (nuvem e espelho no disco de backup)" rclone:mirror local_run ;;
+    tick)    lock skip; routine "$(cloud_title)" backup:cloud run_targets tick ;;
+    local)   lock wait; routine "Backup: local ➡️ backup diário" backup:daily local_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
-    config)  lock wait "$CONFIG_LOCK"; routine "backup das configurações" rclone:backup-configs config_backup "${2:-}" ;;
+    config)  lock wait "$CONFIG_LOCK"; routine "Backup: configurações ➡️ local" backup:configs config_backup "${2:-}" ;;
     *)       ui_fail "uso: $0 tick | local | config [rótulo] | preview <armazenamento>" ;;
 esac

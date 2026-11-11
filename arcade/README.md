@@ -194,6 +194,7 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 | Carregar gamelists | Copia uma pasta de gamelists para `es-de/gamelists` |
 | Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
 | Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak (com o driver GL da NVIDIA igual ao da máquina) e baixa todos os núcleos de novo |
+| Backup: Arcade ➡️ local (agora) | Copia na hora o RetroArch e o ES-DE para a pasta de backup (só com o backup ligado). No Discord: `/astro command:backup:arcade` |
 
 ## Backup
 

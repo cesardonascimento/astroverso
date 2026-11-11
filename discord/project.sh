@@ -154,7 +154,7 @@ runner_units() {
 action_test() {
     ui_step "Mensagem de teste"
     cmd_status || ui_fail "o bot não está instalado"
-    notify_send "🔔 mensagem de teste: o botão abaixo pede o estado da máquina" "Estado da máquina|host:status|" \
+    notify_send "🔔 mensagem de teste: o botão abaixo pede o estado da máquina" "Máquina: estado|machine:status|" \
         || ui_fail "a fila de avisos não existe: reinstale o projeto discord"
     ui_ok "mensagem na fila: ela aparece no canal em alguns segundos"
 }

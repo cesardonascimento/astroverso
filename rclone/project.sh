@@ -33,7 +33,7 @@ cmd_status() {
 cmd_actions() {
     printf '%s\n' \
         "status|Ver as últimas execuções" \
-        "now|Sincronizar agora" \
+        "now|Backup: local 🔄 nuvem (agora)" \
         "add|Adicionar armazenamento em nuvem" \
         "login|Reconectar a um armazenamento em nuvem" \
         "remove|Remover armazenamento em nuvem"
@@ -41,11 +41,28 @@ cmd_actions() {
 
 cmd_remote_actions() {
     printf '%s\n' \
-        "sync|Sincronizar com a nuvem agora|nao" \
-        "show-deletes|Ver o que a sincronização apagaria (teste sem efeito; argumento: armazenamento)|nao" \
-        "allow-deletes|Liberar as exclusões acima do limite na próxima sincronização (argumento: armazenamento)|sim"
-    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup-configs|Fazer backup das configurações agora|nao"
-    [[ -n $(env_get BACKUP_MOUNT) ]] && echo "mirror|Espelhar agora no disco de backup (sincroniza com a nuvem antes, como às 03:00)|nao"
+        "backup:cloud|Backup: local 🔄 nuvem agora (roda a fase atual: ⬅️, ↔️ ou 🔄)|nao" \
+        "backup:cloud-check|Backup: local 🔄 nuvem (teste): o que a sincronização apagaria, sem efeito (argumento: armazenamento)|nao" \
+        "backup:cloud-force|Backup: local 🔄 nuvem (liberar exclusões acima do limite na próxima rodada; argumento: armazenamento)|sim"
+    [[ -n $(env_get BACKUP_MOUNT) ]] && echo "backup:daily|Backup: local ➡️ backup diário agora (sincroniza com a nuvem antes)|nao"
+    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup:configs|Backup: configurações ➡️ local agora (e Backup: Arcade ➡️ local)|nao"
+    return 0
+}
+
+cmd_help() {
+    local group="Backups"
+    printf '%s\n' \
+        "$group|Backup: local ⬅️ nuvem|download inicial: traz tudo da nuvem para o disco, sem apagar nada|uma vez, ao cadastrar a nuvem|backup:cloud|10" \
+        "$group|Backup: local ↔️ nuvem|mesclagem: junta disco e nuvem, sem apagar nada|depois do download inicial, ou se o estado se perder|backup:cloud|20" \
+        "$group|Backup: local 🔄 nuvem|sincronização: o que é criado, alterado ou apagado de um lado vai para o outro|de 30 em 30 min, das 08:00 às 20:00|backup:cloud|30" \
+        "$group|Backup: local 🔄 nuvem (teste)|mostra o que a sincronização apagaria, sem efeito|quando chegar um aviso de exclusões|backup:cloud-check|40" \
+        "$group|Backup: local 🔄 nuvem (liberar exclusões)|libera o limite de 5% numa rodada; pede confirmação|depois de conferir o teste|backup:cloud-force|50"
+    [[ -n $(env_get BACKUP_MOUNT) ]] && echo "$group|Backup: local ➡️ backup diário|cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes)|03:00|backup:daily|60"
+    if [[ -n $(env_get CONFIG_BACKUP) ]]; then
+        printf '%s\n' \
+            "$group|Backup: configurações ➡️ local|arquivo criptografado de cada serviço|01:00|backup:configs|70" \
+            "$group|Backup: configurações ⬅️ local|restaura uma versão das configurações|pelo assistente (Administração)|-|90"
+    fi
     return 0
 }
 
@@ -66,30 +83,30 @@ remote_target() {
 cmd_remote() {
     local name
     case "${1:-}" in
-        sync)
+        backup:cloud)
             systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
-            echo "sincronização iniciada em segundo plano; se der problema, o aviso chega aqui"
+            echo "Backup: local 🔄 nuvem iniciado em segundo plano; o início e o fim chegam aqui"
             ;;
-        show-deletes)
+        backup:cloud-check)
             remote_target name "${2:-}"
             echo "teste sem efeito em $name (listar a nuvem leva alguns minutos):"
             ./run.sh preview "$name"
             ;;
-        allow-deletes)
+        backup:cloud-force)
             remote_target name "${2:-}"
             target_set "$name" BISYNC_FORCE yes
             systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
-            echo "exclusões liberadas em $name; sincronização iniciada em segundo plano"
+            echo "exclusões liberadas em $name; Backup: local 🔄 nuvem iniciado em segundo plano"
             ;;
-        backup-configs)
-            [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
-            systemctl --user start --no-block "$UNIT_PREFIX-config.service"
-            echo "backup das configurações iniciado em segundo plano; se der problema, o aviso chega aqui"
-            ;;
-        mirror)
+        backup:daily)
             [[ -n $(env_get BACKUP_MOUNT) ]] || ui_fail "disco de backup não configurado"
             systemctl --user start --no-block "$UNIT_PREFIX-local.service"
-            echo "espelho em $(env_get BACKUP_MOUNT) iniciado em segundo plano (depois da sincronização com a nuvem); o início e o fim chegam aqui"
+            echo "Backup: local ➡️ backup diário iniciado em segundo plano (em $(env_get BACKUP_MOUNT)); o início e o fim chegam aqui"
+            ;;
+        backup:configs)
+            [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
+            systemctl --user start --no-block "$UNIT_PREFIX-config.service"
+            echo "Backup: configurações ➡️ local iniciado em segundo plano; o início e o fim chegam aqui"
             ;;
         *) ui_fail "ação desconhecida: ${1:-}" ;;
     esac
@@ -98,8 +115,8 @@ cmd_remote() {
 cmd_global_actions() {
     [[ -n $(env_get CONFIG_BACKUP) ]] || return 0
     printf '%s\n' \
-        "backup-now|Fazer backup das configurações agora" \
-        "restore|Restaurar uma versão das configurações"
+        "backup-now|Backup: configurações ➡️ local (agora)" \
+        "restore|Backup: configurações ⬅️ local (restaurar uma versão)"
 }
 
 data_disks() {
@@ -226,12 +243,12 @@ timer_unit() {
 
 write_units() {
     mkdir -p "$UNIT_DIR"
-    write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "sincronização com a nuvem" tick)"
-    write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "sincronização com a nuvem" "${TICK_CALENDAR[@]}")"
-    write_unit "$UNIT_PREFIX-local.service" "$(service_unit "sincronização com a nuvem e espelho no disco de backup" local)"
-    write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "sincronização com a nuvem e espelho no disco de backup" "$LOCAL_CALENDAR")"
-    write_unit "$UNIT_PREFIX-config.service" "$(service_unit "backup das configurações" config)"
-    write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "backup das configurações" "$CONFIG_CALENDAR")"
+    write_unit "$UNIT_PREFIX-tick.service" "$(service_unit "Backup: local 🔄 nuvem" tick)"
+    write_unit "$UNIT_PREFIX-tick.timer" "$(timer_unit "Backup: local 🔄 nuvem" "${TICK_CALENDAR[@]}")"
+    write_unit "$UNIT_PREFIX-local.service" "$(service_unit "Backup: local ➡️ backup diário" local)"
+    write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "Backup: local ➡️ backup diário" "$LOCAL_CALENDAR")"
+    write_unit "$UNIT_PREFIX-config.service" "$(service_unit "Backup: configurações ➡️ local" config)"
+    write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "Backup: configurações ➡️ local" "$CONFIG_CALENDAR")"
     systemctl --user daemon-reload
 }
 
@@ -664,10 +681,11 @@ case "${1:-}" in
     actions)  cmd_actions ;;
     global-actions) cmd_global_actions ;;
     remote-actions) cmd_remote_actions ;;
+    help)     cmd_help ;;
     remote)   shift; cmd_remote "$@" ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
     remove)   cmd_remove ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | global-actions | remote-actions | remote <id> [argumento] | action <id> | install | remove | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | global-actions | remote-actions | help | remote <id> [argumento] | action <id> | install | remove | restore <pasta>" ;;
 esac

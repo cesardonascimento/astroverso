@@ -991,11 +991,45 @@ cmd_actions() {
         "gamelists|Carregar gamelists" \
         "folders|Trocar as pastas de ROMs e de mídias" \
         "update|Atualizar ES-DE, RetroArch e núcleos"
+    [[ -n $(env_get ARCADE_BACKUP) ]] && echo "backup|Backup: Arcade ➡️ local (agora)"
+    return 0
+}
+
+arcade_backup_now() {
+    local user base
+    user="$(env_get GAMES_USER)"
+    [[ -n $(env_get ARCADE_BACKUP) ]] || ui_fail "backup do RetroArch e do ES-DE desligado: reinstale o arcade para escolher a pasta"
+    [[ -n $user ]] || ui_fail "instale o arcade antes"
+    base="$(games_home "$user")/.astro/arcade"
+    [[ -r $base ]] || ui_fail "sem leitura em ~$user/.astro/arcade: rode a instalação do arcade"
+    arcade_sync "$base"
+}
+
+cmd_remote_actions() {
+    [[ -n $(env_get ARCADE_BACKUP) ]] && echo "backup:arcade|Backup: Arcade ➡️ local agora (RetroArch e ES-DE)|nao"
+    return 0
+}
+
+cmd_remote() {
+    case "${1:-}" in
+        backup:arcade) arcade_backup_now ;;
+        *)             ui_fail "ação desconhecida: ${1:-}" ;;
+    esac
+}
+
+cmd_help() {
+    [[ -n $(env_get ARCADE_BACKUP) ]] || return 0
+    echo "Backups|Backup: Arcade ➡️ local|RetroArch (configuração, saves, states, BIOS, capturas e gravações) e ES-DE (configuração, coleções, gamelists e temas) na pasta Arcade|01:00, junto com o das configurações|backup:arcade|80"
 }
 
 cmd_action() {
     local user
     cmd_status || ui_fail "instale o arcade antes"
+    if [[ ${1:-} == backup ]]; then
+        ui_step "Backup: Arcade ➡️ local"
+        arcade_backup_now
+        return
+    fi
     user="$(env_get GAMES_USER)"
     browse_roots
     case "${1:-}" in
@@ -1180,5 +1214,8 @@ case "${1:-}" in
     remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | backup | restore <pasta>" ;;
+    remote-actions) cmd_remote_actions ;;
+    remote)   shift; cmd_remote "$@" ;;
+    help)     cmd_help ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | backup | restore <pasta> | remote-actions | remote <id> | help" ;;
 esac

@@ -16,22 +16,43 @@ project_containers() {
 }
 
 catalog_lines() {
-    echo "host:status|Estado da máquina: containers, discos e próximos agendamentos|nao"
-    local file name
+    echo "machine:status|Máquina: estado (containers, discos e próximos agendamentos)|nao|host|status|host"
+    local file name id description confirm
     for file in ../*/project.sh; do
         name="$(basename "$(dirname "$file")")"
         [[ -x $file ]] || continue
         "$file" status >/dev/null 2>&1 </dev/null || continue
         if [[ $name != "$SELF" && -n $(project_containers "$name") ]]; then
             printf '%s\n' \
-                "$name:start|Inicia os containers do $name|nao" \
-                "$name:stop|Para os containers do $name (ficam parados até o start, mesmo depois de reiniciar a máquina)|sim" \
-                "$name:restart|Reinicia os containers do $name|sim"
+                "$name:start|Serviço: iniciar $name|nao|$name|start|container" \
+                "$name:stop|Serviço: parar $name (fica parado até o start, mesmo depois de reiniciar a máquina)|sim|$name|stop|container" \
+                "$name:restart|Serviço: reiniciar $name|sim|$name|restart|container"
         fi
-        if grep -q '^    remote-actions)' "$file"; then
-            "$file" remote-actions 2>/dev/null </dev/null | sed "s/^/$name:/" || true
-        fi
+        grep -q '^    remote-actions)' "$file" || continue
+        while IFS='|' read -r id description confirm; do
+            [[ -n $id ]] || continue
+            if [[ $id == *:* ]]; then
+                printf '%s|%s|%s|%s|%s|remote\n' "$id" "$description" "${confirm:-nao}" "$name" "$id"
+            else
+                printf '%s|%s|%s|%s|%s|remote\n' "$name:$id" "$description" "${confirm:-nao}" "$name" "$id"
+            fi
+        done < <("$file" remote-actions 2>/dev/null </dev/null || true)
     done
+}
+
+help_lines() {
+    local file name
+    for file in ../*/project.sh; do
+        [[ -x $file ]] && grep -q '^    help)' "$file" || continue
+        "$file" status >/dev/null 2>&1 </dev/null || continue
+        "$file" help 2>/dev/null </dev/null || true
+    done
+    printf '%s\n' \
+        "Máquina e serviços|Máquina: estado|containers, discos e próximos agendamentos|quando quiser|machine:status" \
+        "Máquina e serviços|Serviço: iniciar|sobe os containers de um projeto|quando quiser|<projeto>:start" \
+        "Máquina e serviços|Serviço: parar|para os containers (ficam parados até o start); pede confirmação|quando quiser|<projeto>:stop" \
+        "Máquina e serviços|Serviço: reiniciar|reinicia os containers; pede confirmação|quando quiser|<projeto>:restart" \
+        "Máquina e serviços|Ajuda|esta lista|quando quiser|help"
 }
 
 write_catalog() {
@@ -41,17 +62,38 @@ import json, sys
 items = []
 for line in sys.stdin:
     parts = line.rstrip("\n").split("|")
-    if len(parts) >= 2 and parts[0]:
-        items.append({"id": parts[0], "descricao": parts[1], "confirmar": len(parts) > 2 and parts[2] == "sim"})
+    if len(parts) >= 6 and parts[0]:
+        items.append({"id": parts[0], "descricao": parts[1], "confirmar": parts[2] == "sim",
+                      "projeto": parts[3], "op": parts[4], "tipo": parts[5]})
 print(json.dumps(items, ensure_ascii=False))
 ' > "$FILA/tmp/catalogo.json"
     mv "$FILA/tmp/catalogo.json" "$FILA/catalogo.json"
+    help_lines | python3 -I -c '
+import json, sys
+items, groups = [], []
+for line in sys.stdin:
+    parts = line.rstrip("\n").split("|")
+    if len(parts) >= 5 and parts[1]:
+        item = dict(zip(("grupo", "nome", "descricao", "quando", "comando"), parts[:5]))
+        item["ordem"] = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else 50
+        if item["grupo"] not in groups:
+            groups.append(item["grupo"])
+        items.append(item)
+items.sort(key=lambda item: (groups.index(item["grupo"]), item["ordem"]))
+print(json.dumps(items, ensure_ascii=False))
+' > "$FILA/tmp/ajuda.json"
+    mv "$FILA/tmp/ajuda.json" "$FILA/ajuda.json"
 }
 
-catalog_has() {
+catalog_entry() {
     python3 -I -c '
 import json, sys
-sys.exit(0 if any(a["id"] == sys.argv[2] for a in json.load(open(sys.argv[1]))) else 1)
+for a in json.load(open(sys.argv[1])):
+    if a["id"] == sys.argv[2]:
+        print("\x1f".join((a.get("projeto", ""), a.get("op", ""), a.get("tipo", ""))))
+        break
+else:
+    sys.exit(1)
 ' "$FILA/catalogo.json" "$1"
 }
 
@@ -122,17 +164,20 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
         ui_warn "pedido ilegível descartado"
         return 0
     fi
-    if [[ ! $arg =~ ^[A-Za-z0-9._-]{0,64}$ ]] || ! catalog_has "$action"; then
+    local kind="" entry=""
+    if [[ $arg =~ ^[A-Za-z0-9._-]{0,64}$ ]]; then
+        entry="$(catalog_entry "$action")" || entry=""
+    fi
+    if [[ -z $entry ]]; then
         ui_warn "recusado: $name ($user) pediu \"$action $arg\", fora da lista permitida"
         respond "$id" 1 "comando fora da lista permitida"
         return 0
     fi
     ui_info "pedido de $name ($user): $action${arg:+ $arg}"
-    project="${action%%:*}"
-    op="${action#*:}"
-    if [[ $action == host:status ]]; then
+    IFS=$'\x1f' read -r project op kind <<< "$entry"
+    if [[ $kind == host ]]; then
         output="$(host_status 2>&1)" || status=$?
-    elif [[ $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
+    elif [[ $kind == container && $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
         output="$(container_op "$project" "$op" 2>&1)" || status=$?
     else
         output="$(timeout "$TIMEOUT" "../$project/project.sh" remote "$op" ${arg:+"$arg"} 2>&1 </dev/null)" || status=$?
