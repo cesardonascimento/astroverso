@@ -11,6 +11,15 @@ Proxy reverso com HTTPS válido (Let's Encrypt) para os serviços da rede, por e
 ./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
 ```
 
+## Ações (Gerenciar Astro → caddy)
+
+| Ação | O que faz |
+|---|---|
+| Listar rotas | Mostra as rotas, as manuais e as declaradas pelos projetos (com o nome do projeto) |
+| Adicionar rotas | Pergunta o subdomínio (ou endereço completo) e o destino (ex.: `<ip>:3000`), um por vez, e recarrega o Caddy |
+| Remover rotas | Escolhe com Espaço quais rotas manuais tirar e recarrega o Caddy |
+| Recarregar rotas (inclui as declaradas por outros projetos) | Regrava o `Caddyfile` e recarrega o Caddy sem reiniciar |
+
 ## Perguntas da instalação
 
 | Pergunta | Padrão |

@@ -4,6 +4,8 @@ HOST_PORTS_CONF=/etc/sysctl.d/99-astro.conf
 HOST_FORWARD_CONF=/etc/sysctl.d/99-astro-tailscale.conf
 HOST_SSH_CONF=/etc/ssh/sshd_config.d/10-astro.conf
 HOST_GDM_POWER=/etc/dconf/db/gdm.d/95-astro-power
+HOST_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOST_COMMAND="$HOME/.local/bin/astro"
 
 host_compose() {
     if podman compose version >/dev/null 2>&1; then
@@ -297,6 +299,11 @@ host_undo() {
         ui_ok "SSH aceita login por senha de novo (o serviço continua ativo)"
     fi
 
+    if [[ -L $HOST_COMMAND ]]; then
+        rm -f "$HOST_COMMAND"
+        ui_ok "comando astro removido (o assistente continua em $HOST_REPO/setup.sh)"
+    fi
+
     systemctl --user disable -q --now podman-restart.service 2>/dev/null || true
     if [[ $(loginctl show-user "$USER" -P Linger 2>/dev/null) == yes ]]; then
         loginctl disable-linger "$USER"
@@ -304,7 +311,22 @@ host_undo() {
     ui_ok "containers e serviços de $USER não sobem mais sozinhos no boot"
 }
 
+host_command() {
+    local target="$HOST_REPO/setup.sh"
+    if [[ $(readlink "$HOST_COMMAND" 2>/dev/null) == "$target" ]]; then
+        ui_ok "comando astro já disponível"
+        return
+    fi
+    mkdir -p "${HOST_COMMAND%/*}"
+    ln -sfn "$target" "$HOST_COMMAND"
+    ui_ok "comando astro disponível: digite astro para abrir este assistente"
+    if [[ ":$PATH:" != *":${HOST_COMMAND%/*}:"* ]]; then
+        ui_info "abra um terminal novo (ou entre de novo pelo SSH) para o comando aparecer"
+    fi
+}
+
 host_base() {
+    host_command
     host_no_sleep
     host_compose
     host_autostart

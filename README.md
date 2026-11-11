@@ -25,6 +25,9 @@ git clone <url-deste-repositório> ~/Projects/astro
 ~/Projects/astro/setup.sh
 ```
 
+Depois da primeira instalação, o assistente abre com o comando `astro`, de qualquer pasta (num terminal novo ou
+numa nova entrada pelo SSH).
+
 | Opção | O que faz |
 |---|---|
 | Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `homeassistant`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
@@ -58,8 +61,8 @@ desse usuário.
 
 ### Máquina
 
-Feita uma vez, no início, para todos os projetos: suspensão desligada (inclusive na tela de login), podman-compose, início dos containers no
-boot, SSH e Tailscale.
+Feita uma vez, no início, para todos os projetos: o comando `astro`, suspensão desligada (inclusive na tela de
+login), podman-compose, início dos containers no boot, SSH e Tailscale.
 
 - **Anunciar a rede local no Tailscale?** Transforma o servidor em ponte para a rede de casa: de fora,
   qualquer aparelho seu conectado ao Tailscale passa a acessar todos os aparelhos da casa (impressora,

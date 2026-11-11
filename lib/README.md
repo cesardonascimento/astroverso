@@ -55,9 +55,9 @@ Bibliotecas compartilhadas:
   cores, para o journal. Defina `ASTRO_PROJECT` antes do `source`.
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
-- `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
-  suspensão, podman-compose, inicialização no boot, SSH e Tailscale; chamado uma vez pelo `setup.sh`, na etapa Máquina), e `host_undo` desfaz o que é só do Astro
-  (suspensão, também a da tela de login, portas baixas, rede anunciada no Tailscale, login só por chave no SSH, linger e `podman-restart`;
+- `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (o comando `astro` em `~/.local/bin`, apontando para o
+  `setup.sh`; máquina sem suspensão, podman-compose, inicialização no boot, SSH e Tailscale; chamado uma vez pelo `setup.sh`, na etapa Máquina), e `host_undo` desfaz o que é só do Astro
+  (comando `astro`, suspensão, também a da tela de login, portas baixas, rede anunciada no Tailscale, login só por chave no SSH, linger e `podman-restart`;
   o SSH continua ativo), chamado pelo "Implodir Astro". Funções avulsas: `host_upgrade` (dnf ou apt; avisa e marca `HOST_REBOOT` se veio kernel novo; chamada pelo `setup.sh` uma vez
   antes de instalar, não pelos projetos), `host_no_sleep`,
   `host_unprivileged_ports`, `host_compose`, `host_autostart`, `host_ssh`,
