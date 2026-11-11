@@ -18,8 +18,24 @@ preciso (Mosquitto, Zigbee2MQTT, ESPHome...) entra como outro container deste pr
 |---|---|
 | Endereço do Home Assistant no Caddy | `homeassistant.<domínio do caddy>` |
 | Porta do Home Assistant no host | `8123` |
+| Nome da casa no Home Assistant | `Astro` |
+| Usuário administrador do Home Assistant | `astro` |
+| Senha do usuário | (secreta; só na primeira instalação, sem gravar em lugar nenhum) |
 
 O fuso vem da máquina (`timedatectl`).
+
+## Configuração inicial automática
+
+Se o Home Assistant ainda não tiver usuário (`/api/onboarding`), a instalação faz a configuração inicial pela API
+local (`http://127.0.0.1:<porta>`): cria o administrador (`/api/onboarding/users`, senha pela entrada padrão),
+conclui as etapas `core_config`, `analytics` e `integration` e revoga o token usado. Depois, com o container parado,
+grava em `.storage/core.config` (criado completo se ainda não existir) o nome da casa, o fuso, o país (da tabela
+de fusos), o idioma e a moeda (de um locale do país instalado no sistema, ex.: `pt_BR`), as coordenadas aproximadas
+da cidade do fuso e o sistema métrico (exceto nos EUA). A localização exata se ajusta em Configurações → Sistema →
+Geral.
+
+A cada instalação, grava também `internal_url` e `external_url` como `https://<endereço no Caddy>`: é o endereço
+que o Home Assistant anuncia na rede, e o app do celular o encontra sozinho (a porta local é bloqueada para a rede).
 
 ## O que a instalação faz
 
@@ -34,8 +50,8 @@ O fuso vem da máquina (`timedatectl`).
 
 ## Depois de instalar
 
-Abra o endereço logo: o primeiro acesso cria o usuário administrador. Depois, em Configurações → Dispositivos e
-serviços → Adicionar integração, procure a marca ou o aparelho. Muitos aparelhos da rede local aparecem sozinhos
+No app do celular ou do tablet, use "Inserir endereço manualmente" com `https://<endereço no Caddy>` e entre com o
+usuário administrador. Depois, em Configurações → Dispositivos e serviços → Adicionar integração, procure a marca ou o aparelho. Muitos aparelhos da rede local aparecem sozinhos
 em "Descobertos".
 
 O log mostra erros do Bluetooth (`Missing NET_ADMIN/NET_RAW`): o container rootless não controla o Bluetooth da

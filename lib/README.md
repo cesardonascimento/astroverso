@@ -72,7 +72,7 @@ Bibliotecas compartilhadas:
   (apaga as imagens do `docker-compose.yml` e os `FROM` do `Dockerfile` do projeto) e `state_restore <pasta> [itens a manter]`,
   que troca `$STATE` pela pasta do backup, mantendo os itens pedidos da configuração atual. `env_get CHAVE [padrão]
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
-  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_username`, `is_timezone`, `is_path` (caminho absoluto),
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_label` (nome com espaços, até 40), `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.

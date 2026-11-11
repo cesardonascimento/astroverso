@@ -98,6 +98,10 @@ is_path() {
     [[ $path =~ ^/[[:alnum:]\ ._/-]+$ && $path != *..* ]] && printf '%s' "$path"
 }
 
+is_label() {
+    [[ $1 =~ ^[[:alnum:]][[:alnum:]\ ._-]{0,39}$ ]] && printf '%s' "$1"
+}
+
 is_folder() {
     [[ $1 =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]] && printf '%s' "$1"
 }

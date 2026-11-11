@@ -239,9 +239,14 @@ notificações do canal em "Todas as mensagens".
   Assistant. Por padrão, `homeassistant.<domínio>`. De fora de casa, funciona pelo Tailscale.
 - **Porta do Home Assistant no host:** a porta em que ele escuta na máquina. Ela é bloqueada para a rede: o
   acesso passa só pelo Caddy. Mude só se `8123` estiver ocupada.
+- **Nome da casa no Home Assistant:** o nome que aparece no app e no painel. Por padrão, `Astro`.
+- **Usuário administrador do Home Assistant:** a conta que administra o Home Assistant. Por padrão, `astro`.
+- **Senha do usuário:** só aparece na primeira instalação, quando o Home Assistant ainda não tem usuário. A
+  instalação faz sozinha a configuração inicial (usuário, nome, país, idioma, moeda e fuso da máquina).
 
-Depois de instalar, abra o endereço logo: o primeiro acesso cria o usuário administrador. Os aparelhos entram
-pelas integrações, no próprio painel.
+No app do celular ou do tablet, toque em **Inserir endereço manualmente** e use `https://homeassistant.<domínio>`.
+A instalação faz o Home Assistant se anunciar com esse endereço. Os aparelhos entram pelas integrações, no
+próprio painel.
 
 ### nextcloud
 
