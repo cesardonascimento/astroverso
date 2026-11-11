@@ -57,8 +57,8 @@ mexem pela nuvem (ex.: uma pasta compartilhada com outras pessoas). O `rclone bi
 Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: pode passar dos 5%.
 
 A cópia e a sincronização com a nuvem rodam por `podman unshare`, como o espelho no disco: assim o rclone consegue
-acertar a data e substituir arquivos que o Nextcloud gravou no disco (donos do container). Uma falha na primeira
-cópia avisa no Discord (uma vez por dia), com o botão "Tentar de novo"; outro aviso chega quando ela termina.
+acertar a data e substituir arquivos que o Nextcloud gravou no disco (donos do container). Os avisos de cada
+rodada estão em "Avisos no Discord".
 
 ## Avisos no Discord
 
@@ -69,12 +69,12 @@ silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
 |---|---|---|---|
 | Backup das configurações (01:00) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
 | Rodada das 03:00 (nuvem e espelho) | sim | sim, com o resumo e o tempo | sim, com o erro |
-| Primeira cópia (nuvem → disco) | na primeira tentativa | sim, com o tempo | uma vez por dia, com o erro e "Tentar de novo" |
-| Sincronização a cada 30 minutos | não | só quando volta a funcionar depois de uma falha | uma vez por dia, com "Tentar de novo" |
+| Sincronização com a nuvem (a cada 30 minutos, "Sincronizar agora" e o botão do Discord; inclui a primeira cópia) | sim | sim, com o resumo e o tempo | sim, com o erro e "Tentar de novo" |
 | Disco não montado, exclusões acima de 5%, estado perdido | — | quando volta ao normal | uma vez por dia, com os botões de cada caso |
 
-Só as execuções pelo systemd (agendadas, "Sincronizar agora" e os botões do Discord) avisam; as rodadas pelo
-assistente mostram tudo na tela.
+Só as execuções pelo systemd (agendadas, "Sincronizar agora" e os botões do Discord) avisam. Uma rodada pulada
+porque a anterior ainda está rodando não avisa. O "Fazer backup das configurações agora" do assistente mostra tudo
+na tela.
 
 ## Travas
 

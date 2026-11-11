@@ -97,26 +97,17 @@ import_target() {
     fi
     mkdir -p "$LOCAL"
     ui_step "$name: primeira cópia $REMOTE → $LOCAL (continua de onde parou)"
-    local log error start
-    start=$(date +%s)
-    if [[ $(target_get "$name" IMPORT_NOTIFIED) != yes ]]; then
-        notify_info "▶️ primeira cópia do $name (nuvem → disco) começou"
-        target_set "$name" IMPORT_NOTIFIED yes
-    fi
+    local log error
     log="$(mktemp)"
     if ! rclone_owner copy "$REMOTE" "$LOCAL" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 | tee "$log"; then
         error="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -oE '(Failed to copy|ERROR) *: .*' | tail -1)" || true
         rm -f "$log"
-        ui_error "$name: primeira cópia interrompida, a próxima rodada continua"
-        notify_problem "$name-importacao" "a primeira cópia do $name (nuvem → disco) parou com erro${error:+: $error}. A próxima rodada continua de onde parou" \
-            "Tentar de novo|rclone:sync|"
+        ui_error "$name: primeira cópia interrompida${error:+ ($error)}, a próxima rodada continua de onde parou"
         return 1
     fi
     rm -f "$log"
     target_set "$name" IMPORT_DONE yes
     target_set "$name" BISYNC_READY no
-    rm -f "$(notify_flag "$name-importacao")"
-    notify_info "✅ primeira cópia do $name terminou em $(duration $(($(date +%s) - start))); a sincronização nos dois sentidos começa na próxima rodada"
     ui_ok "$name: primeira cópia concluída; a sincronização nos dois sentidos está ativa"
 }
 
@@ -147,8 +138,6 @@ bisync_target() {
         else
             failures=$(( $(target_get "$name" FAILURES) + 1 ))
             target_set "$name" FAILURES "$failures"
-            notify_problem "$name-falha" "a sincronização do $name falhou ($failures vez(es) seguida(s)). Veja \"Ver as últimas execuções\" no assistente do rclone" \
-                "Tentar de novo|rclone:sync|"
         fi
         if grep -qiE 'must run --resync|cannot find prior' "$log"; then
             target_set "$name" BISYNC_READY no
@@ -165,7 +154,6 @@ bisync_target() {
     target_set "$name" TOO_MANY_DELETES no
     target_set "$name" FAILURES 0
     notify_resolved "$name-exclusoes" "a sincronização do $name voltou a funcionar"
-    notify_resolved "$name-falha" "a sincronização do $name voltou a funcionar"
     notify_resolved "$name-estado" "a sincronização do $name juntou os dois lados e voltou ao normal"
     ui_ok "$name: sincronização concluída"
 }
@@ -379,7 +367,7 @@ config_backup() {
 }
 
 case "${1:-}" in
-    tick)    lock skip; run_targets tick ;;
+    tick)    lock skip; routine "sincronização com a nuvem" rclone:sync run_targets tick ;;
     local)   lock wait; routine "rodada das 03:00 (nuvem e espelho no disco de backup)" "" local_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
     config)  lock wait "$CONFIG_LOCK"; routine "backup das configurações" rclone:backup-configs config_backup "${2:-}" ;;
