@@ -394,7 +394,6 @@ cmd_install() {
     configure
 
     ui_step "Host"
-    host_base
     install_rclone
 
     ui_step "Disco de backup"

@@ -307,9 +307,6 @@ cmd_install() {
     admin="$(env_get ADMIN_USER)"
     files="$(env_get FILES_DIR)"
 
-    ui_step "Host"
-    host_base
-
     ui_step "Discos"
     storage
 

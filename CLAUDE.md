@@ -91,8 +91,11 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_problem / notify_
   --transform`), sem home nem usuário. Cada projeto pode ter o comando `backup` (dumps e `exclude <caminho>`,
   `include <nome> <caminho>`, `add <caminho>`).
 - **Instalar Astro** sempre instala tudo, na ordem `ORDER` do `setup.sh` (`caddy` primeiro, pelo domínio; `rclone` e
-  `discord` por último, por verem os outros), depois da atualização do sistema (primeira vez) e de "Discos da
-  máquina". Um projeto que falha não para os outros; o resumo mostra quais falharam.
+  `discord` por último, por verem os outros), depois da atualização do sistema (primeira vez), da Máquina
+  (`host_base`, uma vez só; os projetos não o chamam) e de "Discos da máquina". Um projeto que falha não para os
+  outros; o resumo mostra quais falharam. Cada etapa roda em subshell com `set -e` (`run_step`) e só ganha a
+  marca `~/.astro/.concluidas/<etapa>` ao terminar sem erro; no "Reinstalar Astro", um checklist escolhe quais
+  concluídas refazer (Enter pula todas). A implosão apaga as marcas depois do backup.
 - **Implodir Astro** (Administração): confirmação digitando `IMPLODIR`; backup `antes-de-implodir` pelo
   `rclone/run.sh config` (pasta e senha do rclone ou, sem elas, perguntadas: `ASTRO_BACKUP_DEST`/`ASTRO_BACKUP_KEY`),
   e nada é desfeito se ele falhar; `remove` de cada projeto na ordem inversa; `disk_release_all`; `host_undo`; rede

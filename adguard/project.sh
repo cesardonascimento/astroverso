@@ -57,16 +57,29 @@ configure() {
     ui_input  language "idioma do painel" "$(env_get ADGUARD_LANGUAGE pt-br)" is_name
 
     ui_step "Reescritas DNS"
-    local rewrite_answer="" domains=() domain
-    if ui_confirm "adicionar domínios de reescrita (*.dominio → IP)?" n; then
-        local default_answer=$dns_ip
-        [[ $default_answer == 0.0.0.0 ]] && default_answer="$(host_lan_ip)"
+    local rewrite_answer="" domains=() extra=() domain caddy_domain default_answer=$dns_ip
+    if [[ $default_answer == 0.0.0.0 ]]; then
+        default_answer="$(host_lan_ip)"
+    fi
+    caddy_domain="$(proxy_domain)"
+    if [[ -n $caddy_domain ]]; then
+        if ui_confirm "responder *.$caddy_domain com o IP desta máquina ($default_answer)?" y; then
+            domains+=("$caddy_domain")
+        fi
+        if ui_confirm "adicionar outros domínios?" n; then
+            ui_list extra "domínio, sem o *. (ex.: casa.com)" normalize_domain
+        fi
+    elif ui_confirm "adicionar domínios de reescrita (*.<domínio> → IP)?" n; then
+        ui_list extra "domínio, sem o *. (ex.: casa.com)" normalize_domain
+    fi
+    for domain in "${extra[@]}"; do
+        [[ " ${domains[*]} " == *" $domain "* ]] || domains+=("$domain")
+    done
+    if ((${#domains[@]})); then
         ui_input rewrite_answer "IP de destino das reescritas" "$(env_get ADGUARD_REWRITE_ANSWER "$default_answer")" is_ipv4
-        ui_list domains "domínio" normalize_domain
         for domain in "${domains[@]}"; do
             ui_ok "*.$domain → $rewrite_answer"
         done
-        ((${#domains[@]})) || ui_info "nenhum domínio informado"
     else
         ui_info "sem reescritas"
     fi
@@ -240,7 +253,6 @@ cmd_install() {
         host_firewall dns "$web_port/tcp"
         host_firewall_unblock_lan "$web_port"
     fi
-    host_base
 
     ui_step "Container"
     local log

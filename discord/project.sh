@@ -174,9 +174,6 @@ cmd_install() {
     state_setup
     configure
 
-    ui_step "Host"
-    host_base
-
     ui_step "Container"
     local log
     ui_info "construindo a imagem do bot (Python + discord.py)..."

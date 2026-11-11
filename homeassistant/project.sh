@@ -118,7 +118,6 @@ cmd_install() {
     port="$(env_get HA_PORT)"
 
     ui_step "Host"
-    host_base
     host_firewall_block_lan "$port"
 
     ui_step "Container"

@@ -66,7 +66,6 @@ cmd_install() {
     host="$(env_get COCKPIT_HOST)"
 
     ui_step "Host"
-    host_base
     install_packages
     configure_proxy_mode "$host"
     host_firewall_block_lan "$PORT"

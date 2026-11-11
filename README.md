@@ -27,8 +27,8 @@ git clone <url-deste-repositório> ~/Projects/astro
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `homeassistant`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
-| Reinstalar Astro | O mesmo, com algum projeto já instalado. Cada um pergunta se usa a configuração já salva |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `homeassistant`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, pergunta quais etapas já concluídas refazer: as outras são puladas, e as interrompidas ou com falha sempre rodam. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
 | Gerenciar Astro → Administração → Fazer backup das configurações agora | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
@@ -51,6 +51,16 @@ desse usuário.
 
 - **Usar a configuração já salva?** Reaproveita as respostas da última instalação. Responda **N** para
   mudar alguma.
+- **Quais etapas concluídas reinstalar?** Só aparece no "Reinstalar Astro". Uma etapa (Máquina, Discos da
+  máquina ou um projeto) só conta como concluída quando termina sem erro; uma instalação interrompida no meio
+  continua de onde parou. Enter sem marcar nada pula todas as concluídas; marque com Espaço as que quer refazer
+  (ou "Todos").
+
+### Máquina
+
+Feita uma vez, no início, para todos os projetos: suspensão desligada, podman-compose, início dos containers no
+boot, SSH e Tailscale.
+
 - **Anunciar a rede local no Tailscale?** Transforma o servidor em ponte para a rede de casa: de fora,
   qualquer aparelho seu conectado ao Tailscale passa a acessar todos os aparelhos da casa (impressora,
   roteador, outros serviços) sem instalar nada neles. A rede é detectada automaticamente. Depois, aprove
@@ -97,11 +107,12 @@ acesso administrativo ligado).
 - **Fuso horário:** usado nos horários dos logs e das estatísticas e nos agendamentos de bloqueio. Por
   padrão, o fuso da máquina.
 - **Idioma do painel.**
-- **Adicionar domínios de reescrita?** Faz o AdGuard responder localmente um domínio inteiro: todo
-  `*.<domínio>` passa a apontar para o IP informado. É o que faz os endereços do Caddy funcionarem dentro
-  de casa, então use o mesmo domínio base do Caddy.
-  - **IP de destino:** para onde os nomes apontam. Por padrão, o IP do servidor.
-  - **Domínios:** um por vez; Enter vazio termina.
+- **Responder \*.\<domínio do Caddy\> com o IP desta máquina?** Faz o AdGuard responder localmente o domínio
+  inteiro do Caddy: todo `*.<domínio>` passa a apontar para o servidor. É o que faz os endereços do Caddy
+  funcionarem dentro de casa. Por padrão, **S**.
+- **Adicionar outros domínios?** Outros domínios inteiros para o mesmo IP. Digite um por vez, sem o `*.`
+  (ex.: `casa.com`); Enter vazio termina. Sem o Caddy configurado, a pergunta é "Adicionar domínios de reescrita?".
+- **IP de destino das reescritas:** para onde os nomes apontam. Por padrão, o IP do servidor.
 - **Endereço do painel no Caddy:** o nome pelo qual o painel do AdGuard é aberto com HTTPS. Por padrão,
   `adguard.<domínio>`.
 - **Usar só o AdGuard como DNS desta máquina?** Define o DNS do próprio servidor. Com **S**, ele sempre

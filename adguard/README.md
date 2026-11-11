@@ -30,9 +30,10 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 | IP do host onde o DNS escuta | `0.0.0.0` (todos) |
 | Fuso horário | o do host |
 | Idioma do painel | `pt-br` |
-| Adicionar reescritas DNS? | não |
+| Responder *.<domínio do caddy> com o IP desta máquina? | sim (só com o Caddy configurado) |
+| Adicionar outros domínios? | não (sem o Caddy: "Adicionar domínios de reescrita?") |
+| Domínios | um por vez, sem o `*.`; Enter vazio termina |
 | IP de destino das reescritas | o IP onde o DNS escuta (ou o IP da máquina na rede) |
-| Domínios | um por vez, Enter vazio termina |
 | Endereço do painel no Caddy | `adguard.<domínio do caddy>` (ou do primeiro domínio de reescrita) |
 
 Cada domínio informado (`dominio.com` ou `*.dominio.com`) vira a reescrita `*.dominio.com → IP`,
@@ -58,14 +59,6 @@ primeira execução ou quando a configuração é respondida de novo.
 - Libera a porta 53 para Podman rootless e desativa o DNS stub do `systemd-resolved`
 - Libera o DNS no firewalld. Com o painel publicado no Caddy, a porta do painel é bloqueada para a rede
   (acesso só por HTTPS); sem o Caddy, ela é liberada
-- Impede a máquina de suspender ou hibernar (alvos do systemd mascarados, tampa ignorada no `logind`,
-  suspensão automática do GNOME desligada)
-- Instala o podman-compose e o Tailscale (dnf ou apt) se faltarem, habilita a inicialização no boot e conecta o Tailscale com `--accept-routes`
-- Ativa o servidor SSH; se houver chave em `~/.ssh/authorized_keys`, oferece desativar o login por senha
-- Oferece anunciar a rede local (detectada automaticamente, ex: `<rede>/24`) no Tailscale para acesso remoto,
-  ativando o encaminhamento de pacotes e o masquerade do firewalld; lembra de aprovar a rota no painel
-- Pede o redirecionamento da porta UDP do Tailscale no roteador para esta máquina (conexões diretas de fora
-  de casa, sem relay) e só continua após a confirmação, guardada em `~/.astro/host.env`
 
 Depois que o container sobe:
 

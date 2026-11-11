@@ -1,14 +1,18 @@
 # Criando um projeto
 
 O `setup.sh` reconhece qualquer pasta com um `project.sh` executável. "Instalar Astro" instala todos na ordem da
-lista `ORDER` do `setup.sh` (`caddy` primeiro, `discord` por último); um projeto fora da lista entra no fim. O
+lista `ORDER` do `setup.sh` (`caddy` primeiro, `discord` por último); um projeto fora da lista entra no fim.
+Antes dos projetos, o `setup.sh` prepara a máquina uma vez (`host_base`) e roda "Discos da máquina": o `install`
+de um projeto supõe a máquina já preparada. Cada etapa (`maquina`, `discos`, um projeto) só ganha a marca
+`~/.astro/.concluidas/<etapa>` quando termina sem erro (a marca é apagada no começo); no "Reinstalar Astro", as
+marcadas podem ser puladas. Um projeto só conta como concluído se o `status` dele também passar. O
 `project.sh` implementa:
 
 | Comando | Responsabilidade |
 |---|---|
 | `describe` | Imprime uma linha de descrição |
 | `status` | Sai com código 0 se o projeto está instalado |
-| `install` | Pergunta a configuração, prepara o host e sobe os containers |
+| `install` | Pergunta a configuração, prepara o que é do projeto no host (portas, pacotes) e sobe os containers |
 | `remove` | Desfaz tudo o que o projeto criou: containers, imagens (`images_remove`), serviços, regras do firewall, ajustes do sistema feitos só para ele, a rota do Caddy e `~/.astro/<projeto>` (`state_purge`). Mantém os pacotes e os dados dos discos. Roda mesmo com o projeto pela metade, sem falhar no que não existe. Chamado pelo "Implodir Astro", na ordem inversa da instalação, depois do backup |
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
@@ -52,7 +56,7 @@ Bibliotecas compartilhadas:
   `ui_input VAR rótulo [padrão] [validador]` e `ui_list VAR rótulo [validador]` repetem a pergunta enquanto o
   validador recusar a resposta.
 - `lib/host.sh`: preparação genérica do host. `host_base` reúne o que todo projeto precisa (máquina sem
-  suspensão, podman-compose, inicialização no boot, SSH e Tailscale), e `host_undo` desfaz o que é só do Astro
+  suspensão, podman-compose, inicialização no boot, SSH e Tailscale; chamado uma vez pelo `setup.sh`, na etapa Máquina), e `host_undo` desfaz o que é só do Astro
   (suspensão, portas baixas, rede anunciada no Tailscale, login só por chave no SSH, linger e `podman-restart`;
   o SSH continua ativo), chamado pelo "Implodir Astro". Funções avulsas: `host_upgrade` (dnf ou apt; avisa e marca `HOST_REBOOT` se veio kernel novo; chamada pelo `setup.sh` uma vez
   antes de instalar, não pelos projetos), `host_no_sleep`,

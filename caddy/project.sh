@@ -211,7 +211,6 @@ cmd_install() {
     https_port="$(env_get HTTPS_PORT 443)"
     host_unprivileged_ports "$((http_port < https_port ? http_port : https_port))"
     host_firewall "$http_port/tcp" "$https_port/tcp" "$https_port/udp"
-    host_base
 
     ui_step "Container"
     local log

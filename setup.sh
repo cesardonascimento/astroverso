@@ -14,6 +14,7 @@ trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
 ORDER=(caddy adguard cockpit homeassistant nextcloud arcade rclone discord)
 IMPLODE_WORD=IMPLODIR
+DONE_DIR="$ASTRO_HOME/.concluidas"
 
 PROJECTS=()
 for name in "${ORDER[@]}"; do
@@ -39,26 +40,94 @@ installed_any() {
     return 1
 }
 
+join() {
+    local IFS=$'\x1f' text
+    text="$*"
+    printf '%s' "${text//$'\x1f'/, }"
+}
+
 summary() {
     ui_step "Resumo"
-    ((${#succeeded[@]} == 0)) || ui_ok "concluído: ${succeeded[*]}"
-    ((${#failed[@]} == 0)) || ui_error "falhou: ${failed[*]}"
+    [[ -z ${skipped[*]:-} ]] || ui_info "pulados (já concluídos): $(join "${skipped[@]}")"
+    ((${#succeeded[@]} == 0)) || ui_ok "concluído: $(join "${succeeded[@]}")"
+    ((${#failed[@]} == 0)) || ui_error "falhou: $(join "${failed[@]}")"
     ((${#failed[@]} == 0))
 }
 
-install_astro() {
-    local name failed=() succeeded=()
-    if ! installed_any; then
+step_label() {
+    case $1 in
+        maquina) printf 'Máquina' ;;
+        discos)  printf 'Discos da máquina' ;;
+        *)       printf '%s' "$1" ;;
+    esac
+}
+
+step_done() {
+    [[ -f $DONE_DIR/$1 ]] || return 1
+    case $1 in
+        maquina|discos) return 0 ;;
+        *)              project "$1" status ;;
+    esac
+}
+
+step_date() {
+    date -d "@$(stat -c %Y "$DONE_DIR/$1")" '+%d/%m %H:%M'
+}
+
+step_machine() {
+    if $1; then
         ui_step "Sistema"
         host_upgrade
     fi
-    disk_manage || true
+    ui_step "Máquina"
+    host_base
+}
+
+run_step() {
+    local step=$1 status
+    shift
+    if step_done "$step" && [[ $redo != *" $step "* ]]; then
+        ui_step "$(step_label "$step")"
+        ui_info "concluída em $(step_date "$step"), pulada"
+        skipped+=("$(step_label "$step")")
+        return 0
+    fi
+    rm -f "$DONE_DIR/$step"
+    set +e
+    (set -e; "$@")
+    status=$?
+    set -e
+    if ((status == 0)); then
+        mkdir -p "$DONE_DIR"
+        chmod 700 "$ASTRO_HOME" "$DONE_DIR"
+        touch "$DONE_DIR/$step"
+        succeeded+=("$(step_label "$step")")
+    else
+        failed+=("$(step_label "$step")")
+    fi
+}
+
+install_astro() {
+    local name step label first=true redo=" " i chosen=() done_steps=() labels=() failed=() succeeded=() skipped=()
+    for step in maquina discos "${PROJECTS[@]}"; do
+        step_done "$step" || continue
+        done_steps+=("$step")
+        label="$(step_label "$step")"
+        labels+=("$(printf '%s%*s concluída em %s' "$label" $((18 - ${#label})) '' "$(step_date "$step")")")
+    done
+    if ((${#done_steps[@]})); then
+        ui_checklist chosen "Quais etapas concluídas reinstalar? (as não concluídas sempre rodam)" --all "${labels[@]}"
+        for i in "${chosen[@]}"; do
+            redo+="${done_steps[i]} "
+        done
+    fi
+    if [[ -f $DONE_DIR/maquina ]] || installed_any; then
+        first=false
+    fi
+    run_step maquina step_machine "$first"
+    run_step discos disk_manage
     for name in "${PROJECTS[@]}"; do
-        if project "$name" install; then
-            succeeded+=("$name")
-        else
-            failed+=("$name")
-        fi
+        run_step "$name" project "$name" install
     done
     summary
 }
@@ -154,6 +223,7 @@ implode() {
         ui_error "o backup falhou: nada foi desfeito"
         return 1
     fi
+    rm -rf "$DONE_DIR"
 
     for ((i = ${#PROJECTS[@]} - 1; i >= 0; i--)); do
         name=${PROJECTS[i]}

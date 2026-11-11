@@ -822,7 +822,6 @@ cmd_install() {
     autologin_mode="$(env_get AUTOLOGIN yes)"
 
     ui_step "Host"
-    host_base
     host_nvidia_driver
     host_intel_media
     install_packages
