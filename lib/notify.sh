@@ -2,25 +2,34 @@ NOTIFY_QUEUE="$HOME/.astro/discord/fila"
 NOTIFY_FLAGS="${XDG_STATE_HOME:-$HOME/.local/state}/astro/notify"
 NOTIFY_REPEAT=86400
 
-notify_send() {
+notify_write() {
     [[ -d $NOTIFY_QUEUE/saida && -d $NOTIFY_QUEUE/tmp ]] || return 2
-    local name tmp
+    local silent=$1 name tmp
+    shift
     name="$(date +%s%N)-$$"
     tmp="$NOTIFY_QUEUE/tmp/$name.json"
     if ! python3 -I -c '
 import json, sys
-host, project, text, *buttons = sys.argv[1:]
+host, project, silent, text, *buttons = sys.argv[1:]
 items = []
 for button in buttons:
     label, action, arg = (button.split("|") + ["", ""])[:3]
     items.append({"rotulo": label, "acao": action, "arg": arg})
-print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items}, ensure_ascii=False))
-' "$(hostname -s)" "${ASTRO_PROJECT:-astro}" "$@" > "$tmp"; then
+print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items, "silencioso": silent == "1"}, ensure_ascii=False))
+' "$(hostname -s)" "${ASTRO_PROJECT:-astro}" "$silent" "$@" > "$tmp"; then
         rm -f "$tmp"
         ui_warn "não foi possível preparar o aviso para o Discord"
         return 1
     fi
     mv "$tmp" "$NOTIFY_QUEUE/saida/$name.json"
+}
+
+notify_send() {
+    notify_write 0 "$@"
+}
+
+notify_info() {
+    notify_write 1 "$@"
 }
 
 notify_flag() {
@@ -49,7 +58,7 @@ notify_resolved() {
     local flag
     flag="$(notify_flag "$1")"
     [[ -f $flag ]] || return 0
-    notify_send "✅ $2" || true
+    notify_info "✅ $2" || true
     rm -f "$flag"
     return 0
 }

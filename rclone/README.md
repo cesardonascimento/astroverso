@@ -60,6 +60,22 @@ A cópia e a sincronização com a nuvem rodam por `podman unshare`, como o espe
 acertar a data e substituir arquivos que o Nextcloud gravou no disco (donos do container). Uma falha na primeira
 cópia avisa no Discord (uma vez por dia), com o botão "Tentar de novo"; outro aviso chega quando ela termina.
 
+## Avisos no Discord
+
+Com o projeto discord instalado, as rotinas agendadas avisam no canal. Início e sucesso vão como mensagem
+silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
+
+| Rotina | Início | Sucesso | Falha |
+|---|---|---|---|
+| Backup das configurações (01:00) | sim | sim, com os serviços salvos e o tempo | sim, com o erro e "Tentar de novo" |
+| Rodada das 03:00 (nuvem e espelho) | sim | sim, com o resumo e o tempo | sim, com o erro |
+| Primeira cópia (nuvem → disco) | na primeira tentativa | sim, com o tempo | uma vez por dia, com o erro e "Tentar de novo" |
+| Sincronização a cada 30 minutos | não | só quando volta a funcionar depois de uma falha | uma vez por dia, com "Tentar de novo" |
+| Disco não montado, exclusões acima de 5%, estado perdido | — | quando volta ao normal | uma vez por dia, com os botões de cada caso |
+
+Só as execuções pelo systemd (agendadas, "Sincronizar agora" e os botões do Discord) avisam; as rodadas pelo
+assistente mostram tudo na tela.
+
 ## Travas
 
 - Nada roda se o disco não estiver montado. Sem o disco, a pasta fica vazia, e espelhar uma pasta vazia

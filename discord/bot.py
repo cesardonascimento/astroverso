@@ -135,7 +135,8 @@ class Bot(discord.Client):
                     arquivo.unlink(missing_ok=True)
                     continue
                 try:
-                    await canal.send(dados.get("texto", "")[:1900], view=botoes(dados.get("botoes")))
+                    await canal.send(dados.get("texto", "")[:1900], view=botoes(dados.get("botoes")),
+                                     silent=bool(dados.get("silencioso")))
                 except discord.HTTPException as erro:
                     log.warning("falha ao enviar aviso (tento de novo): %s", erro)
                     break

@@ -17,6 +17,43 @@ rclone_owner() {
     podman unshare rclone --config "$RCLONE_CONF" "$@"
 }
 
+duration() {
+    if (($1 < 60)); then
+        printf '%ss' "$1"
+    else
+        printf '%dmin %02ds' $(($1 / 60)) $(($1 % 60))
+    fi
+}
+
+routine() {
+    local title=$1 retry=$2 start log status summary
+    shift 2
+    if [[ -z ${INVOCATION_ID:-} ]]; then
+        "$@"
+        return
+    fi
+    start=$(date +%s)
+    log="$(mktemp)"
+    notify_info "▶️ $title começou"
+    set +e
+    (set -e; "$@") 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
+    set -e
+    if ((status == 0)); then
+        summary="$(sed -n 's/^\[rclone\] *ok: //p' "$log" | tail -3 | paste -sd '|' | sed 's/|/; /g')"
+        notify_info "✅ $title terminou em $(duration $(($(date +%s) - start)))${summary:+: $summary}"
+    else
+        summary="$(sed -n 's/^\[rclone\] *erro: //p' "$log" | tail -3 | paste -sd '|' | sed 's/|/; /g')"
+        if [[ -n $retry ]]; then
+            notify_send "❌ $title falhou${summary:+: $summary}" "Tentar de novo|$retry|"
+        else
+            notify_send "❌ $title falhou${summary:+: $summary}. Veja \"Ver as últimas execuções\" no assistente do rclone"
+        fi
+    fi
+    rm -f "$log"
+    return "$status"
+}
+
 lock() {
     [[ ${ASTRO_LOCKED:-} == 1 ]] && return 0
     exec 9>"${2:-$LOCK}"
@@ -60,7 +97,12 @@ import_target() {
     fi
     mkdir -p "$LOCAL"
     ui_step "$name: primeira cópia $REMOTE → $LOCAL (continua de onde parou)"
-    local log error
+    local log error start
+    start=$(date +%s)
+    if [[ $(target_get "$name" IMPORT_NOTIFIED) != yes ]]; then
+        notify_info "▶️ primeira cópia do $name (nuvem → disco) começou"
+        target_set "$name" IMPORT_NOTIFIED yes
+    fi
     log="$(mktemp)"
     if ! rclone_owner copy "$REMOTE" "$LOCAL" "${RCLONE_OPTIONS[@]}" "${PROVIDER_OPTIONS[@]}" 2>&1 | tee "$log"; then
         error="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -oE '(Failed to copy|ERROR) *: .*' | tail -1)" || true
@@ -73,7 +115,8 @@ import_target() {
     rm -f "$log"
     target_set "$name" IMPORT_DONE yes
     target_set "$name" BISYNC_READY no
-    notify_resolved "$name-importacao" "a primeira cópia do $name terminou; a sincronização nos dois sentidos começa na próxima rodada"
+    rm -f "$(notify_flag "$name-importacao")"
+    notify_info "✅ primeira cópia do $name terminou em $(duration $(($(date +%s) - start))); a sincronização nos dois sentidos começa na próxima rodada"
     ui_ok "$name: primeira cópia concluída; a sincronização nos dois sentidos está ativa"
 }
 
@@ -104,10 +147,8 @@ bisync_target() {
         else
             failures=$(( $(target_get "$name" FAILURES) + 1 ))
             target_set "$name" FAILURES "$failures"
-            if ((failures >= 3)); then
-                notify_problem "$name-falha" "a sincronização do $name falhou $failures vezes seguidas. Veja \"Ver as últimas execuções\" no assistente do rclone" \
-                    "Tentar de novo|rclone:sync|"
-            fi
+            notify_problem "$name-falha" "a sincronização do $name falhou ($failures vez(es) seguida(s)). Veja \"Ver as últimas execuções\" no assistente do rclone" \
+                "Tentar de novo|rclone:sync|"
         fi
         if grep -qiE 'must run --resync|cannot find prior' "$log"; then
             target_set "$name" BISYNC_READY no
@@ -195,11 +236,9 @@ local_mirror() {
     if ! podman unshare rclone --config /dev/null sync "$source/" "$backup/atual" --metadata --links \
             --backup-dir "$backup/versoes/$(date +%F)" --exclude '/lost+found/**' "${RCLONE_OPTIONS[@]}"; then
         ui_error "espelho local falhou"
-        notify_problem espelho-local "o espelho de $source no disco de backup ($backup) falhou. Veja \"Ver as últimas execuções\" no assistente do rclone"
         return 1
     fi
     podman unshare find "$backup/versoes" -mindepth 1 -maxdepth 1 -type d -mtime "+$days" -exec rm -rf {} +
-    notify_resolved espelho-local "o espelho no disco de backup voltou a funcionar"
     ui_ok "espelho local concluído; versões com mais de $days dias apagadas"
 }
 
@@ -333,18 +372,16 @@ config_backup() {
     podman unshare rm -rf "$work"
     ((${#saved[@]})) && ui_ok "versão $version salva e criptografada: ${saved[*]}"
     if ((failed)); then
-        notify_problem backup-config "o backup das configurações falhou em parte (salvos: ${saved[*]:-nenhum}). Veja \"Ver as últimas execuções\" no assistente do rclone" \
-            "Tentar de novo|rclone:backup-configs|"
+        ui_error "backup das configurações incompleto (salvos: ${saved[*]:-nenhum})"
         return 1
     fi
-    notify_resolved backup-config "o backup das configurações voltou a funcionar"
     config_prune "$dest" "$(env_get CONFIG_KEEP_DAYS 90)"
 }
 
 case "${1:-}" in
     tick)    lock skip; run_targets tick ;;
-    local)   lock wait; local_run ;;
+    local)   lock wait; routine "rodada das 03:00 (nuvem e espelho no disco de backup)" "" local_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
-    config)  lock wait "$CONFIG_LOCK"; config_backup "${2:-}" ;;
+    config)  lock wait "$CONFIG_LOCK"; routine "backup das configurações" rclone:backup-configs config_backup "${2:-}" ;;
     *)       ui_fail "uso: $0 tick | local | config [rótulo] | preview <armazenamento>" ;;
 esac

@@ -78,7 +78,8 @@ Bibliotecas compartilhadas:
 - `lib/notify.sh`: avisos pelo bot do projeto `discord` (deixa um arquivo na fila `~/.astro/discord/fila/saida`;
   sem o projeto instalado, nada é enviado). `notify_problem <chave> <texto> [botões]` avisa um problema no máximo
   uma vez por dia (marca em `~/.local/state/astro/notify/<projeto>-<chave>`); `notify_resolved <chave> <texto>`
-  avisa que ele acabou, só se houve aviso. `notify_send <texto> [botões]` manda direto. Cada botão é
+  avisa que ele acabou, só se houve aviso, em mensagem silenciosa. `notify_send <texto> [botões]` manda direto;
+  `notify_info <texto> [botões]` também, mas silenciosa (fica no canal, sem notificar o celular). Cada botão é
   `"Rótulo|<projeto>:<ação>|<argumento>"` e roda a ação como o `/astro`. Nenhuma delas derruba o chamador.
   Precisa de `lib/ui.sh`.
 - `lib/disk.sh`: discos de dados **da máquina**, montados pelo sistema no boot. Nenhum disco pertence a um

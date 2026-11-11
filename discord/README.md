@@ -31,7 +31,7 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 | `fila/catalogo.json` | executor | Lista de ações permitidas (o autocompletar do `/astro` vem daqui) |
 | `fila/pedidos/<id>.json` | bot | Ação, argumento e quem pediu |
 | `fila/respostas/<id>.json` | executor | Resultado (o bot responde no Discord e apaga; sobras somem depois de 1 dia) |
-| `fila/saida/<n>.json` | `notify_send` (qualquer projeto) | Aviso e botões, enviados pelo bot ao canal |
+| `fila/saida/<n>.json` | `notify_send` / `notify_info` (qualquer projeto) | Aviso e botões, enviados pelo bot ao canal; com `silencioso`, sai como mensagem silenciosa do Discord (sem notificar o celular) |
 | `fila/tmp/` | todos | Arquivos em escrita: só entram nas outras pastas prontos (`mv`) |
 
 1. `/astro command:<projeto>:<ação> argument:<opcional>` ou um botão de um aviso. Os nomes dos comandos são
