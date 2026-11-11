@@ -37,7 +37,6 @@ cmd_actions() {
         "add|Adicionar armazenamento em nuvem" \
         "login|Reconectar a um armazenamento em nuvem" \
         "remove|Remover armazenamento em nuvem"
-    cmd_global_actions
 }
 
 cmd_remote_actions() {

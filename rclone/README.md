@@ -163,8 +163,13 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Adicionar armazenamento em nuvem | As perguntas acima |
 | Reconectar a um armazenamento em nuvem | Refaz o login (ex.: depois de ligar a verificação em duas etapas) |
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
-| Fazer backup das configurações agora | Também em Gerenciar Astro → Administração: roda o backup das configurações na hora |
-| Restaurar uma versão das configurações | Também em Gerenciar Astro → Administração: veja abaixo |
+
+Em Gerenciar Astro → Administração (ações globais do rclone):
+
+| Ação | O que faz |
+|---|---|
+| Fazer backup das configurações agora | Roda o backup das configurações na hora |
+| Restaurar uma versão das configurações | Veja abaixo |
 
 ## Restaurar uma versão
 
