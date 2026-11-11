@@ -101,7 +101,7 @@ data_disks() {
     local skip=${1:-} mount type
     while read -r mount type; do
         [[ $mount == "$skip" ]] || printf '%s %s\n' "$mount" "$type"
-    done < <(disk_mounts)
+    done < <(disk_mounts | sort -k2,2r -k1,1)
 }
 
 pick_data_disk() {
@@ -130,9 +130,9 @@ configure() {
         return
     fi
     RECONFIGURE=true
-    local mount type mounts=("") labels=("Nenhum (só nuvem)") choice current backup_mount source="" days backup
+    local mount type mounts=() labels=() choice current backup_mount="" source days backup
     backup="$(env_get CONFIG_BACKUP)"
-    current="$(env_get BACKUP_MOUNT)"
+    current="$(env_get SOURCE)"
     while read -r mount type; do
         if [[ $mount == "$current" ]]; then
             mounts=("$mount" "${mounts[@]}")
@@ -141,14 +141,25 @@ configure() {
             mounts+=("$mount")
             labels+=("$mount  ($type)")
         fi
-    done < <(disk_mounts)
-    ui_menu choice "Qual disco recebe o espelho noturno?" "${labels[@]}"
-    backup_mount=${mounts[choice]}
-    if [[ -n $backup_mount ]]; then
-        pick_data_disk source "Qual disco copiar para ele toda noite?" "$(env_get SOURCE)" "$backup_mount"
+    done < <(data_disks)
+    mounts+=("")
+    labels+=("Nenhum (sem espelho, só a nuvem)")
+    ui_step "Espelho noturno"
+    ui_info "o espelho copia um disco inteiro para outro toda noite, às 03:00"
+    ui_menu choice "ORIGEM: qual disco proteger (o que será copiado)?" "${labels[@]}"
+    source=${mounts[choice]}
+    if [[ -n $source && -z $(data_disks "$source") ]]; then
+        ui_warn "não há outro disco da máquina para receber a cópia de $source: sem espelho noturno"
+        source=""
+    fi
+    if [[ -n $source ]]; then
+        pick_data_disk backup_mount "DESTINO: em qual disco guardar a cópia de $source?" "$(env_get BACKUP_MOUNT)" "$source"
         ui_input days "por quantos dias guardar o que for apagado ou alterado" "$(env_get KEEP_DAYS 30)" is_number
+        ui_ok "espelho noturno: $source → $backup_mount/atual"
+        ui_info "o que for apagado ou alterado na origem fica em $backup_mount/versoes por $days dias"
     else
         days=30
+        ui_info "sem espelho noturno"
     fi
     (
         umask 077

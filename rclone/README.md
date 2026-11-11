@@ -13,8 +13,8 @@ mesmo sem ninguém logado.
 
 | Pergunta | Padrão |
 |---|---|
-| Qual disco recebe o espelho noturno? | o atual, ou "Nenhum (só nuvem)" |
-| Qual disco copiar para ele toda noite? | o atual, ou o primeiro dos outros discos da máquina |
+| ORIGEM: qual disco proteger (o que será copiado)? | o atual (`SOURCE`), ou o primeiro disco; "Nenhum" no fim da lista |
+| DESTINO: em qual disco guardar a cópia? | o atual (`BACKUP_MOUNT`), ou o primeiro dos outros discos (a origem não aparece) |
 | Por quantos dias guardar o que for apagado ou alterado | `30` |
 | Adicionar um armazenamento em nuvem agora? | `S` (sem nenhum disco da máquina, não aparece) |
 

@@ -81,17 +81,26 @@ ui_confirm() {
     [[ ${answer,,} == [sy]* ]]
 }
 
-_ui_cursor_hide() { printf '\033[?25l' >/dev/tty; }
-_ui_cursor_show() { printf '\033[?25h' >/dev/tty; }
+_ui_cursor_hide() {
+    printf '\033[?25l' >/dev/tty
+    stty -echo </dev/tty 2>/dev/null || true
+}
+
+_ui_cursor_show() {
+    stty echo </dev/tty 2>/dev/null || true
+    printf '\033[?25h' >/dev/tty
+}
+
+trap '_ui_cursor_show; echo >/dev/tty; exit 130' INT
 
 _ui_read_key() {
     local key rest
     IFS= read -rsn1 key </dev/tty
     if [[ $key == $'\e' ]]; then
-        IFS= read -rsn2 -t 0.05 rest </dev/tty || true
+        IFS= read -rsn2 -t 0.5 rest </dev/tty || true
         case $rest in
-            '[A') key=up ;;
-            '[B') key=down ;;
+            '[A'|'OA') key=up ;;
+            '[B'|'OB') key=down ;;
             *)    key=esc ;;
         esac
     fi

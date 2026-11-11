@@ -229,10 +229,12 @@ pelas integrações, no próprio painel.
 
 ### rclone
 
-- **Qual disco recebe o espelho noturno?** O disco da máquina que guarda a cópia local (de preferência um
-  disco privado). Escolha "Nenhum" para fazer só a cópia na nuvem.
-- **Qual disco copiar para ele toda noite?** O disco da máquina que vai ser protegido, por exemplo o do
-  Nextcloud.
+O espelho noturno copia um disco inteiro para outro disco da máquina, toda noite às 03:00.
+
+- **ORIGEM: qual disco proteger?** O disco que será copiado, por exemplo o do Nextcloud. Escolha "Nenhum" para
+  fazer só a cópia na nuvem.
+- **DESTINO: em qual disco guardar a cópia?** O disco que recebe a cópia (de preferência um disco privado). A
+  origem não aparece nesta lista. No fim, o assistente mostra `origem → destino/atual` para conferir.
 - **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
   pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
 - **Adicionar um armazenamento em nuvem agora?** Liga a cópia fora de casa. Dá para adicionar depois, em

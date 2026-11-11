@@ -48,7 +48,7 @@ alcançados pelo nome; serviços do próprio sistema e containers na rede do hos
 Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
-  prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (`--selected "0 2"` antes
+  prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (sem eco do terminal enquanto abertos; setas `ESC [`/`ESC O`, com 0,5s de espera pelo resto da sequência) (`--selected "0 2"` antes
   dos itens deixa esses índices já marcados; `--all` põe uma opção "Todos" no topo). `ui_browse VAR título
   raiz...` navega pelas pastas a partir das raízes (setas, rolagem de 12 em 12, "usar esta pasta", "voltar" e
   "digitar um caminho"; esconde pastas ocultas, `$RECYCLE.BIN`, `System Volume Information` e `lost+found`). Com `ASTRO_PLAIN=1` (serviços do systemd), as mensagens saem sem
