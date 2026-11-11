@@ -108,14 +108,18 @@ run_step() {
 }
 
 install_astro() {
-    local name step label first=true redo=" " i chosen=() done_steps=() labels=() failed=() succeeded=() skipped=()
+    local name step label first=true redo=" " i chosen=() pending=() done_steps=() labels=() failed=() succeeded=() skipped=()
     for step in maquina discos "${PROJECTS[@]}"; do
-        step_done "$step" || continue
+        if ! step_done "$step"; then
+            pending+=("$(step_label "$step")")
+            continue
+        fi
         done_steps+=("$step")
         label="$(step_label "$step")"
         labels+=("$(printf '%s%*s concluída em %s' "$label" $((18 - ${#label})) '' "$(step_date "$step")")")
     done
     if ((${#done_steps[@]})); then
+        ((${#pending[@]} == 0)) || ui_info "pendentes (sempre rodam): $(join "${pending[@]}")"
         ui_checklist chosen "Quais etapas concluídas reinstalar? (as não concluídas sempre rodam)" --all "${labels[@]}"
         for i in "${chosen[@]}"; do
             redo+="${done_steps[i]} "

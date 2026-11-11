@@ -53,7 +53,7 @@ desse usuário.
   mudar alguma.
 - **Quais etapas concluídas reinstalar?** Só aparece no "Reinstalar Astro". Uma etapa (Máquina, Discos da
   máquina ou um projeto) só conta como concluída quando termina sem erro; uma instalação interrompida no meio
-  continua de onde parou. Enter sem marcar nada pula todas as concluídas; marque com Espaço as que quer refazer
+  continua de onde parou. Antes da lista, uma linha mostra as pendentes, que sempre rodam. Enter sem marcar nada pula todas as concluídas; marque com Espaço as que quer refazer
   (ou "Todos").
 
 ### Máquina
