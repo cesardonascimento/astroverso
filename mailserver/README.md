@@ -47,15 +47,15 @@ astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
 | Token da Cloudflare | (secreto, conferido na API) |
 
 O token precisa de **Account → Workers Scripts → Edit**, **Account → Workers KV Storage → Edit**, **Zone → Email
-Routing Rules → Edit**, **Zone → Zone → Read** e **Zone → DNS → Read**, na conta e na zona do endereço, sem
+Routing Rules → Edit**, **Zone → Zone Settings → Edit**, **Zone → Zone → Read** e **Zone → DNS → Read**, na conta e na zona do endereço, sem
 expiração. É separado do token do Caddy.
 
 ## O que a instalação faz
 
-- **Email Routing:** confere pelo DNS se o domínio do endereço tem os MX da Cloudflare. Se não tiver, mostra como
-  ativar pelo painel (Email → Email Routing → começar e aceitar os registros) e espera. Se o domínio já tiver
-  outros MX, avisa que ativar desviaria o e-mail que chega por eles. A ativação fica manual: a API não garante
-  deixar outros registros de e-mail como estão.
+- **Email Routing:** confere pelo DNS os MX do domínio do endereço. Com os da Cloudflare, segue. Sem nenhum,
+  ativa pela API (`POST zones/<zona>/email/routing/dns` com o nome do domínio, que cria e trava os MX e o SPF) e
+  espera os MX aparecerem (até 2 minutos). Com MX de outro serviço, para sem mudar nada: ativar desviaria o
+  e-mail que chega por eles.
 - **Cloudflare pela API:** cria o KV `astro-mailserver` (se não existir), publica o Worker `astro-mailserver`
   (`worker.js`, com o KV em `MAIL` e a lista em `ALLOWED_SENDERS`) e cria ou atualiza a regra `endereço →
   Worker`.
@@ -83,5 +83,6 @@ expiração. É separado do token do Caddy.
 ## Remoção
 
 `remove` desliga a busca, apaga o container e a imagem, a regra do Email Routing, o Worker e o KV (com os
-e-mails ainda não buscados), a conta "Astro Inbox" do Nextcloud Mail e `~/.astro/mailserver`. O Email Routing do
-domínio continua ativo: desligue pelo painel, se quiser.
+e-mails ainda não buscados), a conta "Astro Inbox" do Nextcloud Mail e `~/.astro/mailserver`. Também desliga o
+Email Routing do domínio (`DELETE zones/<zona>/email/routing/dns`, que tira os MX e o SPF); se a Cloudflare
+recusar, avisa para desligar pelo painel.

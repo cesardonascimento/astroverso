@@ -13,7 +13,7 @@ só na rede local, pelo Caddy, e sem comunicação com os servidores da empresa 
 | Pergunta | Padrão |
 |---|---|
 | Endereço do n8n no Caddy | `n8n.<domínio>` |
-| E-mail do administrador | (é o login; o n8n não manda e-mails) |
+| E-mail do administrador | `n8n@<domínio>` (só o login: não precisa existir, o n8n não manda e-mails) |
 | Nome e sobrenome do administrador | — |
 | Senha do administrador | (secreta, mínimo 8 caracteres; ao reinstalar, pergunta se troca) |
 

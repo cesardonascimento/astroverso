@@ -86,7 +86,8 @@ configure() {
         domain="$(proxy_domain)"
         ui_input host  "endereço do n8n no Caddy" "$(env_get N8N_HOST "n8n${domain:+.$domain}")" is_hostname
         ui_info "o administrador é criado pela instalação: ninguém na rede consegue tomar a conta antes de você"
-        ui_input email "e-mail do administrador (é o login; o n8n não manda e-mails)" "$(env_get OWNER_EMAIL)" is_email
+        ui_input email "e-mail para entrar no n8n (só o login: não precisa existir, o n8n não manda e-mails)" \
+            "$(env_get OWNER_EMAIL "${domain:+n8n@$domain}")" is_email
         ui_input first "nome do administrador" "$(env_get OWNER_FIRST_NAME)" is_label
         ui_input last  "sobrenome do administrador" "$(env_get OWNER_LAST_NAME)" is_label
         if [[ -f $HASH_FILE ]] && ui_confirm "manter a senha atual do administrador?" y; then

@@ -116,6 +116,7 @@ token_instructions() {
     ui_info "       Account → Workers Scripts → Edit"
     ui_info "       Account → Workers KV Storage → Edit"
     ui_info "       Zone → Email Routing Rules → Edit"
+    ui_info "       Zone → Zone Settings → Edit"
     ui_info "       Zone → Zone → Read"
     ui_info "       Zone → DNS → Read"
     ui_info "  3. Account Resources: Include → a sua conta; Zone Resources: Include → Specific zone → $1"
@@ -195,30 +196,35 @@ env_put() {
     printf "%s='%s'\n" "$1" "$2" >> "$ENV_FILE"
 }
 
-routing_check() {
-    local sub=$1 zone=$2 mx
-    cf_call mx '" ".join(x["content"] for x in r)' GET "zones/$zone/dns_records?type=MX&name=$sub" || return 1
-    ROUTING_MX=$mx
-    if [[ $mx == *mx.cloudflare.net* ]]; then
-        ui_ok "Email Routing ativo em $sub (MX da Cloudflare)"
-        return 0
-    fi
-    return 1
+routing_mx() {
+    cf_call ROUTING_MX '" ".join(x["content"] for x in r)' GET "zones/$2/dns_records?type=MX&name=$1"
 }
 
-routing_instructions() {
-    local domain=$1
-    ui_warn "o Email Routing ainda não está ativo em $domain"
-    if [[ -n $ROUTING_MX ]]; then
-        ui_warn "atenção: $domain já recebe e-mail por $ROUTING_MX"
-        ui_warn "ativar o Email Routing troca esses MX e desvia esse e-mail: use outro domínio, sem e-mail (n cancela)"
+routing_ensure() {
+    local domain=$1 zone=$2 ignored i
+    routing_mx "$domain" "$zone" || ui_fail "não foi possível ler os registros MX de $domain"
+    if [[ $ROUTING_MX == *mx.cloudflare.net* ]]; then
+        ui_ok "Email Routing ativo em $domain (MX da Cloudflare)"
+        return 0
     fi
-    ui_info "ative pelo painel da Cloudflare:"
-    ui_info "  1. abra https://dash.cloudflare.com → o domínio $domain → Email → Email Routing"
-    ui_info "  2. comece a configuração (Get started / Enable Email Routing)"
-    ui_info "  3. se ele pedir um endereço e um destino, use um endereço qualquer e o seu e-mail como destino"
-    ui_info "     (o destino recebe um e-mail de confirmação; essa regra pode ser apagada depois)"
-    ui_info "  4. aceite os registros DNS que ele propõe (Add records and enable)"
+    if [[ -n $ROUTING_MX ]]; then
+        ui_error "$domain já recebe e-mail por $ROUTING_MX"
+        ui_fail "ativar o Email Routing desviaria esse e-mail: use um endereço num domínio sem e-mail (ex.: o domínio do astro)"
+    fi
+    ui_info "ativando o Email Routing em $domain (a Cloudflare cria e trava os registros MX e SPF)..."
+    if ! cf_call ignored 'None' POST "zones/$zone/email/routing/dns" \
+            -H 'Content-Type: application/json' --data-binary "$(cf_json name "$domain")"; then
+        ui_fail "não foi possível ativar o Email Routing (o token precisa de Zone → Zone Settings → Edit)"
+    fi
+    for ((i = 0; i < 24; i++)); do
+        routing_mx "$domain" "$zone" || true
+        if [[ $ROUTING_MX == *mx.cloudflare.net* ]]; then
+            ui_ok "Email Routing ativo em $domain (MX da Cloudflare)"
+            return 0
+        fi
+        sleep 5
+    done
+    ui_fail "o Email Routing foi pedido, mas os MX da Cloudflare não apareceram em 2 minutos: rode a instalação de novo"
 }
 
 cloudflare_setup() {
@@ -230,10 +236,7 @@ cloudflare_setup() {
     ZONE_ID="$(env_get ZONE_ID)"
     ACCOUNT_ID="$(env_get ACCOUNT_ID)"
 
-    until routing_check "$sub" "$ZONE_ID"; do
-        routing_instructions "$sub"
-        ui_confirm "já ativou? (n cancela a instalação)" y || ui_fail "Email Routing não ativado em $sub"
-    done
+    routing_ensure "$sub" "$ZONE_ID"
 
     cf_call kv "next((x[\"id\"] for x in r if x[\"title\"] == \"$KV_TITLE\"), \"\")" GET \
         "accounts/$ACCOUNT_ID/storage/kv/namespaces?per_page=100" || ui_fail "não foi possível listar os KV"
@@ -513,7 +516,12 @@ cloudflare_remove() {
     if [[ -n $account && -n $kv ]] && cf_call ignored 'None' DELETE "accounts/$account/storage/kv/namespaces/$kv"; then
         ui_ok "KV $KV_TITLE removido (com os e-mails ainda não buscados)"
     fi
-    ui_info "o Email Routing de ${address#*@} continua ativo: para desligar, Email → Email Routing → Settings → Disable no painel"
+    if [[ -n $zone ]] && cf_call ignored 'None' DELETE "zones/$zone/email/routing/dns" \
+            -H 'Content-Type: application/json' --data-binary "$(cf_json name "${address#*@}")"; then
+        ui_ok "Email Routing desligado em ${address#*@} (registros MX e SPF removidos)"
+    else
+        ui_warn "desligue o Email Routing de ${address#*@} pelo painel: Email → Email Routing → Settings"
+    fi
 }
 
 cmd_remove() {

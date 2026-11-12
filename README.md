@@ -252,15 +252,17 @@ notificações do canal em "Todas as mensagens".
 - **Usuário do Nextcloud:** aparece com o Nextcloud instalado. A caixa entra no app **Mail** desse usuário como
   "Astro Inbox". Por padrão, o administrador do Nextcloud.
 - **Token da Cloudflare:** um token só deste projeto, com as permissões que o assistente lista (Workers, KV,
-  Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o token na hora.
-- **Email Routing:** na primeira vez, o assistente pede para ativar o Email Routing no domínio do endereço,
-  pelo painel da Cloudflare, e espera. Se esse domínio já recebe e-mail por outro serviço, ele avisa antes.
+  regras e configurações do Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o
+  token na hora.
+
+A instalação ativa sozinha o Email Routing no domínio do endereço. Se esse domínio já recebe e-mail por outro
+serviço, ela para sem mudar nada, porque ativar desviaria esse e-mail.
 
 ### n8n
 
 - **Endereço do n8n no Caddy:** o nome pelo qual o n8n é aberto no navegador. Por padrão, `n8n.<domínio>`.
 - **E-mail, nome e sobrenome do administrador:** a conta com que você entra no n8n. O e-mail é só o login: o n8n
-  não manda e-mails. A conta é criada pela própria instalação, para ninguém na rede tomá-la antes de você no
+  não manda e-mails, e o endereço não precisa existir. Por padrão, `n8n@<domínio>`. A conta é criada pela própria instalação, para ninguém na rede tomá-la antes de você no
   primeiro acesso. Para trocar esses dados depois, reinstale o n8n (eles ficam travados na tela do n8n).
 - **Senha do administrador:** pelo menos 8 caracteres. Fica guardada só como hash. Ao reinstalar, o assistente
   pergunta se quer trocá-la.
