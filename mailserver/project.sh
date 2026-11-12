@@ -24,6 +24,7 @@ FETCH_UNIT=astro-mailserver-fetch
 FETCH_EVERY=5min
 LOCK="$STATE/.fetch.lock"
 TOKEN=""
+ROUTING_MX=""
 
 cmd_describe() {
     echo "Mailserver: caixa de e-mail só de entrada, para automações (Cloudflare Email Routing + Dovecot)"
@@ -149,7 +150,7 @@ check_token() {
 configure() {
     ui_step "Configuração"
     local address senders nc_user="" password domain
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if config_reuse; then
         address="$(env_get MAIL_ADDRESS)"
         senders="$(env_get ALLOWED_SENDERS)"
         nc_user="$(env_get NEXTCLOUD_USER)"
@@ -157,8 +158,8 @@ configure() {
         ui_ok "configuração existente mantida"
     else
         domain="$(proxy_domain)"
-        ui_info "endereço que vai receber os e-mails encaminhados (num subdomínio, para não mexer no e-mail do domínio principal)"
-        ui_input address "endereço da caixa" "$(env_get MAIL_ADDRESS "${domain:+inbox@astro.$domain}")" is_email
+        ui_info "endereço que vai receber os e-mails encaminhados, num domínio sem outro e-mail (ex.: o domínio do astro)"
+        ui_input address "endereço da caixa" "$(env_get MAIL_ADDRESS "${domain:+inbox@$domain}")" is_email
         ui_info "só os e-mails destes remetentes (endereço completo ou @domínio) vão para a entrada; os outros vão para a pasta $QUARANTINE"
         ui_input senders "remetentes aceitos, separados por vírgula (ex.: os seus endereços do Proton)" "$(env_get ALLOWED_SENDERS)" is_senders
         if [[ -x ../nextcloud/project.sh ]] && ../nextcloud/project.sh status; then
@@ -197,6 +198,7 @@ env_put() {
 routing_check() {
     local sub=$1 zone=$2 mx
     cf_call mx '" ".join(x["content"] for x in r)' GET "zones/$zone/dns_records?type=MX&name=$sub" || return 1
+    ROUTING_MX=$mx
     if [[ $mx == *mx.cloudflare.net* ]]; then
         ui_ok "Email Routing ativo em $sub (MX da Cloudflare)"
         return 0
@@ -205,14 +207,18 @@ routing_check() {
 }
 
 routing_instructions() {
-    local sub=$1 zone=$2
-    ui_warn "o Email Routing ainda não está ativo em $sub"
-    ui_info "ative pelo painel (só o subdomínio; o e-mail de $zone continua como está):"
-    ui_info "  1. abra https://dash.cloudflare.com → a zona $zone → Email → Email Routing"
-    ui_info "  2. se aparecer o assistente \"Get started\" pedindo para trocar os registros MX de $zone, NÃO conclua:"
-    ui_info "     ele mudaria o e-mail do domínio principal. Pule (Skip) ou vá direto em Settings"
-    ui_info "  3. em Settings → Subdomains, digite $sub e confirme (Add subdomain)"
-    ui_info "  4. confira em DNS → Records: os MX novos devem estar só em $sub, e os MX de $zone, como antes"
+    local domain=$1
+    ui_warn "o Email Routing ainda não está ativo em $domain"
+    if [[ -n $ROUTING_MX ]]; then
+        ui_warn "atenção: $domain já recebe e-mail por $ROUTING_MX"
+        ui_warn "ativar o Email Routing troca esses MX e desvia esse e-mail: use outro domínio, sem e-mail (n cancela)"
+    fi
+    ui_info "ative pelo painel da Cloudflare:"
+    ui_info "  1. abra https://dash.cloudflare.com → o domínio $domain → Email → Email Routing"
+    ui_info "  2. comece a configuração (Get started / Enable Email Routing)"
+    ui_info "  3. se ele pedir um endereço e um destino, use um endereço qualquer e o seu e-mail como destino"
+    ui_info "     (o destino recebe um e-mail de confirmação; essa regra pode ser apagada depois)"
+    ui_info "  4. aceite os registros DNS que ele propõe (Add records and enable)"
 }
 
 cloudflare_setup() {
@@ -225,7 +231,7 @@ cloudflare_setup() {
     ACCOUNT_ID="$(env_get ACCOUNT_ID)"
 
     until routing_check "$sub" "$ZONE_ID"; do
-        routing_instructions "$sub" "$(env_get ZONE_NAME)"
+        routing_instructions "$sub"
         ui_confirm "já ativou? (n cancela a instalação)" y || ui_fail "Email Routing não ativado em $sub"
     done
 
@@ -507,7 +513,7 @@ cloudflare_remove() {
     if [[ -n $account && -n $kv ]] && cf_call ignored 'None' DELETE "accounts/$account/storage/kv/namespaces/$kv"; then
         ui_ok "KV $KV_TITLE removido (com os e-mails ainda não buscados)"
     fi
-    ui_info "o Email Routing de ${address#*@} continua ativo: para desligar, Email Routing → Settings → Subdomains no painel"
+    ui_info "o Email Routing de ${address#*@} continua ativo: para desligar, Email → Email Routing → Settings → Disable no painel"
 }
 
 cmd_remove() {

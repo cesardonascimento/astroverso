@@ -228,7 +228,7 @@ configure() {
     saved="$(env_get GAMES_USER)"
     if [[ -f $ENV_FILE && -n $saved ]] && ! id "$saved" >/dev/null 2>&1; then
         ui_warn "o usuário de jogos $saved não existe nesta máquina: responda a configuração de novo"
-    elif [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    elif config_reuse; then
         ui_ok "configuração existente mantida"
         grep -q '^ARCADE_BACKUP=' "$ENV_FILE" || choose_backup
         return
@@ -1118,6 +1118,31 @@ remove_games_user() {
     ui_ok "usuário $user apagado, com a home"
 }
 
+cmd_domain() {
+    local old=$1 new=$2 user host current item origins=() unit
+    user="$(env_get GAMES_USER)"
+    host="$(env_get SUNSHINE_HOST)"
+    [[ -n $user && -n $host ]] || return 0
+    ui_step "Sunshine"
+    current="$(sunshine_conf_get "$user" csrf_allowed_origins)"
+    for item in ${current//,/ }; do
+        [[ $item == "https://"*".$old" ]] && item="${item%."$old"}.$new"
+        [[ " ${origins[*]} " == *" $item "* ]] || origins+=("$item")
+    done
+    [[ " ${origins[*]} " == *" https://$host "* ]] || origins+=("https://$host")
+    sunshine_conf "$user" "csrf_allowed_origins=$(IFS=,; echo "${origins[*]}")"
+    ui_ok "painel do Sunshine aceita alterações vindas de https://$host"
+    if user_manager_running "$user"; then
+        unit="$(sunshine_unit)"
+        ui_warn "o Sunshine reinicia agora: um stream em andamento cai"
+        sudo systemctl --user -M "$user@" restart "${unit##*/}"
+        ui_ok "Sunshine reiniciado na sessão de $user"
+    fi
+
+    ui_step "Caddy"
+    proxy_publish "$host" "https+insecure://host.containers.internal:$WEB_PORT"
+}
+
 cmd_remove() {
     local user bin
     user="$(env_get GAMES_USER)"
@@ -1244,11 +1269,12 @@ case "${1:-}" in
     actions)  cmd_actions ;;
     action)   shift; cmd_action "$@" ;;
     install)  cmd_install ;;
+    domain)   shift; cmd_domain "$1" "$2" ;;
     remove)   cmd_remove ;;
     backup)   cmd_backup ;;
     restore)  shift; cmd_restore "$1" ;;
     remote-actions) cmd_remote_actions ;;
     remote)   shift; cmd_remote "$@" ;;
     help)     cmd_help ;;
-    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | remove | backup | restore <pasta> | remote-actions | remote <id> | help" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | action <id> | install | domain <antigo> <novo> | remove | backup | restore <pasta> | remote-actions | remote <id> | help" ;;
 esac

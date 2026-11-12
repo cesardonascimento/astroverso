@@ -100,7 +100,7 @@ token_instructions() {
 configure() {
     ui_step "Configuração"
     local domain http_port https_port token
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if config_reuse; then
         domain="$(env_get CADDY_DOMAIN)"
         http_port="$(env_get HTTP_PORT 80)"
         https_port="$(env_get HTTPS_PORT 443)"

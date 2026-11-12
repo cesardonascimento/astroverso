@@ -73,13 +73,13 @@ ask_password() {
 configure() {
     ui_step "Configuração"
     local host email first last domain key token
-    if [[ -f $ENV_FILE && -f $HASH_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if [[ -f $HASH_FILE ]] && config_reuse; then
         host="$(env_get N8N_HOST)"
         email="$(env_get OWNER_EMAIL)"
         first="$(env_get OWNER_FIRST_NAME)"
         last="$(env_get OWNER_LAST_NAME)"
         ui_ok "configuração existente mantida"
-        if ui_confirm "trocar a senha do administrador?" n; then
+        if [[ ${ASTRO_REUSE_CONFIG:-} != 1 ]] && ui_confirm "trocar a senha do administrador?" n; then
             ask_password
         fi
     else

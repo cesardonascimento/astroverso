@@ -95,7 +95,7 @@ check_channel() {
 configure() {
     ui_step "Configuração"
     local token channel users
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if config_reuse; then
         token="$(env_get DISCORD_TOKEN)"
         channel="$(env_get DISCORD_CHANNEL)"
         users="$(env_get DISCORD_USERS)"

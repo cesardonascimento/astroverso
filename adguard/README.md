@@ -87,6 +87,13 @@ Depois que o container sobe:
 podman compose logs -f
 ```
 
+## Troca de domínio
+
+`project.sh domain <antigo> <novo>` (chamado pelo "Trocar o domínio" do assistente) troca a reescrita
+`*.<antigo>` por `*.<novo>` no `AdGuardHome.yaml` (o resto da configuração do painel fica), sobe o container de
+novo, exige o Split DNS do Tailscale para o domínio novo apontando para esta máquina (com instruções e nova
+verificação) e republica o painel no Caddy.
+
 ## Remoção
 
 `remove` volta o DNS desta máquina para o automático (se ele estava em "só o AdGuard"), reativa o DNS stub do

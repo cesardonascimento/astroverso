@@ -259,18 +259,153 @@ implode() {
     ui_info "o repositório continua aqui: para instalar de novo, rode o setup.sh"
 }
 
+domain_before() {
+    local new=$1
+    ui_step "Antes de trocar (na Cloudflare)"
+    ui_info "1. o domínio $new precisa estar na sua conta da Cloudflare (comprado lá, já está; se não, aponte os"
+    ui_info "   nameservers dele para a Cloudflare e espere a zona ficar ativa)"
+    ui_info "2. o token do Caddy precisa enxergar a zona nova: https://dash.cloudflare.com/profile/api-tokens →"
+    ui_info "   o token do Caddy → Edit → Zone Resources → Include → Specific zone → $new (Zone:Read e DNS:Edit)"
+    ui_info "   (se ele não enxergar, a reinstalação do Caddy pede um token novo)"
+    if [[ -f $ASTRO_HOME/mailserver/.env ]]; then
+        ui_info "3. o mesmo vale para o token do mailserver, se ele já estiver instalado"
+    fi
+}
+
+domain_after() {
+    local new=$1 lan_ip
+    lan_ip="$(host_lan_ip)"
+    ui_step "Depois de trocar (fora da máquina)"
+    ui_info "- Tailscale: https://login.tailscale.com/admin/dns → Nameservers: um Split DNS $new → $lan_ip"
+    ui_info "  e apague o do domínio antigo (sem isso, os endereços novos não abrem de fora de casa)"
+    ui_info "- apps do Nextcloud (celular e computador) e agendas/contatos: entre de novo com o endereço novo"
+    ui_info "- favoritos e senhas salvas no navegador ou no gerenciador de senhas: atualize os endereços"
+    ui_info "- o Moonlight não muda (usa o IP); o painel do Sunshine passa a ter o endereço novo"
+    if [[ -f $ASTRO_HOME/mailserver/.env ]]; then
+        ui_info "- mailserver: ative o Email Routing em $new pela Cloudflare (o assistente do mailserver mostra como)"
+        ui_info "  e troque o encaminhamento no seu e-mail para $(env_get MAIL_ADDRESS "" "$ASTRO_HOME/mailserver/.env")"
+    fi
+    ui_info "- o domínio antigo continua com o que já tinha fora do astro (site, e-mail): nada muda nele"
+}
+
+domain_rewrite() {
+    python3 -I -c '
+import os, re, sys
+home, old, new = sys.argv[1:]
+keys = {"CADDY_DOMAIN", "PANEL_HOST", "ADGUARD_REWRITES", "COCKPIT_HOST", "NEXTCLOUD_HOST", "SUNSHINE_HOST", "N8N_HOST"}
+
+def host(value):
+    if value == old:
+        return new
+    if value.endswith("." + old):
+        return value[: -len(old)] + new
+    return value
+
+for name in sorted(os.listdir(home)):
+    path = os.path.join(home, name, ".env")
+    if name.startswith(".") or not os.path.isfile(path):
+        continue
+    lines, changed = [], False
+    for line in open(path, encoding="utf-8").read().splitlines():
+        match = re.match(r"^([A-Z0-9_]+)=\x27(.*)\x27$", line)
+        if match:
+            key, value = match.groups()
+            result = value
+            if key in keys:
+                result = ",".join(host(item) for item in value.split(","))
+            elif key == "MAIL_ADDRESS" and "@" in value:
+                result = value.split("@")[0] + "@" + new
+            if result != value:
+                print(f"{name}\x1f{key}\x1f{value}\x1f{result}")
+                line = f"{key}=\x27{result}\x27"
+                changed = True
+        lines.append(line)
+    if changed:
+        with open(path + ".new", "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        os.chmod(path + ".new", 0o600)
+        os.replace(path + ".new", path)
+
+def routes(path, label):
+    if not os.path.isfile(path):
+        return
+    lines = []
+    for line in open(path, encoding="utf-8").read().splitlines():
+        parts = line.split(" ", 1)
+        if parts and parts[0] and host(parts[0]) != parts[0]:
+            if label:
+                print(f"caddy\x1f{label}\x1f{parts[0]}\x1f{host(parts[0])}")
+            parts[0] = host(parts[0])
+        lines.append(" ".join(parts))
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + ("\n" if lines else ""))
+
+routes(os.path.join(home, "caddy", ".routes"), "rota manual")
+for name in os.listdir(home):
+    routes(os.path.join(home, name, ".proxy"), "")
+' "$ASTRO_HOME" "$1" "$2"
+}
+
+change_domain() {
+    local old new name key before after backup affected=() failed=() succeeded=() skipped=() redo
+    ui_step "Trocar o domínio"
+    old="$(env_get CADDY_DOMAIN "" "$ASTRO_HOME/caddy/.env")"
+    [[ -n $old ]] || { ui_warn "o Caddy não está configurado: não há domínio para trocar"; return 0; }
+    ui_info "domínio atual: $old"
+    ui_input new "domínio novo" "" is_hostname
+    if [[ $new == "$old" ]]; then
+        ui_warn "é o mesmo domínio, nada mudou"
+        return 0
+    fi
+    domain_before "$new"
+    ui_confirm "trocar $old por $new em todos os serviços?" n || { ui_warn "cancelado, nada mudou"; return 0; }
+
+    backup="$ASTRO_HOME/.troca-de-dominio/$(date +%Y-%m-%d_%H%M%S)"
+    mkdir -p "$backup"
+    chmod 700 "$ASTRO_HOME/.troca-de-dominio" "$backup"
+    for name in "$ASTRO_HOME"/*/.env; do
+        cp -p "$name" "$backup/$(basename "$(dirname "$name")").env"
+    done
+    [[ ! -f $ASTRO_HOME/caddy/.routes ]] || cp -p "$ASTRO_HOME/caddy/.routes" "$backup/caddy.routes"
+    ui_ok "configuração atual guardada em $backup"
+
+    ui_step "Endereços"
+    while IFS=$'\x1f' read -r name key before after; do
+        ui_ok "$name: $key $before → $after"
+        [[ " ${affected[*]} " == *" $name "* ]] || affected+=("$name")
+    done < <(domain_rewrite "$old" "$new")
+
+    redo=" ${affected[*]} "
+    for name in "${PROJECTS[@]}"; do
+        [[ $redo == *" $name "* ]] || continue
+        if ! project "$name" status; then
+            ui_info "$name: não instalado, o endereço novo vale na próxima instalação"
+            continue
+        fi
+        if grep -q '^    domain)' "$name/project.sh"; then
+            run_step "$name" project "$name" domain "$old" "$new"
+        else
+            run_step "$name" env ASTRO_REUSE_CONFIG=1 "./$name/project.sh" install
+        fi
+    done
+    summary || true
+    domain_after "$new"
+}
+
 administration() {
     local index globals name id
     while true; do
         global_actions
         globals=${#GLOBAL_IDS[@]}
-        ui_menu index "Administração" "Discos da máquina" "${GLOBAL_LABELS[@]}" "Implodir Astro" "Voltar"
+        ui_menu index "Administração" "Discos da máquina" "Trocar o domínio" "${GLOBAL_LABELS[@]}" "Implodir Astro" "Voltar"
         if ((index == 0)); then
             disk_manage || true
-        elif ((index <= globals)); then
-            read -r name id <<< "${GLOBAL_IDS[index - 1]}"
+        elif ((index == 1)); then
+            change_domain || true
+        elif ((index <= globals + 1)); then
+            read -r name id <<< "${GLOBAL_IDS[index - 2]}"
             project "$name" action "$id" || true
-        elif ((index == globals + 1)); then
+        elif ((index == globals + 2)); then
             implode || true
             $IMPLODED && return 0
         else

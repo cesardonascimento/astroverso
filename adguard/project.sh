@@ -43,7 +43,7 @@ panel_host_default() {
 
 configure() {
     ui_step "Configuração"
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if config_reuse; then
         ui_ok "configuração existente mantida"
         return
     fi
@@ -238,6 +238,70 @@ check_tailscale_split_dns() {
     done
 }
 
+split_dns_route() {
+    tailscale dns status 2>/dev/null | awk -v d="$1" '$1 == "-" && $2 == d && $3 == "->" { print $4; exit }'
+}
+
+require_split_dns() {
+    local domain=$1 lan_ip=$2 server
+    [[ -n $(host_tailscale_ip) ]] || return 0
+    while true; do
+        server="$(split_dns_route "$domain")"
+        if [[ $server == "$lan_ip" ]]; then
+            ui_ok "Split DNS do Tailscale: $domain → $lan_ip"
+            return 0
+        fi
+        if [[ -z $server ]]; then
+            ui_warn "o Split DNS do Tailscale não tem $domain: de fora de casa, os endereços novos não abrem"
+        else
+            ui_warn "o Tailscale envia $domain para $server, não para este AdGuard"
+        fi
+        ui_info "em https://login.tailscale.com/admin/dns → Nameservers → Add nameserver → Custom:"
+        ui_info "  servidor $lan_ip, com \"Restrict to domain\" (Split DNS) ligado e o domínio $domain"
+        ui_info "  e apague a entrada do domínio antigo, se ainda existir"
+        ui_confirm "já ajustou? verificar de novo?" y || { ui_warn "Split DNS pendente: de fora de casa, $domain não resolve"; return 0; }
+    done
+}
+
+cmd_domain() {
+    local old=$1 new=$2 lan_ip web_port panel_host log
+    web_port="$(env_get WEB_PORT 8080)"
+    lan_ip="$(env_get DNS_BIND_IP 0.0.0.0)"
+    [[ $lan_ip == 0.0.0.0 ]] && lan_ip="$(host_lan_ip)"
+
+    ui_step "Reescritas DNS"
+    if podman unshare test -f "$CONF_FILE"; then
+        remove_container
+        podman unshare python3 -I -c '
+import re, sys
+path, old, new = sys.argv[1:]
+text = open(path, encoding="utf-8").read()
+pattern = re.compile(r"^(\s*-?\s*domain:\s*)([\x27\x22]?)\*\." + re.escape(old) + r"\2\s*$", re.M)
+text, count = pattern.subn(lambda m: f"{m.group(1)}{m.group(2)}*.{new}{m.group(2)}", text)
+open(path, "w", encoding="utf-8").write(text)
+print(count)
+' "$CONF_FILE" "$old" "$new" > /dev/null
+        if ! log="$(compose up -d 2>&1)"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_fail "falha ao subir o container"
+        fi
+        if ! timeout 60 bash -c "until curl -sf http://127.0.0.1:$web_port/login.html >/dev/null; do sleep 1; done"; then
+            compose logs --tail 20 2>&1 | ui_prefix >&2
+            ui_fail "o AdGuard não respondeu em 60s"
+        fi
+    fi
+    ui_ok "*.$new → $(env_get ADGUARD_REWRITE_ANSWER "$lan_ip") (no lugar de *.$old)"
+
+    ui_step "DNS"
+    require_split_dns "$new" "$lan_ip"
+
+    panel_host="$(env_get PANEL_HOST)"
+    if [[ -n $panel_host ]]; then
+        ui_step "Caddy"
+        proxy_publish "$panel_host" "http://host.containers.internal:$web_port"
+    fi
+}
+
 cmd_install() {
     state_setup
     configure
@@ -359,8 +423,9 @@ case "${1:-}" in
     status)   cmd_status ;;
     actions)  ;;
     install)  cmd_install ;;
+    domain)   shift; cmd_domain "$1" "$2" ;;
     remove)   cmd_remove ;;
     backup)   printf 'exclude %s\n' "$STATE/data/work" ;;
     restore)  shift; cmd_restore "$1" ;;
-    *)        ui_fail "uso: $0 describe | status | actions | install | remove | backup | restore <pasta>" ;;
+    *)        ui_fail "uso: $0 describe | status | actions | install | domain <antigo> <novo> | remove | backup | restore <pasta>" ;;
 esac

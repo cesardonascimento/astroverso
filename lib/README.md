@@ -17,6 +17,7 @@ marcadas podem ser puladas. Um projeto só conta como concluído se o `status` d
 | `actions` | Lista as ações de pós-configuração, uma por linha no formato `id\|Descrição` (vazio se não houver) |
 | `action <id>` | Executa uma ação listada em `actions` |
 | `global-actions` (opcional) | Como `actions`, mas as ações aparecem em Gerenciar Astro → Administração (com o projeto instalado) e rodam com `action <id>` |
+| `domain <antigo> <novo>` (opcional) | Chamado pelo "Trocar o domínio" depois de os endereços salvos já terem sido trocados no `.env`: reaplica só o que depende do domínio, sem perguntas. Sem ele, o projeto é reinstalado com `ASTRO_REUSE_CONFIG=1` |
 | `restore <pasta>` (opcional) | Troca a configuração pela da pasta extraída do backup (`state_restore`), cuidando do que for do projeto (ex.: carregar o dump do banco), e sobe o serviço de novo |
 | `remote-actions` (opcional) | Ações para o Discord, uma por linha: `id\|Descrição\|sim` (`sim` pede confirmação por botão; senão `nao`). Um `id` sem `:` aparece como `/astro <projeto>:<id>`; com `:`, aparece como está (ex.: `backup:cloud`) e é atendido pelo projeto que o declarou. Nomes em inglês; a descrição começa pelo nome padrão da operação (ex.: `Backup: local 🔄 nuvem`). Os nomes `start`, `stop` e `restart` são do executor (containers `astro-<projeto>*`) |
 | `help` (opcional) | Linhas da ajuda do Discord (`/astro command:help`), uma por operação: `grupo\|nome\|o que é\|quando\|comando\|ordem` (comando `-` quando só existe no assistente; ordem numérica dentro do grupo, padrão 50) |
@@ -74,7 +75,9 @@ Bibliotecas compartilhadas:
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_label` (nome com espaços, até 40), `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_email`, `is_time` (`HH:MM`) e `is_number`.
-  Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles.
+  Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles. `config_reuse` faz a
+  pergunta "usar a configuração já salva?" (falso sem `.env`); com `ASTRO_REUSE_CONFIG=1` (troca de domínio),
+  responde sim sem perguntar, e o projeto não deve fazer outras perguntas opcionais nesse caminho.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
 - `lib/notify.sh`: avisos pelo bot do projeto `discord` (deixa um arquivo na fila `~/.astro/discord/fila/saida`;
   sem o projeto instalado, nada é enviado). `notify_problem <chave> <texto> [botões]` avisa um problema no máximo

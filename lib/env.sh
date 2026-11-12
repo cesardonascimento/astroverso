@@ -13,6 +13,15 @@ compose() {
     podman compose --env-file "$ENV_FILE" "$@"
 }
 
+config_reuse() {
+    [[ -f $ENV_FILE ]] || return 1
+    if [[ ${ASTRO_REUSE_CONFIG:-} == 1 ]]; then
+        ui_info "usando a configuração salva em $ENV_FILE"
+        return 0
+    fi
+    ui_confirm "usar a configuração já salva em $ENV_FILE?" y
+}
+
 state_setup() {
     mkdir -p "$STATE"
     chmod 700 "$ASTRO_HOME" "$STATE"

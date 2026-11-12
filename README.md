@@ -11,7 +11,7 @@ instalação.
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
-| [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@astro.<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. A caixa só recebe: ela não envia e-mails. |
+| [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. A caixa só recebe: ela não envia e-mails. |
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
@@ -36,6 +36,7 @@ numa nova entrada pelo SSH).
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
 | Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
+| Gerenciar Astro → Administração → Trocar o domínio | Passa todos os serviços para outro domínio (ex.: `app.<domínio-antigo>` → `app.<domínio-novo>`): mostra o que fazer antes na Cloudflare, troca os endereços salvos (guardando uma cópia da configuração), reaplica cada serviço sem refazer as perguntas e, no fim, lista o que mudar fora da máquina (Tailscale, apps do Nextcloud, favoritos) |
 | Gerenciar Astro → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
 | Gerenciar Astro → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
 | Gerenciar Astro → Administração → Implodir Astro | Faz um backup das configurações e desfaz tudo o que o Astro criou na máquina (veja abaixo) |
@@ -237,8 +238,9 @@ notificações do canal em "Todas as mensagens".
 
 ### mailserver
 
-- **Endereço da caixa:** o endereço para onde você encaminha os e-mails. Por padrão, `inbox@astro.<domínio do
-  Caddy>`. Fica num subdomínio (`astro.<domínio>`) para não mexer no e-mail do domínio principal.
+- **Endereço da caixa:** o endereço para onde você encaminha os e-mails. Por padrão, `inbox@<domínio do Caddy>`.
+  O domínio do endereço não pode ter outro e-mail: ativar o Email Routing nele troca os registros MX, e o e-mail
+  que já chegava por eles deixaria de chegar. Use um domínio só do astro.
 - **Remetentes aceitos:** quem pode mandar para a caixa, por endereço completo ou `@domínio`, separados por
   vírgula. Use os endereços de onde você encaminha (ex.: os seus no Proton). E-mails de outros remetentes, ou
   sem a autenticação da Cloudflare (SPF ou DMARC), vão para a pasta **Quarentena**, que nenhuma automação lê.
@@ -247,9 +249,8 @@ notificações do canal em "Todas as mensagens".
   "Astro Inbox". Por padrão, o administrador do Nextcloud.
 - **Token da Cloudflare:** um token só deste projeto, com as permissões que o assistente lista (Workers, KV,
   Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o token na hora.
-- **Email Routing no subdomínio:** na primeira vez, o assistente pede para ativar o Email Routing só no
-  subdomínio, pelo painel da Cloudflare, e espera. Não aceite o assistente da Cloudflare que propõe trocar os
-  registros MX do domínio principal: ele mudaria o e-mail que você já usa.
+- **Email Routing:** na primeira vez, o assistente pede para ativar o Email Routing no domínio do endereço,
+  pelo painel da Cloudflare, e espera. Se esse domínio já recebe e-mail por outro serviço, ele avisa antes.
 
 ### n8n
 

@@ -224,6 +224,12 @@ continua.
 Na instalação, com a configuração local vazia e o backup com arquivos, o assistente oferece restaurar dele. As
 ações "Carregar uma configuração do RetroArch/ES-DE" também oferecem o backup primeiro.
 
+## Troca de domínio
+
+`project.sh domain <antigo> <novo>` (chamado pelo "Trocar o domínio" do assistente) troca o endereço do painel em
+`csrf_allowed_origins`, reinicia o Sunshine (um stream em andamento cai) e republica a rota no Caddy, sem
+reinstalar o resto.
+
 ## Remoção
 
 `remove` desativa o login automático, encerra a sessão do usuário de jogos e **apaga o usuário com a home inteira**

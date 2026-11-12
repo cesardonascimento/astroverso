@@ -16,7 +16,7 @@ e-mails.
 ```
 seu e-mail (filtro com encaminhamento)
    ↓
-inbox@astro.<domínio>            Cloudflare Email Routing (só no subdomínio)
+inbox@<domínio>                  Cloudflare Email Routing (domínio sem outro e-mail)
    ↓
 Worker astro-mailserver          confere o remetente e grava o e-mail bruto no KV astro-mailserver
    ↓  de 5 em 5 minutos (astro-mailserver-fetch.timer)
@@ -41,7 +41,7 @@ astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
 
 | Pergunta | Padrão |
 |---|---|
-| Endereço da caixa | `inbox@astro.<domínio do Caddy>` |
+| Endereço da caixa | `inbox@<domínio do Caddy>` |
 | Remetentes aceitos | (endereços ou `@domínio`, separados por vírgula) |
 | Usuário do Nextcloud que recebe a caixa no app Mail | o administrador do Nextcloud (só com o Nextcloud instalado) |
 | Token da Cloudflare | (secreto, conferido na API) |
@@ -52,9 +52,10 @@ expiração. É separado do token do Caddy.
 
 ## O que a instalação faz
 
-- **Email Routing no subdomínio:** confere pelo DNS se o subdomínio do endereço tem os MX da Cloudflare. Se não
-  tiver, mostra como ativar pelo painel (Email → Email Routing → Settings → Subdomains) e espera. A ativação fica
-  manual de propósito: o assistente da Cloudflare para o domínio principal trocaria os MX do e-mail que já existe.
+- **Email Routing:** confere pelo DNS se o domínio do endereço tem os MX da Cloudflare. Se não tiver, mostra como
+  ativar pelo painel (Email → Email Routing → começar e aceitar os registros) e espera. Se o domínio já tiver
+  outros MX, avisa que ativar desviaria o e-mail que chega por eles. A ativação fica manual: a API não garante
+  deixar outros registros de e-mail como estão.
 - **Cloudflare pela API:** cria o KV `astro-mailserver` (se não existir), publica o Worker `astro-mailserver`
   (`worker.js`, com o KV em `MAIL` e a lista em `ALLOWED_SENDERS`) e cria ou atualiza a regra `endereço →
   Worker`.
@@ -83,4 +84,4 @@ expiração. É separado do token do Caddy.
 
 `remove` desliga a busca, apaga o container e a imagem, a regra do Email Routing, o Worker e o KV (com os
 e-mails ainda não buscados), a conta "Astro Inbox" do Nextcloud Mail e `~/.astro/mailserver`. O Email Routing do
-subdomínio continua ativo: desligue pelo painel, se quiser.
+domínio continua ativo: desligue pelo painel, se quiser.

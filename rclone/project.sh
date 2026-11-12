@@ -153,7 +153,7 @@ pick_data_disk() {
 
 configure() {
     ui_step "Configuração"
-    if [[ -f $ENV_FILE ]] && ui_confirm "usar a configuração já salva em $ENV_FILE?" y; then
+    if config_reuse; then
         ui_ok "configuração existente mantida"
         return
     fi
