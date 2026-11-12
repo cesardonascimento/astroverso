@@ -12,6 +12,7 @@ instalação.
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
 | [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@astro.<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. A caixa só recebe: ela não envia e-mails. |
+| [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
 
@@ -30,7 +31,7 @@ numa nova entrada pelo SSH).
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `n8n`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, pergunta quais etapas já concluídas refazer: as outras são puladas, e as interrompidas ou com falha sempre rodam. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
@@ -249,6 +250,19 @@ notificações do canal em "Todas as mensagens".
 - **Email Routing no subdomínio:** na primeira vez, o assistente pede para ativar o Email Routing só no
   subdomínio, pelo painel da Cloudflare, e espera. Não aceite o assistente da Cloudflare que propõe trocar os
   registros MX do domínio principal: ele mudaria o e-mail que você já usa.
+
+### n8n
+
+- **Endereço do n8n no Caddy:** o nome pelo qual o n8n é aberto no navegador. Por padrão, `n8n.<domínio>`.
+- **E-mail, nome e sobrenome do administrador:** a conta com que você entra no n8n. O e-mail é só o login: o n8n
+  não manda e-mails. A conta é criada pela própria instalação, para ninguém na rede tomá-la antes de você no
+  primeiro acesso. Para trocar esses dados depois, reinstale o n8n (eles ficam travados na tela do n8n).
+- **Senha do administrador:** pelo menos 8 caracteres. Fica guardada só como hash. Ao reinstalar, o assistente
+  pergunta se quer trocá-la.
+
+O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
+servidores da empresa. Um modelo do site do n8n ainda pode ser copiado e colado no editor. Ele também não roda
+comandos na máquina e só é acessível pela rede local.
 
 ### nextcloud
 
