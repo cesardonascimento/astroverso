@@ -199,8 +199,8 @@ ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela
 e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
 Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
 cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
-essa resolução, e volta ao final. Os alto-falantes do notebook ficam mudos a cada sessão do usuário de jogos,
-para a máquina não fazer barulho ligada o dia todo (o som do stream não é afetado). No Moonlight, aparecem dois apps: **Desktop** e **ES-DE**. Para o ES-DE ter capa, coloque uma imagem PNG em pé (proporção 2:3) em `~/.config/sunshine/covers/es-de.png` do usuário de jogos e reinstale o arcade. Ao terminar, reinicie a máquina.
+essa resolução, e volta ao final. Com algo plugado no HDMI, o som da máquina sai por ele; sem nada, sai
+pelo notebook (o som do stream não é afetado). Com um plugue HDMI fantasma, a máquina fica em silêncio. No Moonlight, aparecem dois apps: **Desktop** e **ES-DE**. Para o ES-DE ter capa, coloque uma imagem PNG em pé (proporção 2:3) em `~/.config/sunshine/covers/es-de.png` do usuário de jogos e reinstale o arcade. Ao terminar, reinicie a máquina.
 
 ### caddy
 

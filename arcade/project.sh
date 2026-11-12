@@ -21,6 +21,7 @@ GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
 SPEAKERS_BIN=/usr/local/bin/astro-arcade-speakers
 SPEAKERS_UNIT=astro-arcade-speakers.service
+HDMI_AUDIO_CONF=/etc/wireplumber/wireplumber.conf.d/51-astro-hdmi.conf
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 ESDE_API="https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de"
 ESDE_DOWNLOAD="https://gitlab.com/es-de/emulationstation-de/-/package_files"
@@ -621,25 +622,53 @@ origin_settings() {
     ui_ok "painel do Sunshine aceita alterações vindas de $origin (proteção CSRF)"
 }
 
-speakers_setup() {
-    local user=$1
-    if ! cmp -s scripts/speakers.py "$SPEAKERS_BIN"; then
-        sudo install -m 0755 scripts/speakers.py "$SPEAKERS_BIN"
-        if command -v restorecon >/dev/null; then
-            sudo restorecon -q "$SPEAKERS_BIN"
+audio_setup() {
+    local user=$1 legacy=no runtime
+    runtime="/run/user/$(id -u "$user")"
+    if ! cmp -s "$HDMI_AUDIO_CONF" <(hdmi_audio_conf); then
+        sudo mkdir -p "${HDMI_AUDIO_CONF%/*}"
+        hdmi_audio_conf | sudo tee "$HDMI_AUDIO_CONF" >/dev/null
+        if user_manager_running "$user"; then
+            as_user "$user" env XDG_RUNTIME_DIR="$runtime" systemctl --user restart wireplumber || true
         fi
     fi
-    as_user "$user" sh -c '
-        dir="$HOME/.config/systemd/user"
-        mkdir -p "$dir/graphical-session.target.wants"
-        printf "%s\n" "[Unit]" "Description=astro arcade: alto-falantes internos mudos" "After=wireplumber.service" "" \
-            "[Service]" "Type=oneshot" "ExecStart=$1" "" "[Install]" "WantedBy=graphical-session.target" > "$dir/$2"
-        ln -sfn "$dir/$2" "$dir/graphical-session.target.wants/$2"
-    ' sh "$SPEAKERS_BIN" "$SPEAKERS_UNIT"
-    ui_ok "alto-falantes do notebook mudos a cada sessão de $user (o som do stream não é afetado)"
-    if user_session_active "$user"; then
-        as_user "$user" env XDG_RUNTIME_DIR="/run/user/$(id -u "$user")" "$SPEAKERS_BIN"
+    ui_ok "som no HDMI quando houver algo plugado nele, senão no notebook"
+    if as_user "$user" sh -c 'test -e "$HOME/.config/systemd/user/$1"' sh "$SPEAKERS_UNIT"; then
+        legacy=yes
+        as_user "$user" sh -c 'rm -f "$HOME/.config/systemd/user/$1" "$HOME/.config/systemd/user/graphical-session.target.wants/$1"' sh "$SPEAKERS_UNIT"
     fi
+    if [[ -e $SPEAKERS_BIN ]]; then
+        legacy=yes
+        sudo rm -f "$SPEAKERS_BIN"
+    fi
+    [[ $legacy == yes ]] || return 0
+    ui_ok "alto-falantes do notebook não ficam mais mudos a cada sessão de $user"
+    if user_session_active "$user"; then
+        audio_reset "$user" "$runtime"
+    else
+        ui_warn "tire o mudo dos alto-falantes nas Configurações do GNOME, na sessão de $user"
+    fi
+}
+
+audio_reset() {
+    local user=$1 runtime=$2 kind text
+    while read -r kind text; do
+        case $kind in
+            ok)   ui_ok "$text" ;;
+            warn) ui_warn "$text" ;;
+            *)    ui_info "$text" ;;
+        esac
+    done < <(as_user "$user" env XDG_RUNTIME_DIR="$runtime" python3 -I - < scripts/audio.py)
+}
+
+hdmi_audio_conf() {
+    printf "%s\n" \
+        "monitor.alsa.rules = [" \
+        "  {" \
+        "    matches = [ { node.name = \"~alsa_output\\\\..*\\\\.hdmi-.*\" } ]" \
+        "    actions = { update-props = { priority.session = 2000 } }" \
+        "  }" \
+        "]"
 }
 
 display_switch() {
@@ -961,7 +990,7 @@ cmd_install() {
     origin_settings "$user" "$host"
     display_switch "$user"
     emulation "$user" sunshine-apps "$(games_home "$user")/.astro/arcade/sunshine/apps.json" "$ESDE_BIN"
-    speakers_setup "$user"
+    audio_setup "$user"
     enable_service "$user"
     host_firewall "${STREAM_PORTS[@]}"
     host_firewall_block_lan "$WEB_PORT"
@@ -1108,7 +1137,11 @@ cmd_remove() {
     fi
     if [[ -e $DISPLAY_BIN || -e $SPEAKERS_BIN ]]; then
         sudo rm -f "$DISPLAY_BIN" "$SPEAKERS_BIN"
-        ui_ok "ajuste de resolução e alto-falantes removidos"
+        ui_ok "ajuste de resolução removido"
+    fi
+    if [[ -f $HDMI_AUDIO_CONF ]]; then
+        sudo rm -f "$HDMI_AUDIO_CONF"
+        ui_ok "som no HDMI volta à prioridade padrão do sistema"
     fi
     if [[ -f $MUTTER_RULE ]]; then
         sudo rm -f "$MUTTER_RULE"

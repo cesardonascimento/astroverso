@@ -95,10 +95,13 @@ compartilhados).
   responder.
 - **Painel pelo Caddy:** inclui `https://<endereço do Sunshine no Caddy>` em `csrf_allowed_origins`. Sem isso, o
   Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
-- **Notebook em silêncio:** instala `scripts/speakers.py` em `/usr/local/bin/astro-arcade-speakers` e o serviço
-  `astro-arcade-speakers` no usuário de jogos, que sobe com a sessão dele e deixa mudas as saídas de som internas
-  (alto-falante e fone; HDMI fica de fora) com o `wpctl`. Assim funciona desde o primeiro boot, sem rodar a
-  instalação de novo. Durante o stream, o som vai para a saída virtual do Sunshine e não é afetado.
+- **Som no HDMI:** grava `/etc/wireplumber/wireplumber.conf.d/51-astro-hdmi.conf`, que dá às saídas HDMI
+  (`alsa_output.*.hdmi-*`) prioridade maior que a do alto-falante. Com algo plugado no HDMI (TV, monitor ou plugue
+  fantasma), o som sai por ele; sem nada, sai pelo notebook. Vale para todos os usuários. Uma saída escolhida à mão
+  nas Configurações do GNOME passa por cima da prioridade. Durante o stream, o som vai para a saída virtual do
+  Sunshine e não é afetado. Numa instalação antiga, apaga o serviço `astro-arcade-speakers` (que deixava os
+  alto-falantes mudos) e, com a sessão do usuário de jogos ativa, tira o mudo das saídas internas e a saída padrão
+  escolhida à mão (`scripts/audio.py`, com o `wpctl`).
 - **Apps no Moonlight:** o `apps.json` do Sunshine fica com **Desktop** e **ES-DE** (`/usr/local/bin/es-de`,
   `auto-detach`). Os apps de fábrica que não servem aqui ("Low Res Desktop", com `xrandr`, e "Steam Big Picture")
   saem; um app criado pelo painel é mantido. A capa do ES-DE é `~/.config/sunshine/covers/es-de.png` do usuário de
@@ -225,7 +228,7 @@ ações "Carregar uma configuração do RetroArch/ES-DE" também oferecem o back
 
 `remove` desativa o login automático, encerra a sessão do usuário de jogos e **apaga o usuário com a home inteira**
 (`userdel -r`: Sunshine, ES-DE, RetroArch, saves, states, BIOS e núcleos). Também apaga o ES-DE (programa e atalho),
-o `astro-sunshine-display` e o `astro-arcade-speakers`, tira o `setcap` do Sunshine, devolve à Intel o papel de
+o `astro-sunshine-display` e a regra de som no HDMI, tira o `setcap` do Sunshine, devolve à Intel o papel de
 placa principal, tira a espera do GDM, as portas de stream e o bloqueio do painel no firewall e a rota do Caddy,
 e apaga `~/.astro/arcade`. O pacote do Sunshine, o RetroArch (Flatpak), o driver da NVIDIA e os discos (são da
 máquina) ficam.

@@ -1,4 +1,3 @@
-#!/usr/bin/python3 -I
 import json
 import re
 import subprocess
@@ -7,8 +6,8 @@ import time
 ATTEMPTS = 30
 
 
-def log(message):
-    print(f"[arcade] {message}", flush=True)
+def say(kind, text):
+    print(f"{kind} {text}", flush=True)
 
 
 def internal_sinks():
@@ -37,14 +36,18 @@ def main():
             break
         time.sleep(1)
     if not sinks:
-        log("nenhuma saída de som interna encontrada")
-        return
+        say("warn", "nenhuma saída de som interna encontrada; tire o mudo pelas Configurações do GNOME")
     for node_id, name in sinks:
         try:
-            subprocess.run(["wpctl", "set-mute", str(node_id), "1"], check=True, timeout=10)
-            log(f"saída interna muda: {name}")
+            subprocess.run(["wpctl", "set-mute", str(node_id), "0"], check=True, timeout=10)
+            say("ok", f"saída interna com som: {name}")
         except (OSError, subprocess.SubprocessError):
-            log(f"não foi possível deixar muda a saída {name}")
+            say("warn", f"não foi possível tirar o mudo da saída {name}")
+    try:
+        subprocess.run(["wpctl", "clear-default"], check=True, timeout=10)
+        say("ok", "saída de som padrão escolhida pela prioridade (HDMI quando plugado)")
+    except (OSError, subprocess.SubprocessError):
+        say("warn", "não foi possível limpar a saída de som padrão escolhida à mão")
 
 
 main()
