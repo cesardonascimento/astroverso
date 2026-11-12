@@ -1,9 +1,8 @@
 const MAX_SIZE = 24 * 1024 * 1024;
 
 function allowed(sender, list) {
-  const address = sender.toLowerCase();
-  return list.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean).some((item) =>
-    item.startsWith("@") ? address.endsWith(item) : address === item);
+  const domain = sender.toLowerCase().split("@").pop();
+  return list.split(",").map((item) => item.trim().toLowerCase().replace(/^@/, "")).filter(Boolean).includes(domain);
 }
 
 function cloudflareResults(raw) {
@@ -24,9 +23,9 @@ export default {
     const head = new TextDecoder().decode(bytes.slice(0, 65536));
     const results = cloudflareResults(head);
     const authenticated = /\b(spf|dmarc)=pass\b/i.test(results);
-    const sender = allowed(message.from, env.ALLOWED_SENDERS || "");
+    const sender = allowed(message.from, env.ALLOWED_DOMAINS || "");
     const trusted = authenticated && sender;
-    const reason = trusted ? "ok" : !sender ? `remetente fora da lista: ${message.from}` : "sem spf=pass nem dmarc=pass";
+    const reason = trusted ? "ok" : !sender ? `domínio fora da lista: ${message.from}` : "sem spf=pass nem dmarc=pass";
     const mark = new TextEncoder().encode(`X-Astro-Mailserver: ${trusted ? "inbox" : "quarentena"}; ${reason}\r\n`);
     const body = new Uint8Array(mark.length + bytes.length);
     body.set(mark);

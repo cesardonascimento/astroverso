@@ -247,10 +247,11 @@ notificações do canal em "Todas as mensagens".
 - **Endereço da caixa:** o endereço para onde você encaminha os e-mails. Por padrão, `inbox@<domínio do Caddy>`.
   O domínio do endereço não pode ter outro e-mail: ativar o Email Routing nele troca os registros MX, e o e-mail
   que já chegava por eles deixaria de chegar. Use um domínio só do astro.
-- **Remetentes aceitos:** quem pode mandar para a caixa, por endereço completo ou `@domínio`, separados por
-  vírgula. Use os endereços de onde você encaminha (ex.: os seus no Proton). E-mails de outros remetentes, ou
-  sem a autenticação da Cloudflare (SPF ou DMARC), vão para a pasta **Quarentena**, que nenhuma automação lê.
-  Assim, um e-mail falso enviado ao endereço não vira uma conta a pagar.
+- **Domínios autorizados:** de quais domínios a caixa aceita e-mails, separados por vírgula (ex.: o domínio do
+  seu e-mail, de onde você encaminha). E-mails de outros domínios, ou sem a autenticação da Cloudflare (SPF ou
+  DMARC), vão para a pasta **Quarentena**, que nenhuma automação lê. Assim, um e-mail falso enviado ao endereço não
+  vira uma conta a pagar. Depois, a lista muda em Gerenciar Astro → mailserver → **Domínios autorizados**, que
+  também oferece mover para a entrada o que já estava na Quarentena vindo de um domínio recém-autorizado.
 - **Usuário do Nextcloud:** aparece com o Nextcloud instalado. A caixa entra no app **Mail** desse usuário como
   "Astro Inbox". Por padrão, o administrador do Nextcloud.
 - **Token da Cloudflare:** um token só deste projeto, com as permissões que o assistente lista (Workers, KV,

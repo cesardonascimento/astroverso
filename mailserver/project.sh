@@ -36,6 +36,7 @@ cmd_status() {
 
 cmd_actions() {
     printf '%s\n' \
+        "domains|Domínios autorizados (ver, adicionar, remover)" \
         "fetch|Buscar os e-mails agora" \
         "access|Mostrar os dados de acesso à caixa (IMAP)"
 }
@@ -53,21 +54,27 @@ remove_container() {
     podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
-is_senders() {
+is_domains() {
     local item out=()
     for item in ${1//,/ }; do
-        item="${item,,}"
-        if [[ $item == @* ]]; then
-            is_hostname "${item#@}" >/dev/null || return 1
-        else
-            is_email "$item" >/dev/null || return 1
-        fi
-        out+=("$item")
+        item="$(is_hostname "${item#@}")" || return 1
+        [[ " ${out[*]} " == *" $item "* ]] || out+=("$item")
     done
     ((${#out[@]})) || return 1
     local IFS=,
     printf '%s' "${out[*]}"
 }
+
+domains_from_senders() {
+    local item out=()
+    for item in ${1//,/ }; do
+        item="${item##*@}"
+        [[ -n $item && " ${out[*]} " != *" ${item,,} "* ]] && out+=("${item,,}")
+    done
+    local IFS=,
+    printf '%s' "${out[*]}"
+}
+
 
 cf() {
     local method=$1 path=$2
@@ -150,10 +157,10 @@ check_token() {
 
 configure() {
     ui_step "Configuração"
-    local address senders nc_user="" password domain
+    local address domains nc_user="" password domain
     if config_reuse; then
         address="$(env_get MAIL_ADDRESS)"
-        senders="$(env_get ALLOWED_SENDERS)"
+        domains="$(env_get ALLOWED_DOMAINS "$(domains_from_senders "$(env_get ALLOWED_SENDERS)")")"
         nc_user="$(env_get NEXTCLOUD_USER)"
         TOKEN="$(env_get CLOUDFLARE_API_TOKEN)"
         ui_ok "configuração existente mantida"
@@ -161,8 +168,9 @@ configure() {
         domain="$(proxy_domain)"
         ui_info "endereço que vai receber os e-mails encaminhados, num domínio sem outro e-mail (ex.: o domínio do astro)"
         ui_input address "endereço da caixa" "$(env_get MAIL_ADDRESS "${domain:+inbox@$domain}")" is_email
-        ui_info "só os e-mails destes remetentes (endereço completo ou @domínio) vão para a entrada; os outros vão para a pasta $QUARANTINE"
-        ui_input senders "remetentes aceitos, separados por vírgula (ex.: os seus endereços do Proton)" "$(env_get ALLOWED_SENDERS)" is_senders
+        ui_info "só os e-mails destes domínios (com SPF ou DMARC válidos) vão para a entrada; os outros vão para a pasta $QUARANTINE"
+        ui_input domains "domínios autorizados, separados por vírgula (ex.: o domínio do seu e-mail)" \
+            "$(env_get ALLOWED_DOMAINS "$(domains_from_senders "$(env_get ALLOWED_SENDERS)")")" is_domains
         if [[ -x ../nextcloud/project.sh ]] && ../nextcloud/project.sh status; then
             ui_input nc_user "usuário do Nextcloud que recebe a caixa no app Mail" \
                 "$(env_get NEXTCLOUD_USER "$(env_get ADMIN_USER "" "$ASTRO_HOME/nextcloud/.env")")" is_name
@@ -183,8 +191,8 @@ configure() {
 
     (
         umask 077
-        printf "MAIL_ADDRESS='%s'\nALLOWED_SENDERS='%s'\nNEXTCLOUD_USER='%s'\nCLOUDFLARE_API_TOKEN='%s'\nIMAP_PASSWORD='%s'\nZONE_ID='%s'\nZONE_NAME='%s'\nACCOUNT_ID='%s'\n" \
-            "$address" "$senders" "$nc_user" "$TOKEN" "$password" "$ZONE_ID" "$ZONE_NAME" "$ACCOUNT_ID" > "$ENV_FILE.new"
+        printf "MAIL_ADDRESS='%s'\nALLOWED_DOMAINS='%s'\nNEXTCLOUD_USER='%s'\nCLOUDFLARE_API_TOKEN='%s'\nIMAP_PASSWORD='%s'\nZONE_ID='%s'\nZONE_NAME='%s'\nACCOUNT_ID='%s'\n" \
+            "$address" "$domains" "$nc_user" "$TOKEN" "$password" "$ZONE_ID" "$ZONE_NAME" "$ACCOUNT_ID" > "$ENV_FILE.new"
         grep '^KV_ID=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
@@ -235,6 +243,25 @@ routing_ensure() {
     ui_fail "o Email Routing foi pedido, mas os MX da Cloudflare não apareceram em 2 minutos: rode a instalação de novo"
 }
 
+worker_publish() {
+    local kv=$1 metadata ignored
+    metadata="$(python3 -I -c '
+import json, sys
+kv, domains, date = sys.argv[1:]
+print(json.dumps({
+    "main_module": "worker.js",
+    "compatibility_date": date,
+    "bindings": [
+        {"type": "kv_namespace", "name": "MAIL", "namespace_id": kv},
+        {"type": "plain_text", "name": "ALLOWED_DOMAINS", "text": domains},
+    ],
+}))' "$kv" "$(env_get ALLOWED_DOMAINS)" "$COMPATIBILITY_DATE")"
+    cf_call ignored 'None' PUT "accounts/$ACCOUNT_ID/workers/scripts/$WORKER" \
+        -F "metadata=$metadata;type=application/json" \
+        -F "worker.js=@worker.js;type=application/javascript+module" || ui_fail "não foi possível publicar o Worker"
+    ui_ok "Worker $WORKER publicado (domínios autorizados: $(env_get ALLOWED_DOMAINS))"
+}
+
 cloudflare_setup() {
     ui_step "Cloudflare"
     local address sub kv rules rule_id body
@@ -257,22 +284,7 @@ cloudflare_setup() {
     fi
     env_put KV_ID "$kv"
 
-    local metadata
-    metadata="$(python3 -I -c '
-import json, sys
-kv, senders, date = sys.argv[1:]
-print(json.dumps({
-    "main_module": "worker.js",
-    "compatibility_date": date,
-    "bindings": [
-        {"type": "kv_namespace", "name": "MAIL", "namespace_id": kv},
-        {"type": "plain_text", "name": "ALLOWED_SENDERS", "text": senders},
-    ],
-}))' "$kv" "$(env_get ALLOWED_SENDERS)" "$COMPATIBILITY_DATE")"
-    cf_call body 'None' PUT "accounts/$ACCOUNT_ID/workers/scripts/$WORKER" \
-        -F "metadata=$metadata;type=application/json" \
-        -F "worker.js=@worker.js;type=application/javascript+module" || ui_fail "não foi possível publicar o Worker"
-    ui_ok "Worker $WORKER publicado (confere o remetente e guarda o e-mail no KV)"
+    worker_publish "$kv"
 
     cf_call rule_id "next((x[\"id\"] for x in r if any(m.get(\"value\") == \"$address\" for m in x.get(\"matchers\", []))), \"\")" \
         GET "zones/$ZONE_ID/email/routing/rules?per_page=50" || ui_fail "não foi possível listar as regras do Email Routing"
@@ -412,7 +424,7 @@ cmd_install() {
 
     ui_step "Próximo passo"
     ui_info "encaminhe os e-mails para $(env_get MAIL_ADDRESS) (no Proton: filtro com encaminhamento automático)"
-    ui_info "e-mails de remetentes fora da lista ficam na pasta $QUARANTINE (ex.: a confirmação do encaminhamento)"
+    ui_info "e-mails de domínios fora da lista ficam na pasta $QUARANTINE (ex.: a confirmação do encaminhamento)"
 }
 
 kv_path() {
@@ -477,6 +489,57 @@ cmd_fetch() {
     ((count == 0)) || ui_ok "$count e-mail(s) novo(s)"
 }
 
+quarantine_release() {
+    local domain=$1 count
+    count="$({ podman exec "$CONTAINER" doveadm search -u "$MAIL_USER" mailbox "$QUARANTINE" header X-Astro-Mailserver "@$domain" 2>/dev/null || true; } | wc -l)"
+    ((count > 0)) || return 0
+    ui_confirm "mover da $QUARANTINE para a entrada os $count e-mail(s) de @$domain?" y || return 0
+    podman exec "$CONTAINER" doveadm move -u "$MAIL_USER" INBOX mailbox "$QUARANTINE" header X-Astro-Mailserver "@$domain" >/dev/null 2>&1
+    ui_ok "$count e-mail(s) de @$domain movidos para a entrada"
+}
+
+action_domains() {
+    local index list=() chosen=() domain i kept=() added=()
+    TOKEN="$(env_get CLOUDFLARE_API_TOKEN)"
+    ACCOUNT_ID="$(env_get ACCOUNT_ID)"
+    while true; do
+        ui_step "Domínios autorizados"
+        IFS=, read -ra list <<< "$(env_get ALLOWED_DOMAINS "$(domains_from_senders "$(env_get ALLOWED_SENDERS)")")"
+        if ((${#list[@]})); then
+            for domain in "${list[@]}"; do ui_info "@$domain"; done
+        else
+            ui_warn "nenhum domínio autorizado: tudo vai para a $QUARANTINE"
+        fi
+        ui_menu index "O que fazer?" "Adicionar domínio" "Remover domínios" "Voltar"
+        case $index in
+            0)
+                ui_input domain "domínio (ex.: empresa.com.br)" "" is_hostname
+                if [[ " ${list[*]} " == *" $domain "* ]]; then
+                    ui_info "@$domain já está autorizado"
+                    continue
+                fi
+                list+=("$domain")
+                added+=("$domain")
+                ;;
+            1)
+                ((${#list[@]})) || continue
+                ui_checklist chosen "Quais domínios remover?" --esc "${list[@]/#/@}"
+                ((${#chosen[@]})) || continue
+                kept=()
+                for i in "${!list[@]}"; do
+                    [[ " ${chosen[*]} " == *" $i "* ]] || kept+=("${list[i]}")
+                done
+                list=("${kept[@]}")
+                ;;
+            *) return 0 ;;
+        esac
+        env_put ALLOWED_DOMAINS "$(IFS=,; echo "${list[*]}")"
+        worker_publish "$(env_get KV_ID)"
+        for domain in "${added[@]}"; do quarantine_release "$domain"; done
+        added=()
+    done
+}
+
 action_access() {
     ui_step "Dados de acesso (IMAP)"
     ui_info "servidor: $CONTAINER, porta $IMAP_PORT, sem criptografia (só na rede interna dos containers)"
@@ -486,7 +549,8 @@ action_access() {
 
 cmd_action() {
     case "${1:-}" in
-        fetch)  ui_step "Busca"; cmd_fetch ;;
+        fetch)   ui_step "Busca"; cmd_fetch ;;
+        domains) action_domains ;;
         access) action_access ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac

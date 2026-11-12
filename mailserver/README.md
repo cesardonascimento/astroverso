@@ -29,7 +29,7 @@ astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
 
 - **Remetente conferido:** o Worker lê o primeiro `Authentication-Results`, o que a Cloudflare acrescenta
   (`mx.cloudflare.net`), e aceita o e-mail na INBOX só com `spf=pass` ou `dmarc=pass` e o remetente do envelope
-  na lista `ALLOWED_SENDERS` (endereço ou `@domínio`). O resto vai para a **Quarentena**. Cada e-mail ganha no
+  com o domínio na lista `ALLOWED_DOMAINS`. O resto vai para a **Quarentena**. Cada e-mail ganha no
   topo o cabeçalho `X-Astro-Mailserver: inbox|quarentena; <motivo>`. A pasta é decidida pelo prefixo da chave
   no KV (`inbox.` ou `quarentena.`), não pelo cabeçalho, que um remetente poderia forjar.
 - **Sem perda:** um e-mail só sai do KV depois que o Dovecot o aceita. Falhas ficam para a próxima rodada e
@@ -42,7 +42,7 @@ astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
 | Pergunta | Padrão |
 |---|---|
 | Endereço da caixa | `inbox@<domínio do Caddy>` |
-| Remetentes aceitos | (endereços ou `@domínio`, separados por vírgula) |
+| Domínios autorizados | (separados por vírgula; ex.: o domínio do seu e-mail) |
 | Usuário do Nextcloud que recebe a caixa no app Mail | o administrador do Nextcloud (só com o Nextcloud instalado) |
 | Token da Cloudflare | (secreto, conferido na API) |
 
@@ -57,7 +57,7 @@ expiração. É separado do token do Caddy.
   espera os MX aparecerem (até 2 minutos). Com MX de outro serviço, para sem mudar nada: ativar desviaria o
   e-mail que chega por eles.
 - **Cloudflare pela API:** cria o KV `astro-mailserver` (se não existir), publica o Worker `astro-mailserver`
-  (`worker.js`, com o KV em `MAIL` e a lista em `ALLOWED_SENDERS`) e cria ou atualiza a regra `endereço →
+  (`worker.js`, com o KV em `MAIL` e a lista em `ALLOWED_DOMAINS`) e cria ou atualiza a regra `endereço →
   Worker`.
 - **Caixa local:** container `astro-mailserver` (imagem oficial `dovecot/dovecot`, versão fixada no
   `docker-compose.yml`), sem porta na máquina: o IMAP (`31143`, sem TLS) só existe na rede `astro_default`. O
@@ -71,11 +71,19 @@ expiração. É separado do token do Caddy.
   entrada padrão monta os argumentos e lê a senha de uma variável de ambiente. Uma conta com o mesmo endereço não é
   recriada.
 
+## Ações
+
+- **Domínios autorizados:** mostra a lista, adiciona ou remove domínios, grava `ALLOWED_DOMAINS` e republica o
+  Worker na hora. Ao adicionar um domínio, oferece mover para a entrada os e-mails dele que estavam na Quarentena
+  (busca pelo cabeçalho `X-Astro-Mailserver`). Uma lista antiga de remetentes (`ALLOWED_SENDERS`) vira a lista dos
+  domínios deles.
+- **Buscar os e-mails agora** e **Mostrar os dados de acesso à caixa (IMAP)**.
+
 ## Arquivos gerados
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/mailserver/.env` | Endereço, remetentes, usuário do Nextcloud, token, senha do IMAP e IDs da zona, da conta e do KV (600) |
+| `~/.astro/mailserver/.env` | Endereço, domínios autorizados, usuário do Nextcloud, token, senha do IMAP e IDs da zona, da conta e do KV (600) |
 | `~/.astro/mailserver/data/users` | Usuário `inbox` com o hash da senha |
 | `~/.astro/mailserver/data/vmail` | Mensagens (Maildir) |
 | `~/.config/systemd/user/astro-mailserver-fetch.{service,timer}` | Busca periódica |
