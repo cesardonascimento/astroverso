@@ -133,8 +133,7 @@ o Astro reinstalado. A instalação instala também o `zstd`, usado na compacta�
 
 À 01:00, antes dos espelhos, o `astro-rclone-config`:
 
-1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud,
-   cópia do SQLite do Home Assistant) e o que deixar de fora (bancos em uso, código, caches);
+1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud) e o que deixar de fora (bancos em uso, código, caches);
 2. empacota cada `~/.astro/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
    com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O que o projeto
    inclui de fora vai para uma subpasta com nome fixo (ex.: `arcade/sunshine`, com o `~/.astro/arcade/sunshine` do usuário

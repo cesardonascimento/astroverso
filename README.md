@@ -11,7 +11,6 @@ instalação.
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
-| [**homeassistant**](homeassistant/) | **Central da casa inteligente.** Cada marca de aparelho (lâmpadas, tomadas, ar-condicionado, TV) tem o próprio app, e eles não conversam entre si. O Home Assistant junta todos num painel só, no seu servidor, e permite criar rotinas entre marcas diferentes (ex.: desligar o ar quando a janela abrir). |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
 
@@ -30,7 +29,7 @@ numa nova entrada pelo SSH).
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `homeassistant`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, pergunta quais etapas já concluídas refazer: as outras são puladas, e as interrompidas ou com falha sempre rodam. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
@@ -232,21 +231,6 @@ para a máquina não fazer barulho ligada o dia todo (o som do stream não é af
 No fim, chega uma mensagem de teste com um botão "Máquina: estado". No Discord, digite `/astro` e escolha um
 comando (comece por `help`, que mostra a lista de operações; os nomes são em inglês, ex.: `backup:cloud`). Comandos que param ou apagam algo pedem confirmação. No celular, deixe as
 notificações do canal em "Todas as mensagens".
-
-### homeassistant
-
-- **Endereço do Home Assistant no Caddy:** o nome pelo qual o painel é aberto no navegador e no app do Home
-  Assistant. Por padrão, `homeassistant.<domínio>`. De fora de casa, funciona pelo Tailscale.
-- **Porta do Home Assistant no host:** a porta em que ele escuta na máquina. Ela é bloqueada para a rede: o
-  acesso passa só pelo Caddy. Mude só se `8123` estiver ocupada.
-- **Nome da casa no Home Assistant:** o nome que aparece no app e no painel. Por padrão, `Astro`.
-- **Usuário administrador do Home Assistant:** a conta que administra o Home Assistant. Por padrão, `astro`.
-- **Senha do usuário:** só aparece na primeira instalação, quando o Home Assistant ainda não tem usuário. A
-  instalação faz sozinha a configuração inicial (usuário, nome, país, idioma, moeda e fuso da máquina).
-
-No app do celular ou do tablet, toque em **Inserir endereço manualmente** e use `https://homeassistant.<domínio>`.
-A instalação faz o Home Assistant se anunciar com esse endereço. Os aparelhos entram pelas integrações, no
-próprio painel.
 
 ### nextcloud
 
