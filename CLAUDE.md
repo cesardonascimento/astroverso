@@ -95,8 +95,9 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_send / notify_inf
   `discord` por último, por verem os outros), depois da atualização do sistema (primeira vez), da Máquina
   (`host_base`, uma vez só; os projetos não o chamam) e de "Discos da máquina". Um projeto que falha não para os
   outros; o resumo mostra quais falharam. Cada etapa roda em subshell com `set -e` (`run_step`) e só ganha a
-  marca `~/.astro/.concluidas/<etapa>` ao terminar sem erro; no "Reinstalar Astro", um checklist escolhe quais
-  concluídas refazer (Enter pula todas). A implosão apaga as marcas depois do backup.
+  marca `~/.astro/.concluidas/<etapa>` ao terminar sem erro; no "Reinstalar Astro", um checklist com todas as
+  etapas (concluídas com a data, as outras "pendente" e já marcadas) escolhe quais rodar; Esc volta sem rodar nada.
+  Nos menus, Esc escolhe o último item quando ele é "Voltar" ou "Sair" (no inicial, fecha o assistente). A implosão apaga as marcas depois do backup.
 - **Nomes das operações** (iguais em menus, avisos, logs, unidades e ajuda do Discord): `Backup: local ⬅️ nuvem`
   (download inicial), `Backup: local ↔️ nuvem` (mesclagem), `Backup: local 🔄 nuvem` (sincronização),
   `Backup: local ➡️ backup diário`, `Backup: configurações ➡️ local`, `Backup: configurações ⬅️ local` (restauração),

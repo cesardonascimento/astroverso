@@ -4,8 +4,8 @@ O `setup.sh` reconhece qualquer pasta com um `project.sh` executável. "Instalar
 lista `ORDER` do `setup.sh` (`caddy` primeiro, `discord` por último); um projeto fora da lista entra no fim.
 Antes dos projetos, o `setup.sh` prepara a máquina uma vez (`host_base`) e roda "Discos da máquina": o `install`
 de um projeto supõe a máquina já preparada. Cada etapa (`maquina`, `discos`, um projeto) só ganha a marca
-`~/.astro/.concluidas/<etapa>` quando termina sem erro (a marca é apagada no começo); no "Reinstalar Astro", as
-marcadas podem ser puladas. Um projeto só conta como concluído se o `status` dele também passar. O
+`~/.astro/.concluidas/<etapa>` quando termina sem erro (a marca é apagada no começo); no "Reinstalar Astro", um checklist
+mostra todas as etapas, com as pendentes já marcadas, e só as escolhidas rodam. Um projeto só conta como concluído se o `status` dele também passar. O
 `project.sh` implementa:
 
 | Comando | Responsabilidade |
@@ -51,7 +51,9 @@ Bibliotecas compartilhadas:
 
 - `lib/ui.sh`: logs com prefixo `[projeto]` (`ui_step`, `ui_ok`, `ui_info`, `ui_warn`, `ui_error`, `ui_fail`),
   prompts (`ui_input`, `ui_secret`, `ui_confirm`, `ui_list`), `ui_menu` e `ui_checklist` (sem eco do terminal enquanto abertos; setas `ESC [`/`ESC O`, com 0,5s de espera pelo resto da sequência) (`--selected "0 2"` antes
-  dos itens deixa esses índices já marcados; `--all` põe uma opção "Todos" no topo). `ui_browse VAR título
+  dos itens deixa esses índices já marcados; `--all` põe uma opção "Todos" no topo; `--esc` faz o Esc cancelar,
+  com a lista vazia e `UI_CANCELLED=1`; sem ele, o Esc é ignorado). No `ui_menu`, o Esc escolhe o último item
+  quando ele se chama "Voltar" ou "Sair" (e a dica na tela avisa); nos outros menus, ele é ignorado. `ui_browse VAR título
   raiz...` navega pelas pastas a partir das raízes (setas, rolagem de 12 em 12, "usar esta pasta", "voltar" e
   "digitar um caminho"; esconde pastas ocultas, `$RECYCLE.BIN`, `System Volume Information` e `lost+found`). Com `ASTRO_PLAIN=1` (serviços do systemd), as mensagens saem sem
   cores, para o journal. Defina `ASTRO_PROJECT` antes do `source`.

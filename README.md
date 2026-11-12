@@ -29,10 +29,12 @@ git clone <url-deste-repositório> ~/Projects/astro
 Depois da primeira instalação, o assistente abre com o comando `astro`, de qualquer pasta (num terminal novo ou
 numa nova entrada pelo SSH).
 
+Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; no menu inicial, fecha o assistente.
+
 | Opção | O que faz |
 |---|---|
 | Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `n8n`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
-| Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, pergunta quais etapas já concluídas refazer: as outras são puladas, e as interrompidas ou com falha sempre rodam. Cada projeto refeito pergunta se usa a configuração já salva |
+| Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
 | Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |

@@ -48,7 +48,7 @@ join() {
 
 summary() {
     ui_step "Resumo"
-    [[ -z ${skipped[*]:-} ]] || ui_info "pulados (já concluídos): $(join "${skipped[@]}")"
+    [[ -z ${skipped[*]:-} ]] || ui_info "pulados: $(join "${skipped[@]}")"
     ((${#succeeded[@]} == 0)) || ui_ok "concluído: $(join "${succeeded[@]}")"
     ((${#failed[@]} == 0)) || ui_error "falhou: $(join "${failed[@]}")"
     ((${#failed[@]} == 0))
@@ -86,9 +86,13 @@ step_machine() {
 run_step() {
     local step=$1 status
     shift
-    if step_done "$step" && [[ $redo != *" $step "* ]]; then
+    if [[ $redo != *" $step "* ]]; then
         ui_step "$(step_label "$step")"
-        ui_info "concluída em $(step_date "$step"), pulada"
+        if step_done "$step"; then
+            ui_info "concluída em $(step_date "$step"), pulada"
+        else
+            ui_info "não marcada, pulada"
+        fi
         skipped+=("$(step_label "$step")")
         return 0
     fi
@@ -108,22 +112,34 @@ run_step() {
 }
 
 install_astro() {
-    local name step label first=true redo=" " i chosen=() pending=() done_steps=() labels=() failed=() succeeded=() skipped=()
-    for step in maquina discos "${PROJECTS[@]}"; do
-        if ! step_done "$step"; then
-            pending+=("$(step_label "$step")")
-            continue
-        fi
-        done_steps+=("$step")
+    local name step label status first=true redo=" " i chosen=() steps=(maquina discos "${PROJECTS[@]}") labels=() preset=""
+    local failed=() succeeded=() skipped=() any_done=false
+    for i in "${!steps[@]}"; do
+        step=${steps[i]}
         label="$(step_label "$step")"
-        labels+=("$(printf '%s%*s concluída em %s' "$label" $((18 - ${#label})) '' "$(step_date "$step")")")
+        if step_done "$step"; then
+            any_done=true
+            status="concluída em $(step_date "$step")"
+        else
+            status="pendente"
+            preset+="$i "
+        fi
+        labels+=("$(printf '%s%*s %s' "$label" $((18 - ${#label})) '' "$status")")
     done
-    if ((${#done_steps[@]})); then
-        ((${#pending[@]} == 0)) || ui_info "pendentes (sempre rodam): $(join "${pending[@]}")"
-        ui_checklist chosen "Quais etapas concluídas reinstalar? (as não concluídas sempre rodam)" --all "${labels[@]}"
+    if $any_done; then
+        ui_checklist chosen "Quais etapas rodar? (as pendentes já vêm marcadas)" --all --esc --selected "$preset" "${labels[@]}"
+        if ((UI_CANCELLED)); then
+            return 0
+        fi
+        if ((${#chosen[@]} == 0)); then
+            ui_info "nenhuma etapa marcada, nada a fazer"
+            return 0
+        fi
         for i in "${chosen[@]}"; do
-            redo+="${done_steps[i]} "
+            redo+="${steps[i]} "
         done
+    else
+        redo+="${steps[*]} "
     fi
     if [[ -f $DONE_DIR/maquina ]] || installed_any; then
         first=false

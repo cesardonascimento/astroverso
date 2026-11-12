@@ -117,9 +117,13 @@ ui_menu() {
     local -n __ui_out=$1
     local title=$2
     shift 2
-    local items=("$@") count=$# cursor=0 i key
+    local items=("$@") count=$# cursor=0 i key back="" hint="↑/↓ e Enter"
+    case ${items[count - 1]} in
+        Voltar) back=$((count - 1)); hint+=", Esc volta" ;;
+        Sair)   back=$((count - 1)); hint+=", Esc sai" ;;
+    esac
 
-    printf '%s     \033[35m?\033[0m %s \033[2m(↑/↓ e Enter)\033[0m\n' "$(_ui_tag)" "$title" >/dev/tty
+    printf '%s     \033[35m?\033[0m %s \033[2m(%s)\033[0m\n' "$(_ui_tag)" "$title" "$hint" >/dev/tty
     _ui_cursor_hide
     while true; do
         for ((i = 0; i < count; i++)); do
@@ -134,6 +138,7 @@ ui_menu() {
             up)    cursor=$(((cursor - 1 + count) % count)) ;;
             down)  cursor=$(((cursor + 1) % count)) ;;
             enter) break ;;
+            esc)   if [[ -n $back ]]; then cursor=$back; break; fi ;;
             [1-9]) if ((key <= count)); then cursor=$((key - 1)); fi ;;
         esac
         printf '\033[%dA' "$count" >/dev/tty
@@ -144,11 +149,16 @@ ui_menu() {
 
 ui_checklist() {
     local -n __ui_out=$1
-    local title=$2 preset="" offset=0
+    local title=$2 preset="" offset=0 esc=0 hint="↑/↓, Espaço marca, a = todos, Enter confirma"
     shift 2
-    while [[ ${1:-} == --selected || ${1:-} == --all ]]; do
+    UI_CANCELLED=0
+    while [[ ${1:-} == --selected || ${1:-} == --all || ${1:-} == --esc ]]; do
         if [[ $1 == --all ]]; then
             offset=1
+            shift
+        elif [[ $1 == --esc ]]; then
+            esc=1
+            hint+=", Esc volta"
             shift
         else
             preset=" $2 "
@@ -163,7 +173,7 @@ ui_checklist() {
     done
     total=$((count + offset))
 
-    printf '%s     \033[35m?\033[0m %s \033[2m(↑/↓, Espaço marca, a = todos, Enter confirma)\033[0m\n' "$(_ui_tag)" "$title" >/dev/tty
+    printf '%s     \033[35m?\033[0m %s \033[2m(%s)\033[0m\n' "$(_ui_tag)" "$title" "$hint" >/dev/tty
     _ui_cursor_hide
     while true; do
         all=1
@@ -198,6 +208,13 @@ ui_checklist() {
                 for ((i = 0; i < count; i++)); do selected[i]=$((1 - all)); done
                 ;;
             enter) break ;;
+            esc)
+                if ((esc)); then
+                    UI_CANCELLED=1
+                    for ((i = 0; i < count; i++)); do selected[i]=0; done
+                    break
+                fi
+                ;;
         esac
         printf '\033[%dA' "$total" >/dev/tty
     done
