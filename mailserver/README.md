@@ -53,7 +53,7 @@ expiração. É separado do token do Caddy.
 ## O que a instalação faz
 
 - **Email Routing:** confere pelo DNS os MX do domínio do endereço. Com os da Cloudflare, segue. Sem nenhum,
-  ativa pela API (`POST zones/<zona>/email/routing/dns` com o nome do domínio, que cria e trava os MX e o SPF) e
+  ativa pela API (`POST zones/<zona>/email/routing/dns`, que cria e trava os MX e o SPF; o campo `name` só vai para um subdomínio, porque a Cloudflare o recusa com o domínio da zona) e
   espera os MX aparecerem (até 2 minutos). Com MX de outro serviço, para sem mudar nada: ativar desviaria o
   e-mail que chega por eles.
 - **Cloudflare pela API:** cria o KV `astro-mailserver` (se não existir), publica o Worker `astro-mailserver`

@@ -200,8 +200,16 @@ routing_mx() {
     cf_call ROUTING_MX '" ".join(x["content"] for x in r)' GET "zones/$2/dns_records?type=MX&name=$1"
 }
 
+routing_body() {
+    if [[ $1 == "$2" ]]; then
+        printf '{}'
+    else
+        cf_json name "$1"
+    fi
+}
+
 routing_ensure() {
-    local domain=$1 zone=$2 ignored i
+    local domain=$1 zone=$2 zone_name=$3 ignored i
     routing_mx "$domain" "$zone" || ui_fail "não foi possível ler os registros MX de $domain"
     if [[ $ROUTING_MX == *mx.cloudflare.net* ]]; then
         ui_ok "Email Routing ativo em $domain (MX da Cloudflare)"
@@ -213,8 +221,8 @@ routing_ensure() {
     fi
     ui_info "ativando o Email Routing em $domain (a Cloudflare cria e trava os registros MX e SPF)..."
     if ! cf_call ignored 'None' POST "zones/$zone/email/routing/dns" \
-            -H 'Content-Type: application/json' --data-binary "$(cf_json name "$domain")"; then
-        ui_fail "não foi possível ativar o Email Routing (o token precisa de Zone → Zone Settings → Edit)"
+            -H 'Content-Type: application/json' --data-binary "$(routing_body "$domain" "$zone_name")"; then
+        ui_fail "não foi possível ativar o Email Routing (se a Cloudflare falou em permissão, o token precisa de Zone → Zone Settings → Edit)"
     fi
     for ((i = 0; i < 24; i++)); do
         routing_mx "$domain" "$zone" || true
@@ -236,7 +244,7 @@ cloudflare_setup() {
     ZONE_ID="$(env_get ZONE_ID)"
     ACCOUNT_ID="$(env_get ACCOUNT_ID)"
 
-    routing_ensure "$sub" "$ZONE_ID"
+    routing_ensure "$sub" "$ZONE_ID" "$(env_get ZONE_NAME)"
 
     cf_call kv "next((x[\"id\"] for x in r if x[\"title\"] == \"$KV_TITLE\"), \"\")" GET \
         "accounts/$ACCOUNT_ID/storage/kv/namespaces?per_page=100" || ui_fail "não foi possível listar os KV"
@@ -517,7 +525,7 @@ cloudflare_remove() {
         ui_ok "KV $KV_TITLE removido (com os e-mails ainda não buscados)"
     fi
     if [[ -n $zone ]] && cf_call ignored 'None' DELETE "zones/$zone/email/routing/dns" \
-            -H 'Content-Type: application/json' --data-binary "$(cf_json name "${address#*@}")"; then
+            -H 'Content-Type: application/json' --data-binary "$(routing_body "${address#*@}" "$(env_get ZONE_NAME)")"; then
         ui_ok "Email Routing desligado em ${address#*@} (registros MX e SPF removidos)"
     else
         ui_warn "desligue o Email Routing de ${address#*@} pelo painel: Email → Email Routing → Settings"
