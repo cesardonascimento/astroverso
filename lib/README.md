@@ -115,6 +115,11 @@ Bibliotecas compartilhadas:
   - Disco desligado e religado (cabo, troca de case) volta a montar sozinho: um link em
     `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem (e o `cryptsetup`, no LUKS) ao disco.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
+  - `disk_responds <caminho>` confere se um disco montado ainda responde: no LUKS, se o dispositivo por baixo
+    existe; em todos, se a pasta principal e a lista dela são lidas em até 20s. O `disk_manage` liga o timer de
+    usuário `astro-disk-check` (5 min depois do boot e a cada 15 min, `lib/disk-check.sh`), que avisa no Discord
+    (`notify_problem`, uma vez por dia) um disco da máquina desmontado ou que parou de responder, e avisa quando
+    ele volta. O `disk_release_all` o desliga.
   - `disk_mounts` lista os discos da máquina (`/srv/<rótulo> tipo`), lidos do `fstab`; `disk_type <caminho>` dá
     o tipo.
   - Discos tirados da lista são desmontados e saem dos dois arquivos. Os dados nunca são apagados.

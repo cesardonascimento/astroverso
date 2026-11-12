@@ -104,6 +104,10 @@ storage() {
             ui_warn "$path não está montado: fica fora do Nextcloud (veja Gerenciar Astro → Administração → Discos da máquina)"
             continue
         fi
+        if ! disk_responds "$path"; then
+            ui_warn "$path não responde (a conexão do disco caiu?): fica fora do Nextcloud até a máquina ser reiniciada"
+            continue
+        fi
         if ! findmnt -no OPTIONS "$path" | grep -q container_file_t; then
             ui_warn "$path foi montado sem a liberação para containers: rode Gerenciar Astro → Administração → Discos da máquina"
             continue

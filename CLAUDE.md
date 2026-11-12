@@ -71,7 +71,7 @@ lib/ui.sh            logs com prefixo, prompts, ui_menu, ui_checklist (setas e E
 lib/host.sh          host_base (comando astro, sem suspensão, compose, boot, ssh, tailscale) / host_undo, firewall, portas, IP e sub-rede
 lib/env.sh           env_get CHAVE [padrão], state_setup / state_purge, images_remove, validadores
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
-lib/disk.sh          disk_manage / disk_setup / disk_mounts / disk_release_all (discos da máquina no fstab e crypttab, TPM; privado ou compartilhado)
+lib/disk.sh          disk_manage / disk_setup / disk_mounts / disk_responds / disk_release_all (discos da máquina no fstab e crypttab, TPM; privado ou compartilhado; timer astro-disk-check → lib/disk-check.sh)
 lib/notify.sh        avisos pelo bot do discord (fila): notify_send / notify_info (silenciosa), notify_problem / notify_resolved (1 por dia), com botões
 <projeto>/project.sh describe | status | actions | action <id> | install | remove
                      opcionais: global-actions | remote-actions | remote <id> [arg] | help | backup | restore <pasta> | domain <antigo> <novo>
@@ -258,6 +258,13 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_send / notify_inf
   (padrão `{CRYPT}*`, que nunca confere): basta não definir a variável e somar um `passwd-file`. Sem
   `auth_allow_cleartext = yes`, o login sem TLS vindo de outro container é recusado. A imagem não tem shell útil
   (`ls`, `cat`, `id` não existem).
+- Um disco LUKS montado e em uso (ex.: pelo Nextcloud) que desconecta e volta (gaveta USB) deixa o mapeamento
+  `/dev/mapper/luks-*` preso ao aparelho que sumiu: o `systemd-cryptsetup` não consegue fechá-lo ("Device or resource
+  busy") e, na volta, acha o volume "already active". A montagem continua em `/srv`, mas toda leitura dá
+  `Input/output error` (o `ls -ld`, o `getfacl`), até a máquina reiniciar. `disk_responds` detecta isso (dispositivo
+  por baixo do `dm` sumiu ou a raiz não é lida), o `astro-disk-check` avisa no Discord e o Nextcloud deixa o disco
+  de fora em vez de falhar. Sem o disco montado, `ls /srv/<rótulo>` lista a pasta vazia e imutável, sem erro:
+  conferir com `mountpoint -q`.
 - `n8n import:entities --truncateTables=true` falha com "Deployment keys must not be deleted" num banco já
   usado (com o n8n rodando ou não): só funciona num banco novo, sem `database.sqlite`. Uma importação que falha
   deixa os `.jsonl` extraídos na pasta. O `n8n execute` pela linha de comando briga pela porta 5679 do executor de

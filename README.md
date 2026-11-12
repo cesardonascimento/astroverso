@@ -123,6 +123,10 @@ acesso administrativo ligado).
   privados: só o seu usuário entra. Use privado para dados pessoais. A criptografia protege o disco desligado
   ou levado embora; com a máquina ligada, quem decide o acesso é essa resposta.
 
+Depois desta etapa, a máquina confere os discos a cada 15 minutos. Se um deles some (desligado, cabo solto) ou
+para de responder (a conexão caiu e voltou com ele em uso), chega um aviso no Discord. No segundo caso, o disco
+só volta a funcionar depois de reiniciar a máquina.
+
 ### adguard
 
 - **Usuário e senha do painel:** as credenciais de administração do AdGuard, usadas para entrar no painel

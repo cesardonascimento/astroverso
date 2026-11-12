@@ -2,6 +2,8 @@ DISK_FSTAB=/etc/fstab
 DISK_CRYPTTAB=/etc/crypttab
 DISK_ROOT=/srv
 DISK_MOUNTS=()
+DISK_CHECK_BIN="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/disk-check.sh"
+DISK_CHECK_UNIT=astro-disk-check
 
 disk_scan() {
     lsblk -J -b --tree -o PATH,UUID,LABEL,SIZE,FSTYPE,TYPE,MOUNTPOINTS,MODEL | python3 -I -c '
@@ -99,6 +101,39 @@ disk_mounts() {
     while read -r uuid type target; do
         printf '%s %s\n' "$target" "$type"
     done < <(disk_configured)
+}
+
+disk_responds() {
+    local path=$1 source dm slave
+    source="$(findmnt -no SOURCE "$path" 2>/dev/null || true)"
+    if [[ $source == /dev/mapper/* ]]; then
+        dm="$(basename "$(readlink -f "$source")")"
+        for slave in /sys/block/"$dm"/slaves/*; do
+            [[ -e $slave ]] || return 1
+        done
+    fi
+    timeout 20 ls -ld "$path" >/dev/null 2>&1 && timeout 20 ls -A "$path" >/dev/null 2>&1
+}
+
+disk_check_units() {
+    local dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    mkdir -p "$dir"
+    printf '[Unit]\nDescription=astro: confere se os discos da máquina respondem\n\n[Service]\nType=oneshot\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s\n' \
+        "$DISK_CHECK_BIN" > "$dir/$DISK_CHECK_UNIT.service"
+    printf '[Unit]\nDescription=astro: confere os discos a cada 15 minutos\n\n[Timer]\nOnBootSec=5min\nOnUnitActiveSec=15min\n\n[Install]\nWantedBy=timers.target\n' \
+        > "$dir/$DISK_CHECK_UNIT.timer"
+    systemctl --user daemon-reload
+    systemctl --user enable -q --now "$DISK_CHECK_UNIT.timer"
+    ui_ok "discos conferidos a cada 15 minutos: um disco que some ou para de responder gera aviso no Discord"
+}
+
+disk_check_remove() {
+    local dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    [[ -e $dir/$DISK_CHECK_UNIT.timer ]] || return 0
+    systemctl --user disable -q --now "$DISK_CHECK_UNIT.timer" 2>/dev/null || true
+    rm -f "$dir/$DISK_CHECK_UNIT.timer" "$dir/$DISK_CHECK_UNIT.service"
+    systemctl --user daemon-reload
+    ui_ok "verificação dos discos removida"
 }
 
 disk_type() {
@@ -231,6 +266,7 @@ disk_release_all() {
     mapfile -t luks < <(disk_awk "$DISK_CRYPTTAB" 'ours($0) { sub(/^UUID=/, "", $2); print $2 }')
     if [[ -z $(disk_awk "$DISK_FSTAB" '/^# astro / || ours($0)') && -z $(disk_awk "$DISK_CRYPTTAB" '/^# astro / || ours($0)') ]]; then
         ui_ok "nenhum disco montado pelo Astro"
+        disk_check_remove
         return 0
     fi
     DISK_MOUNTS=()
@@ -240,6 +276,7 @@ disk_release_all() {
     for file in "$DISK_FSTAB" "$DISK_CRYPTTAB"; do
         sudo rm -f "$file.astro-bak"
     done
+    disk_check_remove
     sudo systemctl daemon-reload
     ui_ok "discos fora do fstab e do crypttab: deixam de montar no boot (os dados continuam neles)"
     for uuid in "${luks[@]}"; do
@@ -482,5 +519,8 @@ disk_manage() {
     disk_setup "${args[@]}"
     if ((${#DISK_MOUNTS[@]} == 0)); then
         ui_ok "nenhum disco de dados montado pela máquina"
+        disk_check_remove
+    else
+        disk_check_units
     fi
 }
