@@ -290,7 +290,6 @@ As rotinas de contas a pagar usadas hoje:
 | Rotina | O que faz |
 |---|---|
 | Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o astro confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do mês, numa pasta do cofre do Obsidian, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. No Obsidian, a caixa **Pago** é clicável |
-| Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas sem **Pago** marcado que vencem em até 3 dias ou já venceram |
 | Contas: e-mail mensal | No dia 5 de cada mês, às 08:00, manda por e-mail as contas do mês, no mesmo formato do arquivo, aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
