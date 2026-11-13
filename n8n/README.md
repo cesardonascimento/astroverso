@@ -6,7 +6,7 @@ só na rede local, pelo Caddy, e sem comunicação com os servidores da empresa 
 ```bash
 ./project.sh install           # perguntas, containers e rota no Caddy
 ./project.sh remove            # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
-./project.sh remote contas:email [AAAA-MM]   # envia agora o e-mail das contas do mês (o mesmo do Discord)
+./project.sh remote contas:email [AAAA-MM]   # envia agora o e-mail das contas (padrão: mês anterior; o mesmo do Discord)
 ```
 
 ## Perguntas da instalação
@@ -58,7 +58,7 @@ rotinas apontam para esses `id`, que não mudam entre instalações:
 
 **Pelo Discord:** `contas:email [AAAA-MM]` (`remote-actions` do projeto) chama o webhook `POST
 /webhook/astro-contas-email` de dentro do container `astro-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave
-das chamadas pela entrada padrão, corpo `{"mes": "AAAA-MM"}`) e devolve o campo `mensagem` da resposta. A rotina
+das chamadas pela entrada padrão, corpo `{"mes": "AAAA-MM"}`; sem mês, a rotina usa o anterior) e devolve o campo `mensagem` da resposta. A rotina
 que atende esse webhook precisa da credencial "chamadas do assistente" e de resposta pelo último nó; sem ela
 ligada, o comando avisa. O comando `help` do projeto põe `mailserver:fetch` e `contas:email` no grupo Contas.
 

@@ -59,7 +59,7 @@ mostra esta lista.
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
 | Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade` | 01:00, junto com o das configurações | `backup:arcade` |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
-| Contas: e-mail do mês | manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: e-mail mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM`) |
+| Contas: e-mail do mês | manda aos destinatários as contas emitidas no mês anterior, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM` para outro mês) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
@@ -289,8 +289,8 @@ As rotinas de contas a pagar usadas hoje:
 
 | Rotina | O que faz |
 |---|---|
-| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o astro confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do mês, numa pasta do cofre do Obsidian, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. No Obsidian, a caixa **Pago** é clicável |
-| Contas: e-mail mensal | No dia 5 de cada mês, às 08:00, manda por e-mail as contas do mês, no mesmo formato do arquivo, aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento, data de emissão, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o astro confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do **mês de emissão**, numa pasta do cofre do Obsidian, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Sem PDF anexo, baixa o boleto pelo link do e-mail (escolhido pelo texto do link, como "Visualizar boleto" ou "2ª via"). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. No Obsidian, a caixa **Pago** é clicável |
+| Contas: notificação mensal | No dia 5 de cada mês, às 08:00, manda por e-mail as contas emitidas no mês anterior, no mesmo formato do arquivo, aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
 servidores da empresa. Um modelo do site do n8n ainda pode ser copiado e colado no editor. Ele também não roda
@@ -393,7 +393,7 @@ Filtros, um filtro por remetente (ex.: as empresas das contas) com a ação de e
 de confirmação para o endereço novo: ele chega na pasta Quarentena do app Mail do Nextcloud, com o link para
 confirmar.
 
-Para o **Contas: e-mail mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
+Para o **Contas: notificação mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
 e-mail (cada um confirma pelo link que recebe) e escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
 da rotina, separados por vírgula.
 

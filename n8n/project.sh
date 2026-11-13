@@ -31,13 +31,13 @@ cmd_actions() {
 }
 
 cmd_remote_actions() {
-    echo "contas:email|Contas: enviar agora o e-mail consolidado do mês (argumento: AAAA-MM, opcional)|nao"
+    echo "contas:email|Contas: enviar agora o e-mail consolidado (contas emitidas no mês anterior; argumento: AAAA-MM, opcional)|nao"
 }
 
 cmd_help() {
     printf '%s\n' \
         "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do astro, e a rotina Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
-        "Contas|Contas: e-mail do mês|manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: e-mail mensal ligada)|contas:email|20"
+        "Contas|Contas: e-mail do mês|manda aos destinatários as contas emitidas no mês anterior, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada)|contas:email|20"
 }
 
 remove_containers() {
@@ -372,7 +372,7 @@ process.stdin.on("data", (d) => chave += d).on("end", async () => {
     const texto = await r.text();
     let mensagem = texto;
     try { mensagem = JSON.parse(texto).mensagem || texto; } catch (e) {}
-    if (r.status === 404) mensagem = "a rotina Contas: e-mail mensal não está ligada no n8n (ou não tem mais o webhook astro-contas-email)";
+    if (r.status === 404) mensagem = "a rotina Contas: notificação mensal não está ligada no n8n (ou não tem mais o webhook astro-contas-email)";
     console.log(mensagem);
     process.exit(r.ok ? 0 : 1);
   } catch (e) {
