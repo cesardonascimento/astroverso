@@ -299,6 +299,10 @@ lib/notify.sh        avisos pelo bot do discord (fila): notify_send / notify_inf
 - Projeto `tunnel` (combinado, para quando houver um uso concreto de webhook): `cloudflared` em container, túnel
   da Cloudflare publicando só `/webhook/` do n8n num nome próprio (ex.: `hooks.<domínio>`), editor e API só na rede
   local, webhooks com autenticação e regras da Cloudflare na frente. Exige manter o n8n atualizado.
+  Combinado: quando o `tunnel` existir, trocar também a busca do `mailserver` por entrega direta (Worker → `POST`
+  em `hooks.<domínio>/mailserver` com credencial de serviço do Cloudflare Access → túnel → receptor
+  `astro-mailserver-hook` que grava na caixa pelo IMAP), mantendo o KV com a campainha e a busca das 08:00 às 20:00
+  como reserva para quando a máquina estiver fora do ar.
 - Bloqueio opcional no AdGuard dos domínios da n8n usados para telemetria, como segunda camada do isolamento
   (levantar os domínios no código da imagem antes; não bloquear o site e a documentação).
 - Ação "verificar atualizações" para as versões fixadas.
