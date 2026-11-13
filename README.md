@@ -269,6 +269,20 @@ serviço, ela para sem mudar nada, porque ativar desviaria esse e-mail.
   primeiro acesso. Para trocar esses dados depois, reinstale o n8n (eles ficam travados na tela do n8n).
 - **Senha do administrador:** pelo menos 8 caracteres. Fica guardada só como hash. Ao reinstalar, o assistente
   pergunta se quer trocá-la.
+- **Chave da API da Anthropic:** usada pelos módulos de contas para o Claude ler os e-mails de cobrança. Crie em
+  https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astro → n8n → Módulos). O
+  conteúdo dos e-mails de cobrança vai para a API da Anthropic.
+- **Pasta no Nextcloud para as contas:** onde ficam os arquivos `AAAA-MM.md` das contas a pagar, um por mês. Use
+  uma pasta do seu cofre do Obsidian para abri-los lá e marcar as pagas.
+
+O n8n traz **módulos**: rotinas prontas, instaladas desligadas. Você liga, desliga e ajusta cada uma no próprio n8n
+(cada uma começa com um nó **⚙️ Configuração**). Gerenciar Astro → n8n → **Módulos** mostra a situação, instala os
+que faltam, restaura um módulo à versão original e atualiza as credenciais.
+
+| Módulo | O que faz |
+|---|---|
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração) |
+| Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas não marcadas que vencem em até 3 dias ou já venceram |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
 servidores da empresa. Um modelo do site do n8n ainda pode ser copiado e colado no editor. Ele também não roda

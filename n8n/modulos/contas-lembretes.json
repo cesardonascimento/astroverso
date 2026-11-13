@@ -1,0 +1,240 @@
+{
+  "id": "astroContasLembr",
+  "name": "Contas: lembretes",
+  "meta": {
+    "astro": {
+      "modulo": "contas-lembretes",
+      "versao": 1
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "name": "⏰ Todo dia",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "⏰ Todo dia"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pasta",
+              "name": "config.pasta",
+              "value": "__ASTRO_PASTA_CONTAS__",
+              "type": "string"
+            },
+            {
+              "id": "dias_antecedencia",
+              "name": "config.dias_antecedencia",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "canal_discord",
+              "name": "config.canal_discord",
+              "value": "__ASTRO_CANAL_DISCORD__",
+              "type": "string"
+            },
+            {
+              "id": "api_discord",
+              "name": "config.api_discord",
+              "value": "https://discord.com/api/v10",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {
+          "includeBinary": true
+        }
+      },
+      "name": "⚙️ Configuração",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "⚙️ Configuração"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst agora = $now;\nreturn [agora, agora.plus({ months: 1 })].map((d) => ({ json: { mes: d.toFormat('yyyy-MM') } }));\n"
+      },
+      "name": "🗓️ Meses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "🗓️ Meses"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "path": "={{ $('⚙️ Configuração').first().json.config.pasta }}/{{ $json.mes }}.md"
+      },
+      "name": "⬇️ Arquivos",
+      "type": "n8n-nodes-base.nextCloud",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "⬇️ Arquivos",
+      "credentials": {
+        "nextCloudApi": {
+          "id": "astroNextcloud001",
+          "name": "Astro: Nextcloud"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "destinationKey": "conteudo"
+      },
+      "name": "📖 Ler arquivos",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ],
+      "id": "📖 Ler arquivos",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cfg = $('⚙️ Configuração').first().json.config;\nconst hoje = $now.startOf('day');\nconst limite = hoje.plus({ days: Number(cfg.dias_antecedencia) || 0 });\nconst itens = [];\nfor (const item of $input.all()) {\n  const texto = typeof item.json.conteudo === 'string' ? item.json.conteudo : '';\n  for (const linha of texto.split('\\n')) {\n    const m = linha.match(/^- \\[ \\] (.*?)📅 (\\d{4}-\\d{2}-\\d{2})/);\n    if (!m) continue;\n    const venc = DateTime.fromISO(m[2], { zone: $now.zoneName });\n    if (venc > limite) continue;\n    const dias = Math.round(venc.diff(hoje, 'days').days);\n    const quando = dias < 0 ? `venceu há ${-dias} dia(s)` : dias === 0 ? 'vence hoje' : `vence em ${dias} dia(s)`;\n    itens.push(`${dias < 0 ? '🔴' : '🟡'} ${m[1].replace(/ · vence\\s*$/, '').trim()} · ${quando} (${venc.toFormat('dd/MM')})`);\n  }\n}\nif (!itens.length) return [];\nreturn [{ json: { mensagem: ['⏰ **Contas vencendo**', ...itens].join('\\n').slice(0, 1900) } }];\n"
+      },
+      "name": "🔎 Vencendo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "🔎 Vencendo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Configuração').first().json.config.api_discord }}/channels/{{ $('⚙️ Configuração').first().json.config.canal_discord }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.mensagem, allowed_mentions: { parse: [] } }) }}",
+        "options": {}
+      },
+      "name": "📣 Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "📣 Discord",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "astroDiscordBot01",
+          "name": "Astro: bot do Discord"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "⏰ Todo dia": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Configuração": {
+      "main": [
+        [
+          {
+            "node": "🗓️ Meses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗓️ Meses": {
+      "main": [
+        [
+          {
+            "node": "⬇️ Arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⬇️ Arquivos": {
+      "main": [
+        [
+          {
+            "node": "📖 Ler arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Ler arquivos": {
+      "main": [
+        [
+          {
+            "node": "🔎 Vencendo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Vencendo": {
+      "main": [
+        [
+          {
+            "node": "📣 Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

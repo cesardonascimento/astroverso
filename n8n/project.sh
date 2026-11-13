@@ -14,6 +14,9 @@ DATA="$STATE/data/n8n"
 HASH_FILE="$STATE/data/owner_password_hash"
 IMAGE="$(sed -n 's/^ *image: *\(.*n8nio\/n8n:.*\)$/\1/p' docker-compose.yml | head -1)"
 BCRYPT=/usr/local/lib/node_modules/n8n/node_modules/bcryptjs
+MODULES_DIR=modulos
+IMPORT_FILE=/home/node/.n8n/.astro-importar.json
+NEXTCLOUD=astro-nextcloud
 
 cmd_describe() {
     echo "n8n: automações e integrações entre serviços, montadas pelo navegador"
@@ -24,7 +27,7 @@ cmd_status() {
 }
 
 cmd_actions() {
-    :
+    echo "modules|Módulos (rotinas prontas: instalar, restaurar, credenciais)"
 }
 
 remove_containers() {
@@ -106,6 +109,7 @@ configure() {
         umask 077
         printf "N8N_HOST='%s'\nTZ='%s'\nOWNER_EMAIL='%s'\nOWNER_FIRST_NAME='%s'\nOWNER_LAST_NAME='%s'\nN8N_ENCRYPTION_KEY='%s'\nRUNNERS_TOKEN='%s'\n" \
             "$host" "$(timezone)" "$email" "$first" "$last" "$key" "$token" > "$ENV_FILE.new"
+        grep -E '^(CONTAS_PASTA|ANTHROPIC_API_KEY|NEXTCLOUD_APP_PASSWORD)=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     ui_ok "configuração salva em $ENV_FILE (com a chave que protege as credenciais do n8n)"
@@ -127,6 +131,240 @@ start_containers() {
     ui_ok "containers ${CONTAINERS[*]} rodando (código dos fluxos roda no astro-n8n-runners, com JavaScript e Python)"
 }
 
+env_put() {
+    sed -i "/^$1=/d" "$ENV_FILE"
+    (
+        umask 077
+        printf "%s='%s'\n" "$1" "$2" >> "$ENV_FILE"
+    )
+}
+
+n8n_cli() {
+    podman exec "$CONTAINER" n8n "$@"
+}
+
+n8n_import() {
+    local kind=$1 file=$2 log status=0
+    podman exec -i "$CONTAINER" sh -c 'umask 077; cat > "$1"' sh "$IMPORT_FILE" < "$file"
+    log="$(n8n_cli "import:$kind" --input="$IMPORT_FILE" 2>&1)" || status=$?
+    podman exec "$CONTAINER" rm -f "$IMPORT_FILE"
+    if ((status)) || grep -qiE 'error|failed' <<< "$log"; then
+        grep -iE 'error|failed' <<< "$log" | tail -3 | ui_prefix >&2
+        return 1
+    fi
+}
+
+is_nc_folder() {
+    local path="${1#/}"
+    path="${path%/}"
+    [[ -n $path && $path != *..* && $path =~ ^[[:alnum:]\ ._/-]+$ ]] && printf '%s' "$path"
+}
+
+module_ids() {
+    n8n_cli list:workflow 2>/dev/null | cut -d'|' -f1
+}
+
+module_active_ids() {
+    n8n_cli list:workflow --active=true 2>/dev/null | cut -d'|' -f1
+}
+
+module_field() {
+    python3 -I -c 'import json, sys; w = json.load(open(sys.argv[1])); print({"id": w["id"], "name": w["name"]}[sys.argv[2]])' "$1" "$2"
+}
+
+nextcloud_app_password() {
+    local user out password
+    [[ -z $(env_get NEXTCLOUD_APP_PASSWORD) ]] || return 0
+    podman container exists "$NEXTCLOUD" || return 0
+    user="$(env_get ADMIN_USER "" "$ASTRO_HOME/nextcloud/.env")"
+    [[ -n $user ]] || return 0
+    out="$(podman exec -u www-data "$NEXTCLOUD" php occ user:auth-tokens:add -n --name=astro-n8n "$user" 2>/dev/null)" || out=""
+    password="$(tail -1 <<< "$out" | grep -oE '[A-Za-z0-9-]{20,}$' || true)"
+    if [[ -z $password ]]; then
+        ui_warn "não foi possível criar a senha de app do Nextcloud para o n8n"
+        return 0
+    fi
+    env_put NEXTCLOUD_APP_PASSWORD "$password"
+    ui_ok "senha de app \"astro-n8n\" criada no Nextcloud de $user (para os módulos gravarem arquivos)"
+}
+
+anthropic_key() {
+    local key
+    [[ -z $(env_get ANTHROPIC_API_KEY) || ${1:-} == trocar ]] || return 0
+    [[ ${ASTRO_REUSE_CONFIG:-} != 1 ]] || return 0
+    ui_info "os módulos de contas usam a API da Anthropic (Claude) para ler os e-mails de cobrança"
+    ui_info "crie uma chave em https://console.anthropic.com → API Keys (Enter vazio deixa para depois)"
+    read -rsp "$(_ui_tag)     $(printf '\033[35m?\033[0m') chave da API da Anthropic: " key </dev/tty
+    echo
+    if [[ -z $key ]]; then
+        ui_info "sem chave: os módulos de contas ficam instalados, mas não leem e-mails até você cadastrar uma"
+        return 0
+    fi
+    if [[ ! $key =~ ^sk-ant-[A-Za-z0-9_-]+$ ]]; then
+        ui_warn "isso não parece uma chave da Anthropic (começa com sk-ant-): não foi salva"
+        return 0
+    fi
+    env_put ANTHROPIC_API_KEY "$key"
+    ui_ok "chave da API da Anthropic guardada em $ENV_FILE"
+}
+
+credentials_sync() {
+    local tmp names
+    nextcloud_app_password
+    tmp="$(mktemp)"
+    names="$(python3 -I - "$ASTRO_HOME" "$tmp" <<'PYEOF'
+import json, sys
+home, out = sys.argv[1:]
+
+def env(projeto):
+    valores = {}
+    try:
+        for linha in open(f"{home}/{projeto}/.env", encoding="utf-8"):
+            chave, _, valor = linha.rstrip("\n").partition("=")
+            valores[chave] = valor.strip("'")
+    except OSError:
+        pass
+    return valores
+
+n8n, mail, discord, nextcloud = env("n8n"), env("mailserver"), env("discord"), env("nextcloud")
+creds = []
+if mail.get("IMAP_PASSWORD"):
+    creds.append({"id": "astroImapInbox01", "name": "Astro: caixa inbox (IMAP)", "type": "imap", "data": {
+        "user": "inbox", "password": mail["IMAP_PASSWORD"], "host": "astro-mailserver", "port": 31143,
+        "secure": False, "allowUnauthorizedCerts": False}})
+if discord.get("DISCORD_TOKEN"):
+    creds.append({"id": "astroDiscordBot01", "name": "Astro: bot do Discord", "type": "httpHeaderAuth", "data": {
+        "name": "Authorization", "value": "Bot " + discord["DISCORD_TOKEN"]}})
+if n8n.get("NEXTCLOUD_APP_PASSWORD") and nextcloud.get("NEXTCLOUD_HOST") and nextcloud.get("ADMIN_USER"):
+    creds.append({"id": "astroNextcloud001", "name": "Astro: Nextcloud", "type": "nextCloudApi", "data": {
+        "webDavUrl": f"https://{nextcloud['NEXTCLOUD_HOST']}/remote.php/dav/files/{nextcloud['ADMIN_USER']}",
+        "user": nextcloud["ADMIN_USER"], "password": n8n["NEXTCLOUD_APP_PASSWORD"]}})
+if n8n.get("ANTHROPIC_API_KEY"):
+    creds.append({"id": "astroAnthropic001", "name": "Astro: API da Anthropic", "type": "httpHeaderAuth", "data": {
+        "name": "x-api-key", "value": n8n["ANTHROPIC_API_KEY"]}})
+json.dump(creds, open(out, "w"))
+print(", ".join(c["name"].replace("Astro: ", "") for c in creds))
+PYEOF
+)"
+    chmod 600 "$tmp"
+    if [[ -z $names ]]; then
+        rm -f "$tmp"
+        ui_info "nenhuma credencial para os módulos ainda (instale mailserver, nextcloud e discord)"
+        return 0
+    fi
+    if n8n_import credentials "$tmp"; then
+        ui_ok "credenciais dos módulos no n8n: $names"
+    else
+        ui_warn "não foi possível gravar as credenciais dos módulos no n8n"
+    fi
+    rm -f "$tmp"
+}
+
+module_install() {
+    local file=$1 tmp folder channel
+    if grep -q '__ASTRO_PASTA_CONTAS__' "$file"; then
+        folder="$(env_get CONTAS_PASTA)"
+        if [[ -z $folder ]]; then
+            if [[ ${ASTRO_REUSE_CONFIG:-} == 1 ]]; then
+                folder="Contas a pagar"
+            else
+                ui_info "as contas a pagar ficam em arquivos Markdown (um por mês) numa pasta do seu Nextcloud"
+                ui_info "ex.: uma pasta do seu cofre do Obsidian, como <disco>/<pasta do cofre>/Contas a pagar"
+                ui_input folder "pasta no Nextcloud para as contas" "Contas a pagar" is_nc_folder
+            fi
+            env_put CONTAS_PASTA "$folder"
+        fi
+    fi
+    channel="$(env_get DISCORD_CHANNEL "" "$ASTRO_HOME/discord/.env")"
+    tmp="$(mktemp)"
+    python3 -I -c '
+import json, sys
+src, out, folder, channel = sys.argv[1:]
+texto = open(src, encoding="utf-8").read()
+texto = texto.replace("__ASTRO_PASTA_CONTAS__", json.dumps(folder)[1:-1]).replace("__ASTRO_CANAL_DISCORD__", channel)
+json.dump([json.loads(texto)], open(out, "w"), ensure_ascii=False)
+' "$file" "$tmp" "$(env_get CONTAS_PASTA)" "$channel"
+    if n8n_import workflow "$tmp"; then
+        rm -f "$tmp"
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+modules_install_missing() {
+    local file id name ids installed=0
+    ids=" $(module_ids | tr '\n' ' ') "
+    for file in "$MODULES_DIR"/*.json; do
+        [[ -f $file ]] || continue
+        id="$(module_field "$file" id)"
+        name="$(module_field "$file" name)"
+        [[ $ids == *" $id "* ]] && continue
+        if module_install "$file"; then
+            ui_ok "módulo \"$name\" instalado (desligado)"
+            installed=$((installed + 1))
+        else
+            ui_warn "não foi possível instalar o módulo \"$name\""
+        fi
+    done
+    ((installed)) || ui_ok "todos os módulos do repositório já estão no n8n"
+}
+
+modules_status() {
+    local file id name ids active state
+    ids=" $(module_ids | tr '\n' ' ') "
+    active=" $(module_active_ids | tr '\n' ' ') "
+    for file in "$MODULES_DIR"/*.json; do
+        [[ -f $file ]] || continue
+        id="$(module_field "$file" id)"
+        name="$(module_field "$file" name)"
+        if [[ $active == *" $id "* ]]; then
+            state="ligado"
+        elif [[ $ids == *" $id "* ]]; then
+            state="desligado"
+        else
+            state="não instalado"
+        fi
+        ui_info "$(printf '%-22s %s' "$name" "$state")"
+    done
+}
+
+module_restore() {
+    local files=() names=() file index
+    for file in "$MODULES_DIR"/*.json; do
+        files+=("$file")
+        names+=("$(module_field "$file" name)")
+    done
+    ui_menu index "Qual módulo restaurar à versão do repositório?" "${names[@]}" "Voltar"
+    ((index < ${#files[@]})) || return 0
+    ui_warn "isso substitui o fluxo \"${names[index]}\" no n8n, com as suas mudanças nele (o módulo fica desligado)"
+    ui_confirm "restaurar?" n || return 0
+    if module_install "${files[index]}"; then
+        ui_ok "módulo \"${names[index]}\" restaurado (desligado: ligue de novo no n8n)"
+    else
+        ui_warn "não foi possível restaurar o módulo"
+    fi
+}
+
+action_modules() {
+    local index
+    cmd_status || ui_fail "o n8n não está rodando"
+    while true; do
+        ui_step "Módulos"
+        modules_status
+        ui_info "para ligar ou desligar um módulo, abra https://$(env_get N8N_HOST) e use o botão de publicar do fluxo"
+        ui_menu index "O que fazer?" "Instalar os módulos que faltam" "Restaurar um módulo à versão do repositório" \
+            "Atualizar as credenciais (caixa, Discord, Nextcloud, Anthropic)" "Trocar a chave da API da Anthropic" "Voltar"
+        case $index in
+            0) modules_install_missing ;;
+            1) module_restore ;;
+            2) credentials_sync ;;
+            3) anthropic_key trocar; credentials_sync ;;
+            *) return 0 ;;
+        esac
+    done
+}
+
 cmd_install() {
     state_setup
     configure
@@ -135,6 +373,12 @@ cmd_install() {
     ui_info "baixando as imagens do n8n (alguns minutos na primeira vez)..."
     start_containers
     ui_ok "sem comunicação com os servidores da n8n: telemetria, aviso de versão e modelos desligados"
+
+    ui_step "Módulos"
+    anthropic_key
+    credentials_sync
+    modules_install_missing
+    ui_info "os módulos ficam desligados: ligue os que quiser no n8n (Gerenciar Astro → n8n → Módulos mostra a situação)"
 
     ui_step "Caddy"
     proxy_publish "$(env_get N8N_HOST)" "http://$CONTAINER:5678"
@@ -178,7 +422,10 @@ cmd_restore() {
 }
 
 cmd_action() {
-    ui_fail "ação desconhecida: ${1:-}"
+    case "${1:-}" in
+        modules) action_modules ;;
+        *)       ui_fail "ação desconhecida: ${1:-}" ;;
+    esac
 }
 
 cmd_remove() {
