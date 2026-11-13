@@ -32,5 +32,6 @@ export default {
     body.set(bytes, mark.length);
     const key = `${trusted ? "inbox" : "quarentena"}.${Date.now()}.${crypto.randomUUID()}`;
     await env.MAIL.put(key, body);
+    await env.MAIL.put("campainha", String(Date.now()));
   },
 };

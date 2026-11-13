@@ -21,7 +21,8 @@ SMTP_PORT=31587
 QUARANTINE=Quarentena
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 FETCH_UNIT=astro-mailserver-fetch
-FETCH_EVERY=5min
+FETCH_CALENDAR=("*-*-* 08..19:00/5:00" "*-*-* 20:00:00")
+DOORBELL=campainha
 LOCK="$STATE/.fetch.lock"
 TOKEN=""
 ROUTING_MX=""
@@ -46,7 +47,7 @@ cmd_remote_actions() {
 }
 
 cmd_help() {
-    echo "Automações|Mailserver: buscar e-mails|traz para a caixa local os e-mails recebidos na Cloudflare|de 5 em 5 minutos|mailserver:fetch|10"
+    echo "Automações|Mailserver: buscar e-mails|traz para a caixa local os e-mails recebidos na Cloudflare|de 5 em 5 minutos, das 08:00 às 20:00 (só quando a campainha tocou)|mailserver:fetch|10"
 }
 
 remove_container() {
@@ -340,11 +341,14 @@ fetch_units() {
     mkdir -p "$UNIT_DIR"
     printf '[Unit]\nDescription=astro mailserver: busca os e-mails na Cloudflare\nAfter=network-online.target\n\n[Service]\nType=oneshot\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s fetch\n' \
         "$PWD/project.sh" > "$UNIT_DIR/$FETCH_UNIT.service"
-    printf '[Unit]\nDescription=astro mailserver: busca os e-mails a cada %s\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=%s\n\n[Install]\nWantedBy=timers.target\n' \
-        "$FETCH_EVERY" "$FETCH_EVERY" > "$UNIT_DIR/$FETCH_UNIT.timer"
+    {
+        printf '[Unit]\nDescription=astro mailserver: confere a campainha de 5 em 5 minutos, das 08:00 às 20:00\n\n[Timer]\n'
+        printf 'OnCalendar=%s\n' "${FETCH_CALENDAR[@]}"
+        printf '\n[Install]\nWantedBy=timers.target\n'
+    } > "$UNIT_DIR/$FETCH_UNIT.timer"
     systemctl --user daemon-reload
     systemctl --user enable -q --now "$FETCH_UNIT.timer"
-    ui_ok "busca na Cloudflare de $FETCH_EVERY em $FETCH_EVERY ($FETCH_UNIT.timer)"
+    ui_ok "campainha conferida de 5 em 5 minutos, das 08:00 às 20:00; fora desse horário, os e-mails esperam na Cloudflare ($FETCH_UNIT.timer)"
 }
 
 nc_occ_secret() {
@@ -418,7 +422,7 @@ cmd_install() {
     ui_step "Caixa de e-mail"
     start_container
     fetch_units
-    cmd_fetch || true
+    cmd_fetch force || true
 
     nextcloud_mail
 
@@ -462,7 +466,19 @@ cmd_fetch() {
         ui_info "outra busca em andamento"
         return 0
     fi
-    local keys key tmp failed=0 count=0
+    local keys key tmp failed=0 count=0 code ignored
+    if [[ ${1:-} != force ]]; then
+        code="$(cf GET "$(kv_path)/values/$DOORBELL" -o /dev/null -w '%{http_code}' 2>/dev/null)" || code=000
+        if [[ $code == 404 ]]; then
+            notify_resolved fetch "e-mails voltaram a chegar na caixa local"
+            return 0
+        fi
+        if [[ $code != 200 ]]; then
+            notify_problem fetch "não foi possível consultar a Cloudflare (HTTP $code: token, rede ou KV)"
+            return 1
+        fi
+        cf_call ignored 'None' DELETE "$(kv_path)/values/$DOORBELL" || true
+    fi
     if ! cmd_status; then
         notify_problem fetch "a caixa de e-mail ($CONTAINER) não está rodando: os e-mails ficam guardados na Cloudflare"
         ui_fail "container $CONTAINER parado"
@@ -549,7 +565,7 @@ action_access() {
 
 cmd_action() {
     case "${1:-}" in
-        fetch)   ui_step "Busca"; cmd_fetch ;;
+        fetch)   ui_step "Busca"; cmd_fetch force ;;
         domains) action_domains ;;
         access) action_access ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
@@ -558,7 +574,7 @@ cmd_action() {
 
 cmd_remote() {
     case "${1:-}" in
-        fetch) cmd_fetch ;;
+        fetch) cmd_fetch force ;;
         *)     echo "ação desconhecida: ${1:-}"; return 1 ;;
     esac
 }

@@ -19,7 +19,7 @@ seu e-mail (filtro com encaminhamento)
 inbox@<domínio>                  Cloudflare Email Routing (domínio sem outro e-mail)
    ↓
 Worker astro-mailserver          confere o remetente e grava o e-mail bruto no KV astro-mailserver
-   ↓  de 5 em 5 minutos (astro-mailserver-fetch.timer)
+   ↓  campainha conferida de 5 em 5 minutos, das 08:00 às 20:00 (astro-mailserver-fetch.timer)
 project.sh fetch                 baixa cada e-mail, entrega com doveadm save e só então apaga do KV
    ↓
 astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
@@ -35,7 +35,7 @@ astro-mailserver (Dovecot)       usuário inbox, pastas INBOX e Quarentena
 - **Sem perda:** um e-mail só sai do KV depois que o Dovecot o aceita. Falhas ficam para a próxima rodada e
   avisam no Discord (uma vez por dia), com aviso de volta quando passam. Rodadas não se sobrepõem (`flock`).
 - **Limites do plano gratuito:** e-mails de até 24 MiB (o resto é recusado); o KV aceita 1.000 gravações e
-  1.000 listagens por dia (a busca usa 288).
+  1.000 listagens por dia (a busca só lista quando a campainha tocou).
 
 ## Perguntas da instalação
 
@@ -64,8 +64,12 @@ expiração. É separado do token do Caddy.
   `dovecot.conf` liga o login sem TLS e troca a senha da imagem por um `passwd-file` com um usuário só, `inbox`,
   cuja senha é gerada na instalação (`IMAP_PASSWORD` no `.env`; o hash vai para `data/users`). Mensagens em
   `~/.astro/mailserver/data/vmail` (Maildir), dentro do backup das configurações.
-- **Busca:** `astro-mailserver-fetch.service` e `.timer` do usuário, a cada 5 minutos (e 2 minutos depois do
-  boot), rodando `project.sh fetch`. Também em Gerenciar Astro e pelo Discord (`mailserver:fetch`).
+- **Busca:** `astro-mailserver-fetch.service` e `.timer` do usuário, de 5 em 5 minutos das 08:00 às 20:00
+  (`OnCalendar`), rodando `project.sh fetch`. A cada e-mail guardado, o Worker grava também a chave `campainha` no KV.
+  A busca agendada só lê essa chave (uma leitura, barata): sem ela, para ali; com ela, apaga a campainha antes de
+  listar, para um e-mail que chegue no meio da rodada tocar de novo, e então busca. Fora do horário, os e-mails
+  esperam no KV e chegam na primeira rodada das 08:00. "Buscar os e-mails agora" (Gerenciar Astro e Discord
+  `mailserver:fetch`) e a instalação ignoram a campainha e listam direto.
 - **Nextcloud Mail:** com um usuário do Nextcloud configurado, instala e ativa o app Mail e cria a conta "Astro
   Inbox" (IMAP `astro-mailserver:31143`, sem TLS). A senha não vai como argumento do `occ`: um script PHP pela
   entrada padrão monta os argumentos e lê a senha de uma variável de ambiente. Uma conta com o mesmo endereço não é
