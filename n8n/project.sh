@@ -14,7 +14,6 @@ DATA="$STATE/data/n8n"
 HASH_FILE="$STATE/data/owner_password_hash"
 IMAGE="$(sed -n 's/^ *image: *\(.*n8nio\/n8n:.*\)$/\1/p' docker-compose.yml | head -1)"
 BCRYPT=/usr/local/lib/node_modules/n8n/node_modules/bcryptjs
-MODULES_DIR=modulos
 IMPORT_FILE=/home/node/.n8n/.astro-importar.json
 NEXTCLOUD=astro-nextcloud
 EMAIL_HOOK=astro-contas-email
@@ -28,7 +27,7 @@ cmd_status() {
 }
 
 cmd_actions() {
-    echo "modules|Módulos (rotinas prontas: instalar, restaurar, credenciais)"
+    echo "credentials|Credenciais (dados dos outros projetos para as rotinas, chave da Anthropic)"
 }
 
 cmd_remote_actions() {
@@ -37,8 +36,8 @@ cmd_remote_actions() {
 
 cmd_help() {
     printf '%s\n' \
-        "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do astro, e o módulo Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
-        "Contas|Contas: e-mail do mês|manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (módulo Contas: e-mail mensal ligado)|contas:email|20"
+        "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do astro, e a rotina Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
+        "Contas|Contas: e-mail do mês|manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: e-mail mensal ligada)|contas:email|20"
 }
 
 remove_containers() {
@@ -120,7 +119,7 @@ configure() {
         umask 077
         printf "N8N_HOST='%s'\nTZ='%s'\nOWNER_EMAIL='%s'\nOWNER_FIRST_NAME='%s'\nOWNER_LAST_NAME='%s'\nN8N_ENCRYPTION_KEY='%s'\nRUNNERS_TOKEN='%s'\n" \
             "$host" "$(timezone)" "$email" "$first" "$last" "$key" "$token" > "$ENV_FILE.new"
-        grep -E '^(CONTAS_PASTA|ANTHROPIC_API_KEY|NEXTCLOUD_APP_PASSWORD|N8N_HOOK_TOKEN)=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
+        grep -E '^(ANTHROPIC_API_KEY|NEXTCLOUD_APP_PASSWORD|N8N_HOOK_TOKEN)=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     ui_ok "configuração salva em $ENV_FILE (com a chave que protege as credenciais do n8n)"
@@ -170,40 +169,6 @@ n8n_import() {
     fi
 }
 
-is_nc_folder() {
-    local path="${1#/}"
-    path="${path%/}"
-    [[ -n $path && $path != *..* && $path =~ ^[[:alnum:]\ ._/-]+$ ]] && printf '%s' "$path"
-}
-
-module_ids() {
-    n8n_cli list:workflow 2>/dev/null | cut -d'|' -f1 || true
-}
-
-module_active_ids() {
-    n8n_cli list:workflow --active=true 2>/dev/null | cut -d'|' -f1 || true
-}
-
-module_field() {
-    python3 -I -c '
-import json, sys
-w = json.load(open(sys.argv[1]))
-print({"id": w["id"], "name": w["name"], "versao": w.get("meta", {}).get("astro", {}).get("versao", 0)}[sys.argv[2]])
-' "$1" "$2"
-}
-
-module_installed_version() {
-    n8n_cli export:workflow --id="$1" 2>/dev/null | python3 -I -c '
-import json, sys
-texto = sys.stdin.read()
-try:
-    w = json.loads(texto[texto.index("["):])[0]
-    print((w.get("meta") or {}).get("astro", {}).get("versao", 0))
-except (ValueError, IndexError):
-    print(0)
-' || echo 0
-}
-
 nextcloud_app_password() {
     local user out password
     [[ -z $(env_get NEXTCLOUD_APP_PASSWORD) ]] || return 0
@@ -217,19 +182,19 @@ nextcloud_app_password() {
         return 0
     fi
     env_put NEXTCLOUD_APP_PASSWORD "$password"
-    ui_ok "senha de app \"astro-n8n\" criada no Nextcloud de $user (para os módulos gravarem arquivos)"
+    ui_ok "senha de app \"astro-n8n\" criada no Nextcloud de $user (para as rotinas gravarem arquivos)"
 }
 
 anthropic_key() {
     local key
     [[ -z $(env_get ANTHROPIC_API_KEY) || ${1:-} == trocar ]] || return 0
     [[ ${ASTRO_REUSE_CONFIG:-} != 1 ]] || return 0
-    ui_info "os módulos de contas usam a API da Anthropic (Claude) para ler os e-mails de cobrança"
+    ui_info "as rotinas de contas usam a API da Anthropic (Claude) para ler os e-mails de cobrança"
     ui_info "crie uma chave em https://console.anthropic.com → API Keys (Enter vazio deixa para depois)"
     read -rsp "$(_ui_tag)     $(printf '\033[35m?\033[0m') chave da API da Anthropic: " key </dev/tty
     echo
     if [[ -z $key ]]; then
-        ui_info "sem chave: os módulos de contas ficam instalados, mas não leem e-mails até você cadastrar uma"
+        ui_info "sem chave: as rotinas de contas não leem e-mails até você cadastrar uma"
         return 0
     fi
     if [[ ! $key =~ ^sk-ant-[A-Za-z0-9_-]+$ ]]; then
@@ -288,163 +253,39 @@ PYEOF
     chmod 600 "$tmp"
     if [[ -z $names ]]; then
         rm -f "$tmp"
-        ui_info "nenhuma credencial para os módulos ainda (instale mailserver, nextcloud e discord)"
+        ui_info "nenhuma credencial para as rotinas ainda (instale mailserver, nextcloud e discord)"
         return 0
     fi
     if n8n_import credentials "$tmp"; then
-        ui_ok "credenciais dos módulos no n8n: $names"
+        ui_ok "credenciais das rotinas no n8n: $names"
     else
-        ui_warn "não foi possível gravar as credenciais dos módulos no n8n"
+        ui_warn "não foi possível gravar as credenciais das rotinas no n8n"
     fi
     rm -f "$tmp"
 }
 
-module_current() {
-    local id=$1 out=$2
-    n8n_cli export:workflow --id="$id" 2>/dev/null | python3 -I -c '
-import json, sys
-texto = sys.stdin.read()
-try:
-    w = json.loads(texto[texto.index("["):])[0]
-except (ValueError, IndexError):
-    w = {}
-json.dump(w, open(sys.argv[1], "w"), ensure_ascii=False)
-' "$out" || printf '{}' > "$out"
-}
-
-module_install() {
-    local file=$1 tmp current folder channel kept
-    if grep -q '__ASTRO_PASTA_CONTAS__' "$file"; then
-        folder="$(env_get CONTAS_PASTA)"
-        if [[ -z $folder ]]; then
-            if [[ ${ASTRO_REUSE_CONFIG:-} == 1 ]]; then
-                folder="Contas a pagar"
-            else
-                ui_info "as contas a pagar ficam em arquivos Markdown (um por mês) numa pasta do seu Nextcloud"
-                ui_info "ex.: uma pasta do seu cofre do Obsidian, como <disco>/<pasta do cofre>/Contas a pagar"
-                ui_input folder "pasta no Nextcloud para as contas" "Contas a pagar" is_nc_folder
-            fi
-            env_put CONTAS_PASTA "$folder"
-        fi
-    fi
-    channel="$(env_get DISCORD_CHANNEL "" "$ASTRO_HOME/discord/.env")"
-    tmp="$(mktemp)"
-    current="$(mktemp)"
-    chmod 600 "$tmp" "$current"
-    module_current "$(module_field "$file" id)" "$current"
-    kept="$(python3 -I -c '
-import json, sys
-src, current, out, folder, channel, url = sys.argv[1:]
-texto = open(src, encoding="utf-8").read()
-for marca, valor in (("__ASTRO_PASTA_CONTAS__", folder), ("__ASTRO_CANAL_DISCORD__", channel), ("__ASTRO_URL_ENVIO__", url)):
-    texto = texto.replace(marca, json.dumps(valor)[1:-1])
-novo = json.loads(texto)
-
-def configuracao(w):
-    for no in w.get("nodes", []):
-        if no.get("name", "").endswith("Configuração"):
-            return no.get("parameters", {}).get("assignments", {}).get("assignments", [])
-    return []
-
-guardados = {a.get("name"): a.get("value") for a in configuracao(json.load(open(current)))}
-mantidos = []
-for a in configuracao(novo):
-    if a.get("name") in guardados and not a.get("name", "").startswith("config.api_"):
-        if a.get("value") != guardados[a["name"]]:
-            mantidos.append(a["name"].removeprefix("config."))
-        a["value"] = guardados[a["name"]]
-json.dump([novo], open(out, "w"), ensure_ascii=False)
-print(", ".join(mantidos))
-' "$file" "$current" "$tmp" "$(env_get CONTAS_PASTA)" "$channel" "$(env_get SEND_URL "" "$ASTRO_HOME/mailserver/.env")")"
-    rm -f "$current"
-    [[ -z $kept ]] || ui_info "valores do ⚙️ Configuração mantidos: $kept"
-    if n8n_import workflow "$tmp"; then
-        rm -f "$tmp"
-        return 0
-    fi
-    rm -f "$tmp"
-    return 1
-}
-
-modules_install_missing() {
-    local file id name ids installed=0
-    ids=" $(module_ids | tr '\n' ' ') "
-    for file in "$MODULES_DIR"/*.json; do
-        [[ -f $file ]] || continue
-        id="$(module_field "$file" id)"
-        name="$(module_field "$file" name)"
-        [[ $ids == *" $id "* ]] && continue
-        if module_install "$file"; then
-            ui_ok "módulo \"$name\" instalado (desligado)"
-            installed=$((installed + 1))
-        else
-            ui_warn "não foi possível instalar o módulo \"$name\""
-        fi
-    done
-    ((installed)) || ui_ok "todos os módulos do repositório já estão no n8n"
-}
-
-modules_status() {
-    local file id name ids active state repo installed
-    ids=" $(module_ids | tr '\n' ' ') "
-    active=" $(module_active_ids | tr '\n' ' ') "
-    for file in "$MODULES_DIR"/*.json; do
-        [[ -f $file ]] || continue
-        id="$(module_field "$file" id)"
-        name="$(module_field "$file" name)"
-        if [[ $active == *" $id "* ]]; then
-            state="ligado"
-        elif [[ $ids == *" $id "* ]]; then
-            state="desligado"
-        else
-            state="não instalado"
-        fi
-        if [[ $state != "não instalado" ]]; then
-            repo="$(module_field "$file" versao)"
-            installed="$(module_installed_version "$id")"
-            if ((installed < repo)); then
-                state+=" · versão $installed (o repositório tem a $repo: use \"Restaurar\" para atualizar)"
-            fi
-        fi
-        ui_info "$(printf '%-22s %s' "$name" "$state")"
-    done
-}
-
-module_restore() {
-    local files=() names=() file index
-    for file in "$MODULES_DIR"/*.json; do
-        files+=("$file")
-        names+=("$(module_field "$file" name)")
-    done
-    ui_menu index "Qual módulo restaurar à versão do repositório?" "${names[@]}" "Voltar"
-    ((index < ${#files[@]})) || return 0
-    ui_warn "isso substitui o fluxo \"${names[index]}\" no n8n, com as suas mudanças nele (o módulo fica desligado)"
-    ui_info "os valores do nó ⚙️ Configuração (senhas dos PDFs, destinatários...) são mantidos"
-    ui_confirm "restaurar?" n || return 0
-    if module_install "${files[index]}"; then
-        ui_ok "módulo \"${names[index]}\" restaurado (desligado: ligue de novo no n8n)"
-    else
-        ui_warn "não foi possível restaurar o módulo"
-    fi
-}
-
-action_modules() {
+action_credentials() {
     local index
     cmd_status || ui_fail "o n8n não está rodando"
     while true; do
-        ui_step "Módulos"
-        modules_status
-        ui_info "para ligar ou desligar um módulo, abra https://$(env_get N8N_HOST) e use o botão de publicar do fluxo"
-        ui_menu index "O que fazer?" "Instalar os módulos que faltam" "Restaurar um módulo à versão do repositório" \
-            "Atualizar as credenciais (caixa, Discord, Nextcloud, Anthropic, envio de e-mail)" "Trocar a chave da API da Anthropic" "Voltar"
+        ui_step "Credenciais"
+        ui_info "as rotinas usam credenciais com nome fixo (Astro: ...), montadas a partir dos outros projetos"
+        ui_menu index "O que fazer?" "Atualizar as credenciais (caixa, Discord, Nextcloud, Anthropic, envio de e-mail)" \
+            "Trocar a chave da API da Anthropic" "Voltar"
         case $index in
-            0) modules_install_missing ;;
-            1) module_restore ;;
-            2) credentials_sync ;;
-            3) anthropic_key trocar; credentials_sync ;;
+            0) credentials_sync ;;
+            1) anthropic_key trocar; credentials_sync ;;
             *) return 0 ;;
         esac
     done
+}
+
+workflows_hint() {
+    if [[ -z $(n8n_cli list:workflow 2>/dev/null || true) ]]; then
+        ui_info "o n8n está sem rotinas: para trazer as suas, use Administração → Restaurar uma versão → n8n"
+    else
+        ui_ok "rotinas do n8n mantidas (elas ficam no banco do n8n e entram no backup das configurações)"
+    fi
 }
 
 cmd_install() {
@@ -456,11 +297,10 @@ cmd_install() {
     start_containers
     ui_ok "sem comunicação com os servidores da n8n: telemetria, aviso de versão e modelos desligados"
 
-    ui_step "Módulos"
+    ui_step "Credenciais"
     anthropic_key
     credentials_sync
-    modules_install_missing
-    ui_info "os módulos ficam desligados: ligue os que quiser no n8n (Gerenciar Astro → n8n → Módulos mostra a situação)"
+    workflows_hint
 
     ui_step "Caddy"
     proxy_publish "$(env_get N8N_HOST)" "http://$CONTAINER:5678"
@@ -518,7 +358,7 @@ remote_contas_email() {
     fi
     cmd_status || { echo "o n8n não está rodando"; return 1; }
     token="$(env_get N8N_HOOK_TOKEN)"
-    [[ -n $token ]] || { echo "falta a chave das chamadas: Gerenciar Astro → n8n → Módulos → Atualizar as credenciais"; return 1; }
+    [[ -n $token ]] || { echo "falta a chave das chamadas: Gerenciar Astro → n8n → Credenciais → Atualizar as credenciais"; return 1; }
     printf '%s' "$token" | podman exec -i "$CONTAINER" node -e '
 let chave = "";
 process.stdin.on("data", (d) => chave += d).on("end", async () => {
@@ -532,7 +372,7 @@ process.stdin.on("data", (d) => chave += d).on("end", async () => {
     const texto = await r.text();
     let mensagem = texto;
     try { mensagem = JSON.parse(texto).mensagem || texto; } catch (e) {}
-    if (r.status === 404) mensagem = "o módulo Contas: e-mail mensal não está ligado no n8n";
+    if (r.status === 404) mensagem = "a rotina Contas: e-mail mensal não está ligada no n8n (ou não tem mais o webhook astro-contas-email)";
     console.log(mensagem);
     process.exit(r.ok ? 0 : 1);
   } catch (e) {
@@ -545,7 +385,7 @@ process.stdin.on("data", (d) => chave += d).on("end", async () => {
 
 cmd_action() {
     case "${1:-}" in
-        modules) action_modules ;;
+        credentials) action_credentials ;;
         *)       ui_fail "ação desconhecida: ${1:-}" ;;
     esac
 }

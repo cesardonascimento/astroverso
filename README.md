@@ -59,7 +59,7 @@ mostra esta lista.
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
 | Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade` | 01:00, junto com o das configurações | `backup:arcade` |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
-| Contas: e-mail do mês | manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (módulo Contas: e-mail mensal ligado) | `contas:email` (envia na hora; argumento opcional `AAAA-MM`) |
+| Contas: e-mail do mês | manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: e-mail mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM`) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
@@ -117,9 +117,6 @@ acesso administrativo ligado).
   montado sozinho a cada boot em `/srv/<rótulo>`, mesmo sem ninguém logado, e volta sozinho se for desligado e
   religado. Desmarcar um disco o desmonta (os dados continuam nele), depois de confirmar.
 
-Para o **Contas: e-mail mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
-e-mail (cada um confirma pelo link que recebe), escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
-do módulo, separados por vírgula, e ligue o módulo no n8n.
 - **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
   segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca
   para no boot pedindo senha e pode ser reiniciada de longe. Levado para outro computador, o disco
@@ -278,22 +275,23 @@ para ele.
   primeiro acesso. Para trocar esses dados depois, reinstale o n8n (eles ficam travados na tela do n8n).
 - **Senha do administrador:** pelo menos 8 caracteres. Fica guardada só como hash. Ao reinstalar, o assistente
   pergunta se quer trocá-la.
-- **Chave da API da Anthropic:** usada pelos módulos de contas para o Claude ler os e-mails de cobrança. Crie em
-  https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astro → n8n → Módulos). O
-  conteúdo dos e-mails de cobrança vai para a API da Anthropic.
-- **Pasta no Nextcloud para as contas:** onde ficam os arquivos `AAAA-MM.md` das contas a pagar, um por mês. Use
-  uma pasta do seu cofre do Obsidian para abri-los lá e marcar as pagas.
+- **Chave da API da Anthropic:** usada pelas rotinas de contas para o Claude ler os e-mails de cobrança. Crie em
+  https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astro → n8n →
+  Credenciais). O conteúdo dos e-mails de cobrança vai para a API da Anthropic.
 
-O n8n traz **módulos**: rotinas prontas, instaladas desligadas. Você liga, desliga e ajusta cada uma no próprio n8n
-(cada uma começa com um nó **⚙️ Configuração**). Gerenciar Astro → n8n → **Módulos** mostra a situação, instala os
-que faltam, restaura um módulo à versão do repositório (é assim que chega uma versão nova) e atualiza as
-credenciais. Ao restaurar, os valores do ⚙️ Configuração (senhas dos PDFs, destinatários, pasta) são mantidos.
+As **rotinas** ficam no banco do próprio n8n: você as cria, muda e liga pelo editor, e cada versão salva entra no
+histórico do n8n (ícone de relógio no editor). O backup das configurações (01:00) leva o banco inteiro, com rotinas,
+parâmetros e credenciais. Numa instalação do zero, instale o n8n e use Administração → **Restaurar uma versão** →
+n8n para trazer tudo de volta. Gerenciar Astro → n8n → **Credenciais** atualiza as credenciais que as rotinas usam
+(caixa do mailserver, bot do Discord, Nextcloud, Anthropic, envio de e-mail) a partir dos outros projetos.
 
-| Módulo | O que faz |
+As rotinas de contas a pagar usadas hoje:
+
+| Rotina | O que faz |
 |---|---|
-| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Com vários anexos (boleto, nota fiscal, demonstrativo), usa só o que tem o código de pagamento. Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto, gerados na própria máquina. No Obsidian, a caixa **Pago** de cada conta é clicável |
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o astro confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do mês, numa pasta do cofre do Obsidian, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. No Obsidian, a caixa **Pago** é clicável |
 | Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas sem **Pago** marcado que vencem em até 3 dias ou já venceram |
-| Contas: e-mail mensal | No dia 5 de cada mês, às 08:00, manda por e-mail o resumo das contas do mês (com as imagens dos códigos) aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
+| Contas: e-mail mensal | No dia 5 de cada mês, às 08:00, manda por e-mail as contas do mês, no mesmo formato do arquivo, aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
 servidores da empresa. Um modelo do site do n8n ainda pode ser copiado e colado no editor. Ele também não roda
@@ -397,7 +395,7 @@ de confirmação para o endereço novo: ele chega na pasta Quarentena do app Mai
 confirmar.
 
 Para o **Contas: e-mail mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
-e-mail (cada um confirma pelo link que recebe), escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
-do módulo, separados por vírgula, e ligue o módulo no n8n.
+e-mail (cada um confirma pelo link que recebe) e escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
+da rotina, separados por vírgula.
 
 Para criar um projeto novo, veja [lib/README.md](lib/README.md).
