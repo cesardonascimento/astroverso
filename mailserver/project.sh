@@ -25,6 +25,7 @@ FETCH_CALENDAR=("*-*-* 08..19:00/5:00" "*-*-* 20:00:00")
 DOORBELL=campainha
 LOCK="$STATE/.fetch.lock"
 TOKEN=""
+RECIPIENTS=""
 ROUTING_MX=""
 
 cmd_describe() {
@@ -38,6 +39,7 @@ cmd_status() {
 cmd_actions() {
     printf '%s\n' \
         "domains|Domínios autorizados (ver, adicionar, remover)" \
+        "recipients|Destinatários de e-mail (quem pode receber os envios do astro)" \
         "fetch|Buscar os e-mails agora" \
         "access|Mostrar os dados de acesso à caixa (IMAP)"
 }
@@ -124,6 +126,7 @@ token_instructions() {
     ui_info "       Account → Workers Scripts → Edit"
     ui_info "       Account → Workers KV Storage → Edit"
     ui_info "       Zone → Email Routing Rules → Edit"
+    ui_info "       Account → Email Routing Addresses → Edit"
     ui_info "       Zone → Zone Settings → Edit"
     ui_info "       Zone → Zone → Read"
     ui_info "       Zone → DNS → Read"
@@ -194,7 +197,7 @@ configure() {
         umask 077
         printf "MAIL_ADDRESS='%s'\nALLOWED_DOMAINS='%s'\nNEXTCLOUD_USER='%s'\nCLOUDFLARE_API_TOKEN='%s'\nIMAP_PASSWORD='%s'\nZONE_ID='%s'\nZONE_NAME='%s'\nACCOUNT_ID='%s'\n" \
             "$address" "$domains" "$nc_user" "$TOKEN" "$password" "$ZONE_ID" "$ZONE_NAME" "$ACCOUNT_ID" > "$ENV_FILE.new"
-        grep '^KV_ID=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
+        grep -E '^(KV_ID|SEND_KEY|SEND_URL)=' "$ENV_FILE" >> "$ENV_FILE.new" 2>/dev/null || true
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     ui_ok "configuração salva em $ENV_FILE"
@@ -246,22 +249,54 @@ routing_ensure() {
 
 worker_publish() {
     local kv=$1 metadata ignored
-    metadata="$(python3 -I -c '
+    [[ -n $(env_get SEND_KEY) ]] || env_put SEND_KEY "$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 48)"
+    metadata="$(mktemp)"
+    chmod 600 "$metadata"
+    python3 -I - "$kv" "$COMPATIBILITY_DATE" "$ENV_FILE" > "$metadata" <<'PYEOF'
 import json, sys
-kv, domains, date = sys.argv[1:]
+kv, date, env_file = sys.argv[1:]
+env = {}
+for linha in open(env_file, encoding="utf-8"):
+    chave, _, valor = linha.rstrip("\n").partition("=")
+    env[chave] = valor.strip("'")
 print(json.dumps({
     "main_module": "worker.js",
     "compatibility_date": date,
     "bindings": [
         {"type": "kv_namespace", "name": "MAIL", "namespace_id": kv},
-        {"type": "plain_text", "name": "ALLOWED_DOMAINS", "text": domains},
+        {"type": "plain_text", "name": "ALLOWED_DOMAINS", "text": env.get("ALLOWED_DOMAINS", "")},
+        {"type": "plain_text", "name": "REMETENTE", "text": env.get("MAIL_ADDRESS", "")},
+        {"type": "secret_text", "name": "CHAVE_ENVIO", "text": env["SEND_KEY"]},
+        {"type": "send_email", "name": "ENVIO"},
     ],
-}))' "$kv" "$(env_get ALLOWED_DOMAINS)" "$COMPATIBILITY_DATE")"
-    cf_call ignored 'None' PUT "accounts/$ACCOUNT_ID/workers/scripts/$WORKER" \
-        -F "metadata=$metadata;type=application/json" \
-        -F "worker.js=@worker.js;type=application/javascript+module" || ui_fail "não foi possível publicar o Worker"
-    ui_ok "Worker $WORKER publicado (domínios autorizados: $(env_get ALLOWED_DOMAINS))"
+}))
+PYEOF
+    if ! cf_call ignored 'None' PUT "accounts/$ACCOUNT_ID/workers/scripts/$WORKER" \
+            -F "metadata=<$metadata;type=application/json" \
+            -F "worker.js=@worker.js;type=application/javascript+module"; then
+        rm -f "$metadata"
+        ui_fail "não foi possível publicar o Worker"
+    fi
+    rm -f "$metadata"
+    ui_ok "Worker $WORKER publicado (domínios autorizados: $(env_get ALLOWED_DOMAINS); envio só para destinatários confirmados)"
 }
+
+workers_dev() {
+    local sub ignored
+    if ! cf_call sub 'r.get("subdomain", "")' GET "accounts/$ACCOUNT_ID/workers/subdomain" 2>/dev/null || [[ -z $sub ]]; then
+        sub="astro-$(openssl rand -hex 4)"
+        cf_call ignored 'None' PUT "accounts/$ACCOUNT_ID/workers/subdomain" \
+            -H 'Content-Type: application/json' --data-binary "$(cf_json subdomain "$sub")" \
+            || ui_fail "não foi possível criar o endereço workers.dev da conta"
+        ui_ok "endereço workers.dev da conta criado: $sub.workers.dev"
+    fi
+    cf_call ignored 'None' POST "accounts/$ACCOUNT_ID/workers/scripts/$WORKER/subdomain" \
+        -H 'Content-Type: application/json' --data-binary '{"enabled":true}' \
+        || ui_fail "não foi possível ligar o endereço workers.dev do Worker"
+    env_put SEND_URL "https://$WORKER.$sub.workers.dev"
+    ui_ok "envio de e-mails em $(env_get SEND_URL)/enviar (só com a chave do .env)"
+}
+
 
 cloudflare_setup() {
     ui_step "Cloudflare"
@@ -286,6 +321,7 @@ cloudflare_setup() {
     env_put KV_ID "$kv"
 
     worker_publish "$kv"
+    workers_dev
 
     cf_call rule_id "next((x[\"id\"] for x in r if any(m.get(\"value\") == \"$address\" for m in x.get(\"matchers\", []))), \"\")" \
         GET "zones/$ZONE_ID/email/routing/rules?per_page=50" || ui_fail "não foi possível listar as regras do Email Routing"
@@ -514,6 +550,49 @@ quarantine_release() {
     ui_ok "$count e-mail(s) de @$domain movidos para a entrada"
 }
 
+recipients_list() {
+    cf_call RECIPIENTS '"\n".join(x.get("id", "") + "\t" + x.get("email", "") + "\t" + ("confirmado" if x.get("verified") else "aguardando confirmação") for x in r)' \
+        GET "accounts/$ACCOUNT_ID/email/routing/addresses?per_page=50"
+}
+
+action_recipients() {
+    local index email ids=() emails=() states=() chosen=() i id ignored line
+    TOKEN="$(env_get CLOUDFLARE_API_TOKEN)"
+    ACCOUNT_ID="$(env_get ACCOUNT_ID)"
+    while true; do
+        ui_step "Destinatários de e-mail"
+        ui_info "o astro só envia e-mails para endereços confirmados: a Cloudflare manda um link de confirmação para cada um"
+        ids=(); emails=(); states=()
+        if recipients_list; then
+            while IFS=$'\t' read -r id email line; do
+                [[ -n $email ]] || continue
+                ids+=("$id"); emails+=("$email"); states+=("$line")
+                ui_info "$email · $line"
+            done <<< "$RECIPIENTS"
+        fi
+        ((${#emails[@]})) || ui_info "nenhum destinatário cadastrado"
+        ui_menu index "O que fazer?" "Adicionar destinatário" "Remover destinatários" "Voltar"
+        case $index in
+            0)
+                ui_input email "e-mail do destinatário" "" is_email
+                if cf_call ignored 'None' POST "accounts/$ACCOUNT_ID/email/routing/addresses" \
+                        -H 'Content-Type: application/json' --data-binary "$(cf_json email "$email")"; then
+                    ui_ok "$email cadastrado: a pessoa recebe agora um e-mail da Cloudflare e precisa clicar no link de confirmação"
+                fi
+                ;;
+            1)
+                ((${#emails[@]})) || continue
+                ui_checklist chosen "Quais remover?" --esc "${emails[@]}"
+                for i in "${chosen[@]}"; do
+                    cf_call ignored 'None' DELETE "accounts/$ACCOUNT_ID/email/routing/addresses/${ids[i]}" \
+                        && ui_ok "${emails[i]} removido"
+                done
+                ;;
+            *) return 0 ;;
+        esac
+    done
+}
+
 action_domains() {
     local index list=() chosen=() domain i kept=() added=()
     TOKEN="$(env_get CLOUDFLARE_API_TOKEN)"
@@ -567,6 +646,7 @@ cmd_action() {
     case "${1:-}" in
         fetch)   ui_step "Busca"; cmd_fetch force ;;
         domains) action_domains ;;
+        recipients) action_recipients ;;
         access) action_access ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac

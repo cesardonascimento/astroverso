@@ -11,7 +11,7 @@ instalação.
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
-| [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. A caixa só recebe: ela não envia e-mails. |
+| [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. Para avisar alguém por e-mail (ex.: o resumo das contas do mês), as automações enviam pela própria Cloudflare, só para endereços que você cadastrou e que confirmaram o cadastro. |
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
@@ -59,6 +59,7 @@ mostra esta lista.
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
 | Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade` | 01:00, junto com o das configurações | `backup:arcade` |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
+| Contas: e-mail do mês | manda aos destinatários o resumo das contas do mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (módulo Contas: e-mail mensal ligado) | `contas:email` (envia na hora; argumento opcional `AAAA-MM`) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
@@ -115,6 +116,10 @@ acesso administrativo ligado).
 - **Quais discos a máquina monta?** Marque com Espaço os discos que ficam sempre ligados à máquina. Cada um é
   montado sozinho a cada boot em `/srv/<rótulo>`, mesmo sem ninguém logado, e volta sozinho se for desligado e
   religado. Desmarcar um disco o desmonta (os dados continuam nele), depois de confirmar.
+
+Para o **Contas: e-mail mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
+e-mail (cada um confirma pelo link que recebe), escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
+do módulo, separados por vírgula, e ligue o módulo no n8n.
 - **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
   segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca
   para no boot pedindo senha e pode ser reiniciada de longe. Levado para outro computador, o disco
@@ -255,11 +260,15 @@ notificações do canal em "Todas as mensagens".
 - **Usuário do Nextcloud:** aparece com o Nextcloud instalado. A caixa entra no app **Mail** desse usuário como
   "Astro Inbox". Por padrão, o administrador do Nextcloud.
 - **Token da Cloudflare:** um token só deste projeto, com as permissões que o assistente lista (Workers, KV,
-  regras e configurações do Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o
+  regras, endereços de destino e configurações do Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o
   token na hora.
 
 A instalação ativa sozinha o Email Routing no domínio do endereço. Se esse domínio já recebe e-mail por outro
 serviço, ela para sem mudar nada, porque ativar desviaria esse e-mail.
+
+Quem recebe os e-mails das automações é cadastrado em Gerenciar Astro → mailserver → **Destinatários de e-mail**.
+A Cloudflare manda a cada endereço novo um e-mail com um link de confirmação; até a pessoa clicar, nada é enviado
+para ele.
 
 ### n8n
 
@@ -277,12 +286,14 @@ serviço, ela para sem mudar nada, porque ativar desviaria esse e-mail.
 
 O n8n traz **módulos**: rotinas prontas, instaladas desligadas. Você liga, desliga e ajusta cada uma no próprio n8n
 (cada uma começa com um nó **⚙️ Configuração**). Gerenciar Astro → n8n → **Módulos** mostra a situação, instala os
-que faltam, restaura um módulo à versão original e atualiza as credenciais.
+que faltam, restaura um módulo à versão do repositório (é assim que chega uma versão nova) e atualiza as
+credenciais. Ao restaurar, os valores do ⚙️ Configuração (senhas dos PDFs, destinatários, pasta) são mantidos.
 
 | Módulo | O que faz |
 |---|---|
-| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Com vários anexos (boleto, nota fiscal, demonstrativo), usa só o que tem o código de pagamento e anota de qual anexo ele saiu. Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou código de barras do boleto, gerados na própria máquina |
-| Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas não marcadas que vencem em até 3 dias ou já venceram |
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, titular, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Com vários anexos (boleto, nota fiscal, demonstrativo), usa só o que tem o código de pagamento. Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto, gerados na própria máquina. No Obsidian, a caixa **Pago** de cada conta é clicável |
+| Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas sem **Pago** marcado que vencem em até 3 dias ou já venceram |
+| Contas: e-mail mensal | No dia 5 de cada mês, às 08:00, manda por e-mail o resumo das contas do mês (com as imagens dos códigos) aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
 servidores da empresa. Um modelo do site do n8n ainda pode ser copiado e colado no editor. Ele também não roda
@@ -384,5 +395,9 @@ Com o **mailserver**, crie no seu e-mail um encaminhamento para o endereço da c
 Filtros, um filtro por remetente (ex.: as empresas das contas) com a ação de encaminhar. O Proton manda um e-mail
 de confirmação para o endereço novo: ele chega na pasta Quarentena do app Mail do Nextcloud, com o link para
 confirmar.
+
+Para o **Contas: e-mail mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
+e-mail (cada um confirma pelo link que recebe), escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
+do módulo, separados por vírgula, e ligue o módulo no n8n.
 
 Para criar um projeto novo, veja [lib/README.md](lib/README.md).

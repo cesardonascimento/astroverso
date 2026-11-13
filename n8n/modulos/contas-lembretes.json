@@ -4,7 +4,7 @@
   "meta": {
     "astro": {
       "modulo": "contas-lembretes",
-      "versao": 1
+      "versao": 2
     }
   },
   "settings": {
@@ -130,7 +130,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst cfg = $('⚙️ Configuração').first().json.config;\nconst hoje = $now.startOf('day');\nconst limite = hoje.plus({ days: Number(cfg.dias_antecedencia) || 0 });\nconst itens = [];\nfor (const item of $input.all()) {\n  const texto = typeof item.json.conteudo === 'string' ? item.json.conteudo : '';\n  for (const linha of texto.split('\\n')) {\n    const m = linha.match(/^- \\[ \\] (.*?)📅 (\\d{4}-\\d{2}-\\d{2})/);\n    if (!m) continue;\n    const venc = DateTime.fromISO(m[2], { zone: $now.zoneName });\n    if (venc > limite) continue;\n    const dias = Math.round(venc.diff(hoje, 'days').days);\n    const quando = dias < 0 ? `venceu há ${-dias} dia(s)` : dias === 0 ? 'vence hoje' : `vence em ${dias} dia(s)`;\n    itens.push(`${dias < 0 ? '🔴' : '🟡'} ${m[1].replace(/ · vence\\s*$/, '').trim()} · ${quando} (${venc.toFormat('dd/MM')})`);\n  }\n}\nif (!itens.length) return [];\nreturn [{ json: { mensagem: ['⏰ **Contas vencendo**', ...itens].join('\\n').slice(0, 1900) } }];\n"
+        "jsCode": "\nconst cfg = $('⚙️ Configuração').first().json.config;\nconst hoje = $now.startOf('day');\nconst limite = hoje.plus({ days: Number(cfg.dias_antecedencia) || 0 });\nconst pendentes = [];\nfor (const item of $input.all()) {\n  const texto = typeof item.json.conteudo === 'string' ? item.json.conteudo : '';\n  for (const bloco of texto.split(/^-{3,}\\s*$/m)) {\n    if (!/^- \\[ \\] \\*\\*Pago\\*\\*/m.test(bloco)) continue;\n    const campo = (nome) => ((bloco.match(new RegExp(`^\\\\*\\\\*${nome}\\\\*\\\\*: *(.*)$`, 'm')) || [])[1] || '').trim();\n    const data = campo('Vencimento').match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})/);\n    if (!data) continue;\n    pendentes.push({ descricao: [campo('Conta'), campo('Valor')].filter(Boolean).join(' · '), vencimento: `${data[3]}-${data[2]}-${data[1]}` });\n  }\n  for (const linha of texto.split('\\n')) {\n    const m = linha.match(/^- \\[ \\] (.*?)📅 (\\d{4}-\\d{2}-\\d{2})/);\n    if (m) pendentes.push({ descricao: m[1].replace(/ · vence\\s*$/, '').trim(), vencimento: m[2] });\n  }\n}\nconst itens = [];\nfor (const p of pendentes) {\n  const venc = DateTime.fromISO(p.vencimento, { zone: $now.zoneName });\n  if (!venc.isValid || venc > limite) continue;\n  const dias = Math.round(venc.diff(hoje, 'days').days);\n  const quando = dias < 0 ? `venceu há ${-dias} dia(s)` : dias === 0 ? 'vence hoje' : `vence em ${dias} dia(s)`;\n  itens.push(`${dias < 0 ? '🔴' : '🟡'} ${p.descricao} · ${quando} (${venc.toFormat('dd/MM')})`);\n}\nif (!itens.length) return [];\nreturn [{ json: { mensagem: ['⏰ **Contas vencendo**', ...itens].join('\\n').slice(0, 1900) } }];\n"
       },
       "name": "🔎 Vencendo",
       "type": "n8n-nodes-base.code",
