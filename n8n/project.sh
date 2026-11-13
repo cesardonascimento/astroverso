@@ -161,15 +161,31 @@ is_nc_folder() {
 }
 
 module_ids() {
-    n8n_cli list:workflow 2>/dev/null | cut -d'|' -f1
+    n8n_cli list:workflow 2>/dev/null | cut -d'|' -f1 || true
 }
 
 module_active_ids() {
-    n8n_cli list:workflow --active=true 2>/dev/null | cut -d'|' -f1
+    n8n_cli list:workflow --active=true 2>/dev/null | cut -d'|' -f1 || true
 }
 
 module_field() {
-    python3 -I -c 'import json, sys; w = json.load(open(sys.argv[1])); print({"id": w["id"], "name": w["name"]}[sys.argv[2]])' "$1" "$2"
+    python3 -I -c '
+import json, sys
+w = json.load(open(sys.argv[1]))
+print({"id": w["id"], "name": w["name"], "versao": w.get("meta", {}).get("astro", {}).get("versao", 0)}[sys.argv[2]])
+' "$1" "$2"
+}
+
+module_installed_version() {
+    n8n_cli export:workflow --id="$1" 2>/dev/null | python3 -I -c '
+import json, sys
+texto = sys.stdin.read()
+try:
+    w = json.loads(texto[texto.index("["):])[0]
+    print((w.get("meta") or {}).get("astro", {}).get("versao", 0))
+except (ValueError, IndexError):
+    print(0)
+' || echo 0
 }
 
 nextcloud_app_password() {
@@ -311,7 +327,7 @@ modules_install_missing() {
 }
 
 modules_status() {
-    local file id name ids active state
+    local file id name ids active state repo installed
     ids=" $(module_ids | tr '\n' ' ') "
     active=" $(module_active_ids | tr '\n' ' ') "
     for file in "$MODULES_DIR"/*.json; do
@@ -324,6 +340,13 @@ modules_status() {
             state="desligado"
         else
             state="não instalado"
+        fi
+        if [[ $state != "não instalado" ]]; then
+            repo="$(module_field "$file" versao)"
+            installed="$(module_installed_version "$id")"
+            if ((installed < repo)); then
+                state+=" · versão $installed (o repositório tem a $repo: use \"Restaurar\" para atualizar)"
+            fi
         fi
         ui_info "$(printf '%-22s %s' "$name" "$state")"
     done

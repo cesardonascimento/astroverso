@@ -281,7 +281,7 @@ que faltam, restaura um módulo à versão original e atualiza as credenciais.
 
 | Módulo | O que faz |
 |---|---|
-| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração) |
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai conta, valor, vencimento e código (boleto ou Pix), o astro confere os dígitos do código e grava a conta no arquivo do mês, com aviso no Discord. Abre PDFs com senha (as senhas ficam no nó ⚙️ Configuração). Com vários anexos (boleto, nota fiscal, demonstrativo), usa só o que tem o código de pagamento e anota de qual anexo ele saiu |
 | Contas: lembretes | Todo dia às 08:00, avisa no Discord as contas não marcadas que vencem em até 3 dias ou já venceram |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os

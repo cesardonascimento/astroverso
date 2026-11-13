@@ -39,7 +39,8 @@ só na rede local, pelo Caddy, e sem comunicação com os servidores da empresa 
 Rotinas prontas em `modulos/*.json`, fluxos do n8n com `id` fixo e `meta.astro` (`modulo`, `versao`). A instalação
 importa, desligados, os que ainda não existem no n8n (`import:workflow`); um módulo já instalado nunca é
 sobrescrito, para não perder as mudanças feitas na interface. A ação **Módulos** (Gerenciar Astro → n8n) mostra
-cada um (ligado, desligado ou não instalado, por `list:workflow`), instala os que faltam, restaura um à versão do
+cada um (ligado, desligado ou não instalado, por `list:workflow`, e quando o repositório tem uma `meta.astro.versao`
+maior que a instalada, lida por `export:workflow`), instala os que faltam, restaura um à versão do
 repositório (substitui as mudanças e o deixa desligado), atualiza as credenciais e troca a chave da Anthropic.
 Marcadores trocados na importação: `__ASTRO_PASTA_CONTAS__` (`CONTAS_PASTA`) e `__ASTRO_CANAL_DISCORD__` (canal do
 projeto discord). Para levar ao repositório uma mudança feita na interface: `n8n export:workflow --id=<id>`.
@@ -56,7 +57,10 @@ logo depois; atualizadas a cada instalação e pela ação):
 
 **Contas: leitura** (`astroContasLeitu`): gatilho IMAP na `INBOX` (marca como lido, anexos baixados) → ⚙️
 Configuração (pasta, modelo `claude-haiku-5-5`, esforço `low`, senhas de PDF, aviso, endereços das APIs) → cada
-PDF tentado sem senha e com cada senha (Extract from File) → um pedido por e-mail à API (`anthropic-version:
+PDF tentado sem senha e com cada senha (Extract from File) → um pedido por e-mail à API, com os anexos que parecem
+boleto primeiro (linha digitável, Pix, "pagável", "vencimento"; nota fiscal, demonstrativo e extrato por último),
+até 20 mil caracteres por anexo e 60 mil no total; a instrução diz que um e-mail traz uma conta só, tirada do
+documento com o código de pagamento, e o JSON diz de qual `anexo` ela saiu (`anthropic-version:
 2026-10-21`, `output_config.format` com JSON schema: `e_cobranca` e `contas[]`) → conferência sem IA (DV dos campos
 e geral da linha digitável de 47 dígitos, blocos da conta de consumo de 48, valor e vencimento pelo fator, CRC16
 do Pix) → um arquivo `AAAA-MM.md` por mês de vencimento, criando a pasta nível a nível, sem repetir um código já
