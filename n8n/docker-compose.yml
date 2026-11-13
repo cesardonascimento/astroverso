@@ -48,7 +48,8 @@ services:
       retries: 3
 
   n8n-runners:
-    image: docker.io/n8nio/runners:2.47.5
+    build: .
+    image: localhost/astro-n8n-runners:latest
     container_name: astro-n8n-runners
     restart: always
     depends_on:

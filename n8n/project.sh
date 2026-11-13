@@ -118,6 +118,11 @@ configure() {
 start_containers() {
     local log
     mkdir -p "$DATA"
+    ui_info "construindo o executor de código (imagem oficial + biblioteca de QR Code)..."
+    if ! log="$(compose build 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix >&2
+        ui_fail "falha ao construir a imagem do executor de código"
+    fi
     remove_containers
     if ! log="$(compose up -d 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2

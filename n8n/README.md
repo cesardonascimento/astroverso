@@ -64,7 +64,10 @@ documento com o código de pagamento, e o JSON diz de qual `anexo` ela saiu (`an
 2026-10-21`, `output_config.format` com JSON schema: `e_cobranca` e `contas[]`) → conferência sem IA (DV dos campos
 e geral da linha digitável de 47 dígitos, blocos da conta de consumo de 48, valor e vencimento pelo fator, CRC16
 do Pix) → um arquivo `AAAA-MM.md` por mês de vencimento, criando a pasta nível a nível, sem repetir um código já
-presente → aviso no Discord. Divergências viram `⚠️ revisar (motivo)` na tarefa; um e-mail que a IA não leu vira
+presente → aviso no Discord. Para cada código conferido, gera a imagem para pagar com a câmera: código de barras
+"2 de 5 intercalado" do boleto (os 44 dígitos do código de barras, montado da linha digitável, em JavaScript puro)
+e QR Code do Pix (biblioteca `qrcode`), em SVG, gravados em `<pasta>/imagens/` com nome pelo hash do código
+(`boleto-<hash>.svg`, `pix-<hash>.svg`) e embutidos na tarefa (`![[pix-<hash>.svg|220]]`, formato do Obsidian). Divergências viram `⚠️ revisar (motivo)` na tarefa; um e-mail que a IA não leu vira
 uma tarefa de revisão.
 
 Formato de cada conta (tarefa do Markdown, data no formato do plugin Tasks do Obsidian):
@@ -72,11 +75,19 @@ Formato de cada conta (tarefa do Markdown, data no formato do plugin Tasks do Ob
 ```markdown
 - [ ] Energia · R$ 187,32 · vence 📅 2026-11-20
   - Boleto: `34191750090001234567489012345008416360000018732`
+  - ![[boleto-81e68724f5.svg|420]]
   - Beneficiário: Companhia de Energia · recebido em 12/11/2026 · e-mail "Sua fatura chegou"
 ```
 
 **Contas: lembretes** (`astroContasLembr`): todo dia às 08:00, lê os arquivos do mês atual e do seguinte e avisa
 as tarefas `- [ ]` com `📅` até `dias_antecedencia` (padrão 3) à frente, inclusive as vencidas.
+
+## Executor de código
+
+O `astro-n8n-runners` usa uma imagem própria (`Dockerfile`, construída na instalação a partir de `n8nio/runners` na
+mesma versão do n8n): a biblioteca `qrcode` (versão fixada) fica em `/opt/astro/node_modules` (`NODE_PATH`), e o
+`/etc/n8n-task-runners.json` libera `qrcode` em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A
+versão do `ARG N8N_VERSION` acompanha a do `n8nio/n8n` no `docker-compose.yml`.
 
 ## Backup e restauração
 
