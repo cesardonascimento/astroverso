@@ -29,7 +29,7 @@ async function enviar(request, env) {
   const para = (Array.isArray(pedido.para) ? pedido.para : []).map((item) => String(item).trim()).filter(Boolean);
   if (!para.length || !pedido.assunto) return resposta(400, { erro: "faltam destinatários ou assunto" });
   const anexos = (pedido.anexos || []).map((anexo) => ({
-    content: anexo.base64,
+    content: Uint8Array.from(atob(String(anexo.base64 || "")), (letra) => letra.charCodeAt(0)),
     filename: anexo.nome,
     type: anexo.tipo,
     disposition: anexo.cid ? "inline" : "attachment",
