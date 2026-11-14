@@ -134,6 +134,26 @@ filters:
     url: https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
     name: StevenBlack Unified Hosts
     id: 6
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_67.txt
+    name: HaGeZi's Apple Tracker Blocklist
+    id: 7
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_63.txt
+    name: HaGeZi's Windows/Office Tracker Blocklist
+    id: 8
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_60.txt
+    name: HaGeZi's Xiaomi Tracker Blocklist
+    id: 9
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_71.txt
+    name: HaGeZi's DNS Rebind Protection
+    id: 10
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt
+    name: HaGeZi NSFW
+    id: 11
 whitelist_filters: []
 user_rules: []
 dhcp:

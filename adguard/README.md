@@ -17,7 +17,7 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 | Upstreams | DoH Cloudflare; DoH Google só se o Cloudflare falhar (`fallback_dns`). Bootstrap `1.1.1.1`, `1.0.0.1` e `8.8.8.8` |
 | Cache | 32 MB, otimista, TTL mín. 60s |
 | Segurança | DNSSEC + Safe Browsing ligados |
-| Listas | AdGuard DNS, AdAway, OISD Big, HaGeZi PRO, HaGeZi TIF (StevenBlack incluída, desligada) |
+| Listas | AdGuard DNS, AdAway, OISD Big, HaGeZi PRO, HaGeZi TIF, HaGeZi Apple, Windows/Office e Xiaomi (rastreadores), HaGeZi DNS Rebind Protection, HaGeZi NSFW (StevenBlack incluída, desligada) |
 | Logs | Consultas: 7 dias · Estatísticas: 30 dias |
 
 ## Perguntas da instalação
