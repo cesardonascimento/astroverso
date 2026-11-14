@@ -65,9 +65,12 @@ ligada, o comando avisa. O comando `help` do projeto põe `mailserver:fetch` e `
 ## Executor de código
 
 O `astro-n8n-runners` usa uma imagem própria (`Dockerfile`, construída na instalação a partir de `n8nio/runners` na
-mesma versão do n8n): as bibliotecas `qrcode` e `pngjs` (versões fixadas, usadas pelas rotinas de contas para o QR
-Code do Pix e o código de barras) ficam em `/opt/astro/node_modules` (`NODE_PATH`), e o
-`/etc/n8n-task-runners.json` as libera em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A versão
+mesma versão do n8n): as bibliotecas `qrcode` e `pngjs` (versões fixadas, usadas pelas rotinas de contas para desenhar o QR
+Code do Pix e o código de barras), `mupdf` e `zxing-wasm` (leitura de QR Codes) e o módulo `astro-qr` (pasta
+`astro-qr`: abre o PDF, com as senhas se precisar, desenha as páginas e devolve os QR Codes encontrados; também lê
+imagens) ficam em `/opt/astro/node_modules` (`NODE_PATH`), e o `/etc/n8n-task-runners.json` libera `qrcode`, `pngjs`
+e `astro-qr` em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A rotina Contas: leitura lê o Pix
+dos QR Codes dos anexos antes de chamar o Claude. A versão
 do `ARG N8N_VERSION` acompanha a do `n8nio/n8n` no `docker-compose.yml`.
 
 ## Backup e restauração
