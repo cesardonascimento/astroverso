@@ -31,13 +31,13 @@ cmd_actions() {
 }
 
 cmd_remote_actions() {
-    echo "contas:email|Contas: enviar agora o e-mail consolidado (contas emitidas no mês anterior; argumento: AAAA-MM, opcional)|nao"
+    echo "contas:email|Contas: enviar agora o e-mail consolidado (contas que vencem no mês; argumento: AAAA-MM, opcional)|nao"
 }
 
 cmd_help() {
     printf '%s\n' \
         "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do astro, e a rotina Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
-        "Contas|Contas: e-mail do mês|manda aos destinatários as contas emitidas no mês anterior, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada)|contas:email|20"
+        "Contas|Contas: e-mail do mês|manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada)|contas:email|20"
 }
 
 remove_containers() {
