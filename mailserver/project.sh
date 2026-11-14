@@ -41,15 +41,20 @@ cmd_actions() {
         "domains|Domínios autorizados (ver, adicionar, remover)" \
         "recipients|Destinatários de e-mail (quem pode receber os envios do astro)" \
         "fetch|Buscar os e-mails agora" \
+        "reprocess|Reprocessar e-mails (entregar de novo na entrada, para as rotinas lerem outra vez)" \
         "access|Mostrar os dados de acesso à caixa (IMAP)"
 }
 
 cmd_remote_actions() {
-    echo "fetch|Mailserver: buscar os e-mails agora|nao"
+    printf '%s\n' \
+        "fetch|Mailserver: buscar os e-mails agora|nao" \
+        "reprocess|Mailserver: reprocessar os e-mails da entrada dos últimos 30 dias (as rotinas leem outra vez)|sim"
 }
 
 cmd_help() {
-    echo "Automações|Mailserver: buscar e-mails|traz para a caixa local os e-mails recebidos na Cloudflare|de 5 em 5 minutos, das 08:00 às 20:00 (só quando a campainha tocou)|mailserver:fetch|10"
+    printf '%s\n' \
+        "Automações|Mailserver: buscar e-mails|traz para a caixa local os e-mails recebidos na Cloudflare|de 5 em 5 minutos, das 08:00 às 20:00 (só quando a campainha tocou)|mailserver:fetch|10" \
+        "Automações|Mailserver: reprocessar e-mails|entrega de novo na entrada os e-mails dos últimos 30 dias, para as rotinas do n8n lerem outra vez (uma conta já gravada no arquivo do mês é pulada)|quando quiser refazer a leitura|mailserver:reprocess|20"
 }
 
 remove_container() {
@@ -550,6 +555,104 @@ quarantine_release() {
     ui_ok "$count e-mail(s) de @$domain movidos para a entrada"
 }
 
+inbox_list() {
+    local query=(mailbox INBOX all)
+    [[ -z ${1:-} ]] || query=(mailbox INBOX SINCE "$1")
+    { podman exec "$CONTAINER" doveadm fetch -u "$MAIL_USER" 'uid date.received hdr.subject' "${query[@]}" 2>/dev/null || true; } | python3 -I -c '
+import sys, email.header
+for bloco in sys.stdin.read().split("\f"):
+    campos = {}
+    for linha in bloco.strip("\n").split("\n"):
+        chave, _, valor = linha.partition(": ")
+        if chave in ("uid", "date.received", "hdr.subject"):
+            campos[chave] = valor
+    if "uid" not in campos:
+        continue
+    try:
+        assunto = str(email.header.make_header(email.header.decode_header(campos.get("hdr.subject", ""))))
+    except Exception:
+        assunto = campos.get("hdr.subject", "")
+    assunto = (assunto or "(sem assunto)").replace("\x1f", " ").replace("\n", " ")[:90]
+    print("\x1f".join([campos["uid"], campos.get("date.received", "")[:16] or "-", assunto]))
+'
+}
+
+reprocess_one() {
+    local uid=$1 file
+    file="$(mktemp)"
+    chmod 600 "$file"
+    if ! podman exec "$CONTAINER" doveadm fetch -u "$MAIL_USER" text mailbox INBOX uid "$uid" > "$file" 2>/dev/null; then
+        rm -f "$file"
+        ui_warn "não foi possível ler o e-mail $uid"
+        return 1
+    fi
+    python3 -I -c '
+import sys
+dados = open(sys.argv[1], "rb").read()
+if dados.startswith(b"text:"):
+    dados = dados[5:].lstrip(b" ")
+    if dados.startswith(b"\n"):
+        dados = dados[1:]
+open(sys.argv[1], "wb").write(dados)
+' "$file"
+    if [[ ! -s $file ]] || ! podman exec -i "$CONTAINER" doveadm save -u "$MAIL_USER" -m INBOX < "$file" >/dev/null 2>&1; then
+        rm -f "$file"
+        ui_warn "o Dovecot não aceitou de novo o e-mail $uid (o original continua na entrada)"
+        return 1
+    fi
+    podman exec "$CONTAINER" doveadm expunge -u "$MAIL_USER" mailbox INBOX uid "$uid" >/dev/null 2>&1 \
+        || ui_warn "a cópia antiga do e-mail $uid continua na entrada"
+    ui_ok "entregue de novo: $(mail_subject "$file")"
+    rm -f "$file"
+}
+
+reprocess_uids() {
+    local uid count=0
+    for uid in "$@"; do
+        reprocess_one "$uid" && count=$((count + 1))
+    done
+    ui_ok "$count e-mail(s) entregue(s) de novo na entrada: o n8n os lê em alguns segundos"
+}
+
+action_reprocess() {
+    local lines=() uids=() labels=() chosen=() line uid date subject picked=() i
+    cmd_status || ui_fail "o mailserver não está rodando"
+    mapfile -t lines < <(inbox_list)
+    if ((${#lines[@]} == 0)); then
+        ui_info "a entrada está vazia: nada para reprocessar"
+        return 0
+    fi
+    for line in "${lines[@]}"; do
+        IFS=$'\x1f' read -r uid date subject <<< "$line"
+        uids+=("$uid")
+        labels+=("$date  $subject")
+    done
+    ui_info "cada e-mail escolhido volta para a entrada como novo, e as rotinas do n8n (ex.: Contas: leitura) o leem outra vez"
+    ui_info "uma conta que já está no arquivo do mês é pulada: para gravá-la de novo, apague antes o bloco dela no Obsidian"
+    ui_checklist chosen "Quais e-mails reprocessar?" --all --esc "${labels[@]}"
+    ((${#chosen[@]})) || return 0
+    for i in "${chosen[@]}"; do
+        picked+=("${uids[i]}")
+    done
+    reprocess_uids "${picked[@]}"
+}
+
+remote_reprocess() {
+    local lines=() line uid date subject uids=()
+    cmd_status || { echo "o mailserver não está rodando"; return 1; }
+    mapfile -t lines < <(inbox_list 30d)
+    if ((${#lines[@]} == 0)); then
+        echo "nenhum e-mail na entrada nos últimos 30 dias"
+        return 0
+    fi
+    for line in "${lines[@]}"; do
+        IFS=$'\x1f' read -r uid date subject <<< "$line"
+        uids+=("$uid")
+    done
+    reprocess_uids "${uids[@]}"
+    echo "contas que já estão no arquivo do mês são puladas: apague o bloco no Obsidian para gravar de novo"
+}
+
 recipients_list() {
     cf_call RECIPIENTS '"\n".join(x.get("id", "") + "\t" + x.get("email", "") + "\t" + ("confirmado" if x.get("verified") else "aguardando confirmação") for x in r)' \
         GET "accounts/$ACCOUNT_ID/email/routing/addresses?per_page=50"
@@ -647,6 +750,7 @@ cmd_action() {
         fetch)   ui_step "Busca"; cmd_fetch force ;;
         domains) action_domains ;;
         recipients) action_recipients ;;
+        reprocess) ui_step "Reprocessar e-mails"; action_reprocess ;;
         access) action_access ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
     esac
@@ -655,6 +759,7 @@ cmd_action() {
 cmd_remote() {
     case "${1:-}" in
         fetch) cmd_fetch force ;;
+        reprocess) remote_reprocess ;;
         *)     echo "ação desconhecida: ${1:-}"; return 1 ;;
     esac
 }

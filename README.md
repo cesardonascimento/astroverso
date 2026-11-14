@@ -61,6 +61,7 @@ mostra esta lista.
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
 | Contas: e-mail do mês | manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM` para outro mês) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
+| Mailserver: reprocessar e-mails | entrega de novo na entrada os e-mails dos últimos 30 dias, para as rotinas do n8n lerem outra vez (uma conta já gravada no arquivo do mês é pulada: apague o bloco dela antes) | quando quiser refazer a leitura (no assistente, escolhendo os e-mails) | `mailserver:reprocess` (pede confirmação) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
 | Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |

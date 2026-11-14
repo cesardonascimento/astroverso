@@ -93,6 +93,10 @@ expiração. É separado do token do Caddy.
 - **Destinatários de e-mail:** lista os endereços de destino da conta na Cloudflare (confirmados ou aguardando
   confirmação), cadastra um novo (a Cloudflare manda a ele um e-mail com o link de confirmação) e remove os
   escolhidos. Só os confirmados recebem os envios do astro.
+- **Reprocessar e-mails:** lista os e-mails da entrada (data e assunto), você marca quais (ou todos), e cada um é
+  copiado de novo para a entrada como novo (`doveadm fetch text` → `doveadm save`) e só então a cópia antiga é
+  apagada. As rotinas do n8n que leem a caixa (como Contas: leitura) os processam outra vez. Pelo Discord,
+  `mailserver:reprocess` faz o mesmo com os e-mails dos últimos 30 dias, com confirmação.
 - **Buscar os e-mails agora** e **Mostrar os dados de acesso à caixa (IMAP)**.
 
 ## Arquivos gerados
