@@ -29,6 +29,8 @@ tela do usuário de jogos.
 | Onde estão as ROMs? (uma ou mais pastas) | (sem padrão: navegar pelos discos) |
 | Guardar o RetroArch e o ES-DE todas as noites? | `S` |
 | Pasta do backup do RetroArch e do ES-DE | `Arcade` ao lado da pasta do backup das configurações do rclone (ex.: `<disco>/proton/Astro/Arcade`), ou `<primeiro disco privado>/Astro/Arcade` |
+| Guardar as mídias do ES-DE todas as noites? | `S` |
+| Pasta do backup das mídias do ES-DE | `<primeiro disco privado>/astro/arcade/media` |
 | Restaurar o RetroArch/ES-DE do backup em `<pasta>`? | `S` (só com a configuração local vazia e o backup com arquivos) |
 | Carregar uma configuração existente do RetroArch? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
 | Carregar uma configuração existente do ES-DE? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
@@ -197,7 +199,7 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 | Carregar uma configuração do ES-DE | Copia o backup (se houver) ou outra pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
 | Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
 | Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak (com o driver GL da NVIDIA igual ao da máquina) e baixa todos os núcleos de novo |
-| Backup: Arcade ➡️ local (agora) | Copia na hora o RetroArch e o ES-DE para a pasta de backup (só com o backup ligado). No Discord: `/astro command:backup:arcade` |
+| Backup: Arcade ➡️ local (agora) | Copia na hora o RetroArch, o ES-DE e as mídias para as pastas de backup (só com algum backup ligado). No Discord: `/astro command:backup:arcade` |
 
 ## Backup
 
@@ -218,6 +220,11 @@ Núcleos, assets, shaders, `custom_systems` e logs ficam de fora: o Astro e os p
 pasta da nuvem, a cópia segue para ela e para o disco de backup nas rodadas das 03:00 (com as versões delas). Uma
 falha (disco desmontado, rclone ausente) marca o backup das configurações como falho, e o "Implodir Astro" não
 continua.
+
+As mídias do ES-DE (`MEDIA_DIR`) vão para a **pasta do backup das mídias** (`MEDIA_BACKUP`), na mesma hora, por um
+`rclone sync` incremental: o que sai da pasta de mídias também sai da cópia. Por terem muitos arquivos, o padrão fica
+fora da pasta da nuvem (`<primeiro disco privado>/astro/arcade/media`); no disco de dados, elas seguem para o disco de
+backup nas rodadas das 03:00. Uma falha nas mídias só avisa: o resto do backup e o "Implodir Astro" continuam.
 
 Na instalação, com a configuração local vazia e o backup com arquivos, o assistente oferece restaurar dele. As
 ações "Carregar uma configuração do RetroArch/ES-DE" também oferecem o backup primeiro.

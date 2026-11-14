@@ -57,7 +57,7 @@ mostra esta lista.
 | Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
 | Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
-| Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade` | 01:00, junto com o das configurações | `backup:arcade` |
+| Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade`, e as mídias do ES-DE na pasta de backup delas | 01:00, junto com o das configurações | `backup:arcade` |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
 | Contas: e-mail do mês | manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM` para outro mês) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
@@ -193,6 +193,10 @@ fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca 
   temas) para uma pasta comum. Por padrão, **S**.
   - **Pasta do backup do RetroArch e do ES-DE:** por padrão, `Arcade` ao lado do backup das configurações do
     rclone, dentro da pasta da nuvem: assim a cópia segue para a nuvem e para o disco de backup.
+- **Guardar as mídias do ES-DE todas as noites?** Copia, toda noite à 01:00, a pasta de mídias (capas, telas e
+  vídeos) para outra pasta, como backup. O que for apagado das mídias também sai da cópia. Por padrão, **S**.
+  - **Pasta do backup das mídias do ES-DE:** por padrão, `<primeiro disco privado>/astro/arcade/media`, fora da
+    pasta da nuvem: as mídias têm muitos arquivos e deixariam a sincronização com a nuvem lenta.
 - **Restaurar o RetroArch/ES-DE do backup?** Só aparece numa instalação nova, com o backup cheio. Com **S** (padrão),
   tudo volta como estava, inclusive saves e gamelists.
 - **Carregar uma configuração existente do RetroArch?** Só aparece na primeira vez. Com **S**, você escolhe a

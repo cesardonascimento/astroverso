@@ -213,6 +213,33 @@ choose_backup() {
     ui_ok "backup do RetroArch e do ES-DE em $dest"
 }
 
+media_backup_default() {
+    local disk
+    disk="$(disk_mounts | awk '$2 == "privado" { print $1; exit }')"
+    [[ -z $disk ]] || printf '%s/astro/arcade/media' "$disk"
+    return 0
+}
+
+choose_media_backup() {
+    local dest default
+    default="$(env_get MEDIA_BACKUP "$(media_backup_default)")"
+    ui_info "toda noite, à 01:00, a pasta de mídias do ES-DE (capas, telas e vídeos) pode ser copiada para outra pasta"
+    if ! ui_confirm "guardar as mídias do ES-DE todas as noites?" y; then
+        env_put MEDIA_BACKUP ""
+        ui_info "sem backup das mídias do ES-DE"
+        return
+    fi
+    while true; do
+        ui_input dest "pasta do backup das mídias do ES-DE" "$default" is_path
+        if mkdir -p "$dest" 2>/dev/null && [[ -w $dest ]]; then
+            break
+        fi
+        ui_warn "não foi possível gravar em $dest: escolha outra pasta"
+    done
+    env_put MEDIA_BACKUP "$dest"
+    ui_ok "backup das mídias do ES-DE em $dest"
+}
+
 backup_folder() {
     local dir
     dir="$(env_get ARCADE_BACKUP)"
@@ -231,6 +258,7 @@ configure() {
     elif config_reuse; then
         ui_ok "configuração existente mantida"
         grep -q '^ARCADE_BACKUP=' "$ENV_FILE" || choose_backup
+        grep -q '^MEDIA_BACKUP=' "$ENV_FILE" || choose_media_backup
         return
     fi
     default=$GAMES_DEFAULT
@@ -242,22 +270,25 @@ configure() {
         check_games_user "$user" && break
     done
     ui_input host "endereço do Sunshine no Caddy" "$(env_get SUNSHINE_HOST "sunshine.$(hostname -s)${domain:+.$domain}")" is_hostname
-    local media roms backup
+    local media roms backup media_backup
     media="$(env_get MEDIA_DIR)"
     roms="$(env_get ROM_DIRS)"
     backup="$(env_get ARCADE_BACKUP)"
+    media_backup="$(env_get MEDIA_BACKUP)"
     (
         umask 077
         printf "GAMES_USER='%s'\nSUNSHINE_HOST='%s'\nAUTOLOGIN='%s'\n" "$user" "$host" "$autologin_current" > "$ENV_FILE.new"
         [[ -z $media ]] || printf "MEDIA_DIR='%s'\n" "$media" >> "$ENV_FILE.new"
         [[ -z $roms ]] || printf "ROM_DIRS='%s'\n" "$roms" >> "$ENV_FILE.new"
         [[ -z $backup ]] || printf "ARCADE_BACKUP='%s'\n" "$backup" >> "$ENV_FILE.new"
+        [[ -z $media_backup ]] || printf "MEDIA_BACKUP='%s'\n" "$media_backup" >> "$ENV_FILE.new"
     )
     mv "$ENV_FILE.new" "$ENV_FILE"
     choose_autologin
     choose_media
     choose_roms
     choose_backup
+    choose_media_backup
     ui_ok "configuração salva em $ENV_FILE"
 }
 
@@ -1006,22 +1037,29 @@ cmd_actions() {
         "esde|Carregar uma configuração do ES-DE" \
         "folders|Trocar as pastas de ROMs e de mídias" \
         "update|Atualizar ES-DE, RetroArch e núcleos"
-    [[ -n $(env_get ARCADE_BACKUP) ]] && echo "backup|Backup: Arcade ➡️ local (agora)"
+    backup_enabled && echo "backup|Backup: Arcade ➡️ local (agora)"
     return 0
+}
+
+backup_enabled() {
+    [[ -n $(env_get ARCADE_BACKUP)$(env_get MEDIA_BACKUP) ]]
 }
 
 arcade_backup_now() {
     local user base
     user="$(env_get GAMES_USER)"
-    [[ -n $(env_get ARCADE_BACKUP) ]] || ui_fail "backup do RetroArch e do ES-DE desligado: reinstale o arcade para escolher a pasta"
+    backup_enabled || ui_fail "backup do Arcade desligado: reinstale o arcade para escolher as pastas"
     [[ -n $user ]] || ui_fail "instale o arcade antes"
     base="$(games_home "$user")/.astro/arcade"
     [[ -r $base ]] || ui_fail "sem leitura em ~$user/.astro/arcade: rode a instalação do arcade"
-    arcade_sync "$base"
+    local status=0
+    arcade_sync "$base" || status=1
+    media_sync || status=1
+    return $status
 }
 
 cmd_remote_actions() {
-    [[ -n $(env_get ARCADE_BACKUP) ]] && echo "backup:arcade|Backup: Arcade ➡️ local agora (RetroArch e ES-DE)|nao"
+    backup_enabled && echo "backup:arcade|Backup: Arcade ➡️ local agora (RetroArch, ES-DE e mídias)|nao"
     return 0
 }
 
@@ -1033,8 +1071,8 @@ cmd_remote() {
 }
 
 cmd_help() {
-    [[ -n $(env_get ARCADE_BACKUP) ]] || return 0
-    echo "Backups|Backup: Arcade ➡️ local|RetroArch (configuração, saves, states, BIOS, capturas e gravações) e ES-DE (configuração, coleções, gamelists e temas) na pasta Arcade|01:00, junto com o das configurações|backup:arcade|80"
+    backup_enabled || return 0
+    echo "Backups|Backup: Arcade ➡️ local|RetroArch (configuração, saves, states, BIOS, capturas e gravações) e ES-DE (configuração, coleções, gamelists e temas) na pasta Arcade, e as mídias do ES-DE na pasta de backup delas|01:00, junto com o das configurações|backup:arcade|80"
 }
 
 cmd_action() {
@@ -1191,6 +1229,31 @@ arcade_sync() {
     ui_ok "RetroArch e ES-DE copiados para $dest"
 }
 
+media_sync() {
+    local source dest path log
+    source="$(env_get MEDIA_DIR)"
+    dest="$(env_get MEDIA_BACKUP)"
+    [[ -n $dest && -n $source ]] || return 0
+    for path in "$source" "$dest"; do
+        path="$(cut -d/ -f1-3 <<< "$path")"
+        if [[ $path == "$DISK_ROOT"/* ]] && ! mountpoint -q "$path"; then
+            ui_error "$path não está montado: o backup das mídias do ES-DE não foi feito"
+            return 1
+        fi
+    done
+    if ! command -v rclone >/dev/null; then
+        ui_error "o backup das mídias do ES-DE precisa do rclone: instale o Astro de novo"
+        return 1
+    fi
+    mkdir -p "$dest"
+    if ! log="$(rclone --config /dev/null sync "$source" "$dest" --skip-links --log-level ERROR 2>&1)"; then
+        printf '%s\n' "$log" | ui_prefix
+        ui_error "o backup das mídias do ES-DE em $dest falhou"
+        return 1
+    fi
+    ui_ok "mídias do ES-DE copiadas para $dest"
+}
+
 cmd_backup() {
     local user base
     user="$(env_get GAMES_USER)"
@@ -1201,6 +1264,9 @@ cmd_backup() {
         return 0
     fi
     arcade_sync "$base" >&2 || return 1
+    if ! media_sync >&2; then
+        ui_warn "as mídias continuam em $(env_get MEDIA_DIR); o resto do backup segue" >&2
+    fi
     if [[ -d $base/sunshine ]]; then
         printf 'include sunshine %s\nexclude %s\n' "$base/sunshine" "$base/sunshine/sunshine.log*"
     fi
