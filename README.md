@@ -33,7 +33,7 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `n8n`, `arcade`, `rclone` e `discord`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `arcade` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
@@ -199,8 +199,8 @@ fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca 
   pasta de outra instalação (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
   jogos. Uma configuração do Windows serve: caminhos e drivers do Windows são limpos.
 - **Carregar uma configuração existente do ES-DE?** Igual, para o ES-DE (a pasta `ES-DE` do Windows também
-  serve). As pastas de ROMs e mídias passam a ser as respondidas acima.
-- **Carregar gamelists existentes?** Igual, para as gamelists (a lista de jogos com nomes e descrições).
+  serve), com as gamelists (a lista de jogos com nomes e descrições), coleções e temas. As pastas de ROMs e
+  mídias passam a ser as respondidas acima.
 
 Depois, as mesmas cópias podem ser feitas pelas ações do projeto, em Gerenciar Astro → arcade.
 
@@ -278,13 +278,14 @@ para ele.
   pergunta se quer trocá-la.
 - **Chave da API da Anthropic:** usada pelas rotinas de contas para o Claude ler os e-mails de cobrança. Crie em
   https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astro → n8n →
-  Credenciais). O conteúdo dos e-mails de cobrança vai para a API da Anthropic.
+  Trocar a chave da API da Anthropic). O conteúdo dos e-mails de cobrança vai para a API da Anthropic.
 
 As **rotinas** ficam no banco do próprio n8n: você as cria, muda e liga pelo editor, e cada versão salva entra no
 histórico do n8n (ícone de relógio no editor). O backup das configurações (01:00) leva o banco inteiro, com rotinas,
 parâmetros e credenciais. Numa instalação do zero, instale o n8n e use Administração → **Restaurar uma versão** →
-n8n para trazer tudo de volta. Gerenciar Astro → n8n → **Credenciais** atualiza as credenciais que as rotinas usam
-(caixa do mailserver, bot do Discord, Nextcloud, Anthropic, envio de e-mail) a partir dos outros projetos.
+n8n para trazer tudo de volta. As credenciais que as rotinas usam (caixa do mailserver, bot do Discord, Nextcloud,
+Anthropic, envio de e-mail) são montadas a partir dos outros projetos na instalação do n8n: se a senha de um deles
+mudar (ex.: token novo do bot), reinstale o n8n.
 
 As rotinas de contas a pagar usadas hoje:
 

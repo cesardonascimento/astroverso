@@ -32,7 +32,6 @@ tela do usuário de jogos.
 | Restaurar o RetroArch/ES-DE do backup em `<pasta>`? | `S` (só com a configuração local vazia e o backup com arquivos) |
 | Carregar uma configuração existente do RetroArch? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
 | Carregar uma configuração existente do ES-DE? | `N` (só com a configuração local vazia, sem backup ou recusando-o) |
-| Carregar gamelists existentes? | `N` (só com as gamelists locais vazias) |
 
 O usuário de jogos não pode ser o mesmo da instalação, um usuário do sistema nem ter `sudo`. Se o `.env`
 salvo aponta para um usuário que não existe mais (ex.: renomeado), a instalação pergunta tudo de novo, em vez
@@ -196,7 +195,6 @@ O ES-DE fica no menu de aplicativos do usuário de jogos e abre o RetroArch sozi
 |---|---|
 | Carregar uma configuração do RetroArch | Copia o backup (se houver) ou outra pasta de configuração para a local (sem `.dll`/`.exe`) e limpa o `retroarch.cfg` |
 | Carregar uma configuração do ES-DE | Copia o backup (se houver) ou outra pasta de dados do ES-DE e regrava as pastas de ROMs e mídias |
-| Carregar gamelists | Copia uma pasta de gamelists para `es-de/gamelists` |
 | Trocar as pastas de ROMs e de mídias | Pergunta as pastas de novo, refaz o `custom_systems` e baixa os núcleos que faltarem |
 | Atualizar ES-DE, RetroArch e núcleos | Instala o ES-DE mais recente, atualiza o Flatpak (com o driver GL da NVIDIA igual ao da máquina) e baixa todos os núcleos de novo |
 | Backup: Arcade ➡️ local (agora) | Copia na hora o RetroArch e o ES-DE para a pasta de backup (só com o backup ligado). No Discord: `/astro command:backup:arcade` |

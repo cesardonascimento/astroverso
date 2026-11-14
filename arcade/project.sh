@@ -902,18 +902,6 @@ load_esde() {
     ui_ok "configuração do ES-DE carregada de $source"
 }
 
-load_gamelists() {
-    local user=$1 force=${2:-false} target source
-    target="$(games_home "$user")/.astro/arcade/es-de/gamelists"
-    if ! $force; then
-        has_files "$target" && return 0
-        ui_confirm "carregar gamelists existentes (uma pasta por sistema, com gamelist.xml)?" n || return 0
-    fi
-    ui_browse source "Onde estão as gamelists?" "${BROWSE_ROOTS[@]}"
-    import_folder "$user" "$source" "$target"
-    ui_ok "gamelists carregadas de $source"
-}
-
 check_folders() {
     local user=$1 path roms=()
     rom_dirs roms
@@ -977,7 +965,6 @@ cmd_install() {
     install_esde
     load_retroarch "$user"
     load_esde "$user"
-    load_gamelists "$user"
     apply_esde "$user"
     apply_retroarch "$user"
     games_acl "$user"
@@ -1017,7 +1004,6 @@ cmd_actions() {
     printf '%s\n' \
         "retroarch|Carregar uma configuração do RetroArch" \
         "esde|Carregar uma configuração do ES-DE" \
-        "gamelists|Carregar gamelists" \
         "folders|Trocar as pastas de ROMs e de mídias" \
         "update|Atualizar ES-DE, RetroArch e núcleos"
     [[ -n $(env_get ARCADE_BACKUP) ]] && echo "backup|Backup: Arcade ➡️ local (agora)"
@@ -1071,10 +1057,6 @@ cmd_action() {
             ui_step "ES-DE"
             load_esde "$user" true
             apply_esde "$user"
-            ;;
-        gamelists)
-            ui_step "Gamelists"
-            load_gamelists "$user" true
             ;;
         folders)
             ui_step "Pastas"

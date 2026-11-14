@@ -1,7 +1,7 @@
 # Criando um projeto
 
 O `setup.sh` reconhece qualquer pasta com um `project.sh` executável. "Instalar Astro" instala todos na ordem da
-lista `ORDER` do `setup.sh` (`caddy` primeiro, `discord` por último); um projeto fora da lista entra no fim.
+lista `ORDER` do `setup.sh` (`caddy` primeiro, `rclone` por último); um projeto fora da lista entra no fim.
 Antes dos projetos, o `setup.sh` prepara a máquina uma vez (`host_base`) e roda "Discos da máquina": o `install`
 de um projeto supõe a máquina já preparada. Cada etapa (`maquina`, `discos`, um projeto) só ganha a marca
 `~/.astro/.concluidas/<etapa>` quando termina sem erro (a marca é apagada no começo); no "Reinstalar Astro", um checklist

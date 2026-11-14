@@ -44,7 +44,8 @@ Numa instalação do zero, a instalação avisa quando o n8n está sem rotinas, 
 versão** → n8n as traz do backup.
 
 **Credenciais** (`import:credentials` com `id` fixo, a partir de um arquivo temporário dentro do container, apagado
-logo depois; atualizadas a cada instalação e pela ação **Credenciais**, que também troca a chave da Anthropic). As
+logo depois; atualizadas a cada instalação e pela ação **Trocar a chave da API da Anthropic**; o n8n instala depois do
+mailserver, do nextcloud e do discord, e uma senha trocada num deles pede reinstalar o n8n). As
 rotinas apontam para esses `id`, que não mudam entre instalações:
 
 | Credencial (`id`) | Origem |

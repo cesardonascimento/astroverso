@@ -27,7 +27,7 @@ cmd_status() {
 }
 
 cmd_actions() {
-    echo "credentials|Credenciais (dados dos outros projetos para as rotinas, chave da Anthropic)"
+    echo "anthropic|Trocar a chave da API da Anthropic"
 }
 
 cmd_remote_actions() {
@@ -264,20 +264,11 @@ PYEOF
     rm -f "$tmp"
 }
 
-action_credentials() {
-    local index
+action_anthropic() {
     cmd_status || ui_fail "o n8n não está rodando"
-    while true; do
-        ui_step "Credenciais"
-        ui_info "as rotinas usam credenciais com nome fixo (Astro: ...), montadas a partir dos outros projetos"
-        ui_menu index "O que fazer?" "Atualizar as credenciais (caixa, Discord, Nextcloud, Anthropic, envio de e-mail)" \
-            "Trocar a chave da API da Anthropic" "Voltar"
-        case $index in
-            0) credentials_sync ;;
-            1) anthropic_key trocar; credentials_sync ;;
-            *) return 0 ;;
-        esac
-    done
+    ui_step "Chave da API da Anthropic"
+    anthropic_key trocar
+    credentials_sync
 }
 
 workflows_hint() {
@@ -358,7 +349,7 @@ remote_contas_email() {
     fi
     cmd_status || { echo "o n8n não está rodando"; return 1; }
     token="$(env_get N8N_HOOK_TOKEN)"
-    [[ -n $token ]] || { echo "falta a chave das chamadas: Gerenciar Astro → n8n → Credenciais → Atualizar as credenciais"; return 1; }
+    [[ -n $token ]] || { echo "falta a chave das chamadas: reinstale o n8n"; return 1; }
     printf '%s' "$token" | podman exec -i "$CONTAINER" node -e '
 let chave = "";
 process.stdin.on("data", (d) => chave += d).on("end", async () => {
@@ -385,7 +376,7 @@ process.stdin.on("data", (d) => chave += d).on("end", async () => {
 
 cmd_action() {
     case "${1:-}" in
-        credentials) action_credentials ;;
+        anthropic) action_anthropic ;;
         *)       ui_fail "ação desconhecida: ${1:-}" ;;
     esac
 }
