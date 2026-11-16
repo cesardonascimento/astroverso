@@ -22,7 +22,7 @@ máquina, e a pasta compartilhada é do usuário que instala.
 
 - Instala o pacote `samba` (Fedora ou Debian/Ubuntu).
 - Acrescenta ao fim do `/etc/samba/smb.conf`, entre `# astro samba: inicio` e `# astro samba: fim`, o
-  compartilhamento `[Public]`: `path = ~/Public`, `valid users = <usuário>`, gravação liberada. O resto do arquivo
+  compartilhamento `[Public]` e, num `[global]` próprio, `multicast dns register = no`: `path = ~/Public`, `valid users = <usuário>`, gravação liberada. O resto do arquivo
   fica como veio do sistema (cópia em `smb.conf.astro-bak` antes da primeira mudança). A configuração é conferida
   pelo `testparm`; se falhar, o arquivo volta ao que era.
 - **SELinux:** marca `~/Public` com `samba_share_t` (`semanage fcontext` + `restorecon`), o único lugar do home
@@ -32,23 +32,25 @@ máquina, e a pasta compartilhada é do usuário que instala.
   a instalação rodar de novo (ou `restorecon -R ~/Public`).
 - **Senha:** cadastra quem instala no banco de senhas do Samba (`smbpasswd -s -a`, senha pela entrada padrão). Ela
   é separada da senha do login e vale só para a pasta de rede.
-- **Avahi só na rede local:** acrescenta `deny-interfaces=tailscale0` na seção `[server]` do
-  `/etc/avahi/avahi-daemon.conf`. O Samba se anuncia pelo Avahi (mDNS) e aparece sozinho em "Rede" nos outros
-  computadores da casa; sem isso, o anúncio saía também pelo Tailscale, o nome `<máquina>.local` apontava para o IP
-  do Tailscale e o Nautilus de outra máquina não listava o compartilhamento.
+- **Sem anúncio na rede:** o Samba não se anuncia pelo Avahi (mDNS). Esse anúncio só funciona dentro de casa;
+  o acesso é sempre pelo endereço, com o nome do domínio (abaixo), igual em casa e pelo Tailscale.
 - Habilita e reinicia o `smb.service` (`smbd` no Debian).
 - Libera o serviço `samba` no firewalld (porta 445 e as do NetBIOS) para a rede local.
 
 ## Acesso
 
-- Windows: `\\<ip>\Public` no Explorador de Arquivos (ou "Mapear unidade de rede").
-- macOS, Linux (Arquivos → Outros locais) e iPhone (app Arquivos → Conectar ao Servidor): `smb://<ip>/Public`.
+- Windows: `\\<nome-da-máquina>.<domínio>\Public` no Explorador de Arquivos (ou "Mapear unidade de rede").
+- macOS, Linux (Arquivos → Outros locais) e iPhone (app Arquivos → Conectar ao Servidor):
+  `smb://<nome-da-máquina>.<domínio>/Public`.
+
+O AdGuard responde todo `*.<domínio>` com o IP da máquina, em casa e pelo Tailscale (Split DNS), então qualquer
+nome do domínio serve. Sem o Caddy instalado, use o IP (`\\<ip>\Public`).
 
 Entre com o usuário que instalou e a senha do Samba.
 
 ## Remoção
 
-Tira o bloco do `smb.conf`, a linha do Avahi, o usuário do Samba, o rótulo do SELinux e a liberação no firewall, e desliga o
+Tira o bloco do `smb.conf`, o usuário do Samba, o rótulo do SELinux e a liberação no firewall, e desliga o
 `smb.service`. Ficam o pacote e os arquivos da `~/Public`.
 
 ## Arquivos
@@ -56,6 +58,5 @@ Tira o bloco do `smb.conf`, a linha do Avahi, o usuário do Samba, o rótulo do 
 | Caminho | O que é |
 |---|---|
 | `~/.astro/samba/.env` | `SHARE_DIR` (a pasta compartilhada) |
-| `/etc/samba/smb.conf` | bloco `[Public]` entre as marcas do astro |
-| `/etc/avahi/avahi-daemon.conf` | `deny-interfaces=tailscale0` na seção `[server]` |
+| `/etc/samba/smb.conf` | bloco `[global]` (sem mDNS) e `[Public]` entre as marcas do astro |
 | `/var/lib/samba/private/passdb.tdb` | senha do Samba (do sistema, fora do backup) |

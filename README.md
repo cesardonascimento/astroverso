@@ -318,10 +318,11 @@ lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos,
 - **Senha do Samba:** a senha para abrir a pasta de rede, com o seu usuário. É separada da senha de login da
   máquina (pode ser a mesma) e vale só para a pasta. Na reinstalação, o assistente pergunta se mantém a atual.
 
-No Windows, abra `\\<ip>\Public` no Explorador de Arquivos (ou use "Mapear unidade de rede" para ela virar uma
-letra de disco). No Mac, no Linux e no iPhone, conecte ao servidor `smb://<ip>/Public`. Na rede de casa, a máquina
-aparece sozinha em "Rede" (Nautilus: Outros locais). Só a pasta `Public` fica
-na rede: o resto do seu home não aparece. Um arquivo movido para a pasta de outro lugar do home pode não aparecer
+No Windows, abra `\\<nome-da-máquina>.<domínio>\Public` no Explorador de Arquivos (ou use "Mapear unidade de
+rede" para ela virar uma letra de disco). No Mac, no Linux e no iPhone, conecte ao servidor
+`smb://<nome-da-máquina>.<domínio>/Public`. O endereço é o mesmo em casa e fora, pelo Tailscale: o AdGuard responde
+o nome. A máquina não se anuncia sozinha em "Rede": salve o endereço como favorito. Só a pasta `Public` fica na
+rede: o resto do seu home não aparece. Um arquivo movido para a pasta de outro lugar do home pode não aparecer
 pela rede até a instalação do `samba` rodar de novo.
 
 ### sunshine
