@@ -5,7 +5,6 @@ import sys
 
 from gi.repository import Gio, GLib
 
-STREAM_MARK = "/tmp/astro-sunshine-stream"
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "astro-sunshine-display.json")
 
 
@@ -86,24 +85,11 @@ def undo(display):
     log(f"tela restaurada para {original[0]}")
 
 
-def stream_mark(active):
-    try:
-        if active:
-            with open(STREAM_MARK, "w") as f:
-                f.write(f"{os.getpid()}\n")
-            os.chmod(STREAM_MARK, 0o644)
-        elif os.path.exists(STREAM_MARK):
-            os.remove(STREAM_MARK)
-    except OSError as error:
-        log(f"não foi possível {'criar' if active else 'apagar'} o marcador de stream: {error}")
-
-
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else ""
     if action not in ("do", "undo"):
         log("uso: astro-sunshine-display do | undo")
         return
-    stream_mark(action == "do")
     try:
         display = proxy()
         do(display) if action == "do" else undo(display)

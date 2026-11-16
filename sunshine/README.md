@@ -61,8 +61,7 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf`. No início de cada stream,
   ele troca a tela, pelo DBus do Mutter, para a resolução exata do aparelho (se a tela aceitar) e volta no fim.
-  Também cria `/tmp/astro-sunshine-stream`, apagado no fim: com ele, o rclone não sincroniza com a nuvem durante
-  o stream. Se o `sunshine.conf` já tiver um `global_prep_cmd` próprio, não mexe e avisa.
+  Se o `sunshine.conf` já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - Habilita o serviço de usuário do Sunshine: ele sobe com a sessão gráfica, aberta pelo login automático.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
   `48010`.

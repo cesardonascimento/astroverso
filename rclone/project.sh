@@ -54,7 +54,7 @@ cmd_help() {
     printf '%s\n' \
         "$group|Backup: local ⬅️ nuvem|download inicial: traz tudo da nuvem para o disco, sem apagar nada|uma vez, ao cadastrar a nuvem|backup:cloud|10" \
         "$group|Backup: local ↔️ nuvem|mesclagem: junta disco e nuvem, sem apagar nada|depois do download inicial, ou se o estado se perder|backup:cloud|20" \
-        "$group|Backup: local 🔄 nuvem|sincronização: o que é criado, alterado ou apagado de um lado vai para o outro|de 2 em 2 horas, das 08:00 às 20:00, fora dos streams do Sunshine|backup:cloud|30" \
+        "$group|Backup: local 🔄 nuvem|sincronização: o que é criado, alterado ou apagado de um lado vai para o outro|de 2 em 2 horas, das 08:00 às 20:00|backup:cloud|30" \
         "$group|Backup: local 🔄 nuvem (teste)|mostra o que a sincronização apagaria, sem efeito|quando chegar um aviso de exclusões|backup:cloud-check|40" \
         "$group|Backup: local 🔄 nuvem (liberar exclusões)|libera o limite de 5% numa rodada; pede confirmação|depois de conferir o teste|backup:cloud-force|50"
     [[ -n $(env_get BACKUP_MOUNT) ]] && echo "$group|Backup: local ➡️ backup diário|cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes)|03:00|backup:daily|60"
@@ -67,8 +67,6 @@ cmd_help() {
 }
 
 cloud_now() {
-    mkdir -p "$STATE"
-    touch "$STATE/.agora"
     systemctl --user start --no-block "$UNIT_PREFIX-tick.service"
 }
 
@@ -261,7 +259,7 @@ write_units() {
 schedules() {
     write_units
     systemctl --user enable -q --now "$UNIT_PREFIX-tick.timer"
-    ui_ok "Backup: local 🔄 nuvem de 2 em 2 horas, das 08:00 às 20:00, e às 03:00, com prioridade baixa e pausa durante os streams do Sunshine"
+    ui_ok "Backup: local 🔄 nuvem de 2 em 2 horas, das 08:00 às 20:00, e às 03:00, com prioridade baixa"
     if [[ -n $(env_get CONFIG_BACKUP) ]]; then
         systemctl --user enable -q --now "$UNIT_PREFIX-config.timer"
         ui_ok "configurações: backup criptografado à 01:00 em $(env_get CONFIG_BACKUP)"

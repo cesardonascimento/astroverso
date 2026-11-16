@@ -76,16 +76,11 @@ Só as execuções pelo systemd (agendadas, "Backup: local 🔄 nuvem (agora)" e
 avisam. Uma rodada pulada porque a anterior ainda está rodando não avisa. O "Backup: configurações ➡️ local
 (agora)" do assistente mostra tudo na tela.
 
-## Prioridade e streams do Sunshine
+## Prioridade
 
-- As rotinas rodam com prioridade mínima (`Nice=19`, `CPUSchedulingPolicy=idle`, `IOSchedulingClass=idle`): só usam a
-  CPU e o disco que sobrarem. Listar a Proton inteira a cada rodada é pesado (cada nome é decifrado), e assim o
-  Sunshine e o resto da máquina sempre vêm primeiro.
-- Durante um stream do Sunshine (marcador `/tmp/astro-sunshine-stream`, criado e apagado pelo
-  `astro-sunshine-display` do sunshine), a sincronização com a nuvem pula as rodadas agendadas. Se um stream começar
-  no meio de uma rodada, ela é interrompida (`SIGINT`, com aviso ⏸️ no Discord) e a próxima continua de onde parou.
-  Um marcador com mais de 6 horas é ignorado. O "agora" manual (`backup:cloud` e o menu) roda mesmo com stream.
-  O backup das configurações (01:00) e o backup diário (03:00) não pausam.
+As rotinas rodam com prioridade mínima (`Nice=19`, `CPUSchedulingPolicy=idle`, `IOSchedulingClass=idle`): só usam a
+CPU e o disco que sobrarem. Listar a Proton inteira a cada rodada é pesado (cada nome é decifrado), e assim o
+Sunshine e o resto da máquina sempre vêm primeiro.
 
 ## Travas
 

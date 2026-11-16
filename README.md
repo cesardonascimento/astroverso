@@ -52,7 +52,7 @@ mostra esta lista.
 |---|---|---|---|
 | Backup: local ⬅️ nuvem | download inicial: traz tudo da nuvem para o disco, sem apagar nada | uma vez, ao cadastrar a nuvem | `backup:cloud` (roda a fase atual) |
 | Backup: local ↔️ nuvem | mesclagem: junta disco e nuvem, sem apagar nada | depois do download inicial, ou se o estado se perder | `backup:cloud` (roda a fase atual) |
-| Backup: local 🔄 nuvem | sincronização: o que é criado, alterado ou apagado de um lado vai para o outro | de 2 em 2 horas, das 08:00 às 20:00 (pula durante os streams do Sunshine) | `backup:cloud` |
+| Backup: local 🔄 nuvem | sincronização: o que é criado, alterado ou apagado de um lado vai para o outro | de 2 em 2 horas, das 08:00 às 20:00 | `backup:cloud` |
 | Backup: local 🔄 nuvem (teste) | mostra o que a sincronização apagaria, sem efeito | quando chegar um aviso de exclusões | `backup:cloud-check` |
 | Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
 | Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
@@ -296,7 +296,7 @@ O espelho noturno copia um disco inteiro para outro disco da máquina, toda noit
   a hora (ex.: `2026-11-10_010000/nextcloud/nextcloud.tar.zst.gpg`); as mais antigas que isso são apagadas. Por
   padrão, `90`.
 
-Os horários: sincronização com a nuvem de 2 em 2 horas, das 08:00 às 20:00 (pulada enquanto houver um stream do Sunshine); 01:00 backup das configurações;
+Os horários: sincronização com a nuvem de 2 em 2 horas, das 08:00 às 20:00; 01:00 backup das configurações;
 03:00 uma última sincronização com a nuvem e o espelho no disco de backup.
 
 **Restaurar uma versão** (Gerenciar Astro → Administração): mostra as versões da mais nova para a mais antiga e os serviços de
