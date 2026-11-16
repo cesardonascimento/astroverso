@@ -34,8 +34,10 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   (`gdm.service.d/astro-nvidia.conf`, `udevadm wait` de até 30s no `/dev/dri/by-path/pci-<placa>-card`). Se ela
   não aparecer, o GDM sobe mesmo assim.
 - **Login automático com a tela bloqueada:** configura o GDM (`custom.conf`) para entrar com o usuário que
-  instala no boot, e um início automático do GNOME (`~/.config/autostart/astro-lock.desktop`,
-  `loginctl lock-session`) bloqueia a sessão logo depois. O Sunshine sobe com a sessão e transmite a tela de
+  instala no boot, e o serviço de usuário `astro-sunshine-lock` (com a `graphical-session.target`) bloqueia a
+  sessão logo depois: `loginctl lock-session` na sessão gráfica, repetido a cada 2s até o GNOME confirmar
+  (`LockedHint`), por até 1 minuto. O início automático do GNOME (`~/.config/autostart`) não serve: no GNOME 50, o
+  comando roda antes de o GNOME conseguir bloquear. O Sunshine sobe com a sessão e transmite a tela de
   bloqueio; quem conecta destrava com a senha. A tela bloqueia de novo depois de 5 minutos parada
   (`idle-delay 300`, `lock-delay 0`, sem escurecer antes). Com o login automático, o chaveiro do GNOME não é
   destravado no boot.
@@ -74,7 +76,7 @@ nele, escolha a máquina e digite no painel (PIN) o código que o Moonlight most
 
 ## Remoção
 
-Desliga o login automático e o bloqueio no login, desabilita o serviço do Sunshine, tira o `setcap`, o ajuste de
+Desliga o login automático e o serviço de bloqueio no login, desabilita o serviço do Sunshine, tira o `setcap`, o ajuste de
 resolução, a regra da placa principal e a espera do GDM, fecha as portas, tira a rota do Caddy e apaga
 `~/.astro/sunshine` com o atalho `~/.config/sunshine`. Ficam o pacote do Sunshine e o driver da NVIDIA.
 
@@ -85,7 +87,7 @@ resolução, a regra da placa principal e a espera do GDM, fecha as portas, tira
 | `~/.astro/sunshine/.env` | `SUNSHINE_HOST` |
 | `~/.astro/sunshine/config/` | configuração do Sunshine (`sunshine.conf`, `apps.json`, pareamentos, credenciais) |
 | `~/.astro/sunshine/.proxy` | rota do painel no Caddy |
-| `~/.config/autostart/astro-lock.desktop` | bloqueio da tela logo depois do login automático |
+| `~/.config/systemd/user/astro-sunshine-lock.service` | bloqueio da tela logo depois do login automático |
 | `/usr/local/bin/astro-sunshine-display` | troca de resolução durante o stream |
 | `/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules` | NVIDIA como placa principal do GNOME |
 | `/etc/systemd/system/gdm.service.d/astro-nvidia.conf` | GDM espera a NVIDIA no boot |

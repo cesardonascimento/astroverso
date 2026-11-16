@@ -166,16 +166,19 @@ disk_block_write() {
 }
 
 disk_hotplug_link() {
-    local wants
-    wants="/etc/systemd/system/$(systemd-escape -p --suffix=device "$1").wants"
+    local wants unit=$1
+    [[ $unit == /* ]] && unit="$(systemd-escape -p --suffix=device "$unit")"
+    wants="/etc/systemd/system/$unit.wants"
     [[ -L $wants/$2 ]] && return 0
     sudo mkdir -p "$wants"
     sudo ln -sfn "/run/systemd/generator/$2" "$wants/$2"
 }
 
 disk_hotplug_unlink() {
-    sudo find /etc/systemd/system -path '*.device.wants/*' -name "${1//\\/\\\\}" -delete 2>/dev/null || true
-    sudo find /etc/systemd/system -name '*.device.wants' -type d -empty -delete 2>/dev/null || true
+    sudo find /etc/systemd/system \( -path '*.device.wants/*' -o -path '*/systemd-cryptsetup@*.service.wants/*' \) \
+        -name "${1//\\/\\\\}" -delete 2>/dev/null || true
+    sudo find /etc/systemd/system \( -name '*.device.wants' -o -name 'systemd-cryptsetup@*.service.wants' \) \
+        -type d -empty -delete 2>/dev/null || true
 }
 
 disk_tpm_ok() {
@@ -330,7 +333,7 @@ disk_permissions() {
 }
 
 disk_setup() {
-    local arg uuid type device fstype label mapper fs_uuid fs_type name target pass wait_options
+    local arg uuid type device fstype label mapper fs_uuid fs_type name target pass wait_options trigger
     local hotplug=() fstab=() crypttab=() keep=() mounts=()
     local -A seen=() old=()
     DISK_MOUNTS=()
@@ -357,6 +360,7 @@ disk_setup() {
         fi
         fstype="$(lsblk -dno FSTYPE "$device")"
         wait_options="x-systemd.device-timeout=10s"
+        trigger=""
         if [[ $fstype == crypto_LUKS ]]; then
             mapper="luks-$uuid"
             label="$(lsblk -no LABEL "$device" | grep -v '^$' | head -1 || true)"
@@ -371,6 +375,7 @@ disk_setup() {
             udevadm settle 2>/dev/null || true
             device="/dev/mapper/$mapper"
             wait_options="x-systemd.device-timeout=5min,x-systemd.requires=systemd-cryptsetup@$(systemd-escape "$mapper").service"
+            trigger="systemd-cryptsetup@$(systemd-escape "$mapper").service"
         fi
         read -r fs_uuid fs_type label < <(lsblk -dno UUID,FSTYPE,LABEL "$device")
         if [[ $fstype == crypto_LUKS && -n $label && -z $(lsblk -dno LABEL "/dev/disk/by-uuid/$uuid") ]] \
@@ -388,7 +393,8 @@ disk_setup() {
         local line="UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth,$(disk_options "$fs_type" "$type") 0 $pass"
         fstab+=("# astro $uuid $type" "$line")
         keep+=("$uuid")
-        hotplug+=("/dev/disk/by-uuid/$fs_uuid $(systemd-escape -p --suffix=mount "$target")")
+        disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
+        hotplug+=("${trigger:-/dev/disk/by-uuid/$fs_uuid} $(systemd-escape -p --suffix=mount "$target")")
         local changed=false
         if [[ -n ${old[$uuid]:-} && $(disk_mount_options "${old[$uuid]}") != "$(disk_mount_options "$line")" ]]; then
             changed=true
@@ -478,7 +484,13 @@ disk_manage() {
         [[ -n ${current[$uuid]:-} ]] && preset+="${#uuids[@]} "
         uuids+=("$uuid")
     done < <(disk_scan)
-    if ((${#uuids[@]} == 0 && ${#current[@]} == 0)); then
+    for uuid in "${!current[@]}"; do
+        [[ " ${uuids[*]} " == *" $uuid "* ]] && continue
+        lines+=("$(printf '%-20s %8s  %-24s' "${targets[$uuid]##*/}" "-" "desligado")")
+        preset+="${#uuids[@]} "
+        uuids+=("$uuid")
+    done
+    if ((${#uuids[@]} == 0)); then
         ui_info "nenhum disco além do disco do sistema"
         return 0
     fi
@@ -490,13 +502,7 @@ disk_manage() {
         picked_lines+=("${lines[i]}")
     done
     for uuid in "${!current[@]}"; do
-        [[ " ${picked[*]} " == *" $uuid "* ]] && continue
-        if [[ " ${uuids[*]} " == *" $uuid "* ]]; then
-            removed+=("${targets[$uuid]}")
-        else
-            picked+=("$uuid")
-            picked_lines+=("${targets[$uuid]##*/} (desligado)")
-        fi
+        [[ " ${picked[*]} " == *" $uuid "* ]] || removed+=("${targets[$uuid]}")
     done
     if ((${#removed[@]})); then
         ui_warn "deixam de ser montados: ${removed[*]} (os dados continuam nos discos)"

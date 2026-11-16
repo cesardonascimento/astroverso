@@ -115,7 +115,10 @@ Bibliotecas compartilhadas:
     levar quase um minuto no boot; disco ausente falha em 10s pelo `crypttab`). Nada
     pede senha no boot: um disco ausente ou que o TPM não destrava fica de fora e a máquina sobe.
   - Disco desligado e religado (cabo, troca de case) volta a montar sozinho: um link em
-    `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem (e o `cryptsetup`, no LUKS) ao disco.
+    `/etc/systemd/system/<dispositivo>.device.wants/` liga a montagem ao disco. No LUKS, o disco liga o
+    `cryptsetup`, e a montagem fica em `systemd-cryptsetup@<mapeamento>.service.wants/`.
+  - "Discos da máquina" lista também os discos configurados que estão desligados (`desligado`), já marcados:
+    desmarcar um deles o tira do `fstab`/`crypttab` sem precisar ligá-lo.
   - A pasta vazia em `/srv` fica imutável (`chattr +i`): sem o disco, nada grava nela.
   - `disk_responds <caminho>` confere se um disco montado ainda responde: no LUKS, se o dispositivo por baixo
     existe; em todos, se a pasta principal e a lista dela são lidas em até 20s. O `disk_manage` liga o timer de

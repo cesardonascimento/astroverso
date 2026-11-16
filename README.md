@@ -114,7 +114,8 @@ acesso administrativo ligado).
 
 - **Quais discos a máquina monta?** Marque com Espaço os discos que ficam sempre ligados à máquina. Cada um é
   montado sozinho a cada boot em `/srv/<rótulo>`, mesmo sem ninguém logado, e volta sozinho se for desligado e
-  religado. Desmarcar um disco o desmonta (os dados continuam nele), depois de confirmar.
+  religado. Desmarcar um disco o desmonta (os dados continuam nele), depois de confirmar. Um disco configurado que
+  não está ligado aparece como "desligado": desmarque-o para a máquina esquecê-lo.
 
 - **Senha do LUKS:** só aparece para um disco criptografado. Ela é pedida uma vez para cadastrar o chip de
   segurança da máquina (TPM), que passa a destravar o disco sozinho a cada boot. Assim a máquina nunca

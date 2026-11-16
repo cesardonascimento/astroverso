@@ -20,7 +20,8 @@ DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 CONFIG_DIR="$STATE/config"
 CONFIG_LINK="$HOME/.config/sunshine"
-LOCK_AUTOSTART="$HOME/.config/autostart/astro-lock.desktop"
+LOCK_UNIT=astro-sunshine-lock.service
+LOCK_FILE="$HOME/.config/systemd/user/$LOCK_UNIT"
 IDLE_LOCK=300
 
 cmd_describe() {
@@ -366,15 +367,31 @@ screen_lock() {
         gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
     " >/dev/null 2>&1
     ui_ok "tela de $USER bloqueia depois de $((IDLE_LOCK / 60)) minutos parada"
-    mkdir -p "${LOCK_AUTOSTART%/*}"
-    printf '%s\n' "[Desktop Entry]" "Type=Application" "Name=Astro: bloquear a tela no login" \
-        "Exec=loginctl lock-session" "X-GNOME-Autostart-Delay=3" "NoDisplay=true" > "$LOCK_AUTOSTART.new"
-    if cmp -s "$LOCK_AUTOSTART.new" "$LOCK_AUTOSTART"; then
-        rm -f "$LOCK_AUTOSTART.new"
+    mkdir -p "${LOCK_FILE%/*}"
+    lock_unit > "$LOCK_FILE.new"
+    if cmp -s "$LOCK_FILE.new" "$LOCK_FILE"; then
+        rm -f "$LOCK_FILE.new"
     else
-        mv "$LOCK_AUTOSTART.new" "$LOCK_AUTOSTART"
+        mv "$LOCK_FILE.new" "$LOCK_FILE"
     fi
-    ui_ok "a sessão de $USER bloqueia logo depois do login automático"
+    systemctl --user daemon-reload
+    systemctl --user enable -q "$LOCK_UNIT"
+    ui_ok "a sessão de $USER bloqueia logo depois do login automático ($LOCK_UNIT)"
+}
+
+lock_unit() {
+    printf '%s\n' \
+        "[Unit]" \
+        "Description=astro sunshine: bloqueia a tela depois do login" \
+        "After=graphical-session.target" \
+        "PartOf=graphical-session.target" \
+        "" \
+        "[Service]" \
+        "Type=oneshot" \
+        "ExecStart=/bin/sh -c 's=\$\$(loginctl show-user \"\$\$USER\" -p Display --value); for i in \$\$(seq 30); do sleep 2; [ \"\$\$(loginctl show-session \"\$\$s\" -p LockedHint --value)\" = yes ] && exit 0; loginctl lock-session \"\$\$s\"; done; echo \"[sunshine] erro: a tela não bloqueou\"; exit 1'" \
+        "" \
+        "[Install]" \
+        "WantedBy=graphical-session.target"
 }
 
 enable_service() {
@@ -466,8 +483,10 @@ cmd_remove() {
     local unit bin
     ui_step "Remoção"
     autologin_off
-    if [[ -f $LOCK_AUTOSTART ]]; then
-        rm -f "$LOCK_AUTOSTART"
+    if [[ -f $LOCK_FILE ]]; then
+        systemctl --user disable -q "$LOCK_UNIT" 2>/dev/null || true
+        rm -f "$LOCK_FILE"
+        systemctl --user daemon-reload
         ui_ok "a sessão de $USER não bloqueia mais sozinha no login"
     fi
     for unit in "${UNITS[@]}"; do
