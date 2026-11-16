@@ -319,7 +319,8 @@ lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos,
   máquina (pode ser a mesma) e vale só para a pasta. Na reinstalação, o assistente pergunta se mantém a atual.
 
 No Windows, abra `\\<ip>\Public` no Explorador de Arquivos (ou use "Mapear unidade de rede" para ela virar uma
-letra de disco). No Mac, no Linux e no iPhone, conecte ao servidor `smb://<ip>/Public`. Só a pasta `Public` fica
+letra de disco). No Mac, no Linux e no iPhone, conecte ao servidor `smb://<ip>/Public`. Na rede de casa, a máquina
+aparece sozinha em "Rede" (Nautilus: Outros locais). Só a pasta `Public` fica
 na rede: o resto do seu home não aparece. Um arquivo movido para a pasta de outro lugar do home pode não aparecer
 pela rede até a instalação do `samba` rodar de novo.
 

@@ -12,6 +12,8 @@ SHARE_DIR="$HOME/Public"
 CONF=/etc/samba/smb.conf
 MARK_BEGIN="# astro samba: inicio"
 MARK_END="# astro samba: fim"
+AVAHI_CONF=/etc/avahi/avahi-daemon.conf
+AVAHI_DENY=deny-interfaces=tailscale0
 
 cmd_describe() {
     echo "Samba: a pasta $SHARE de $USER como pasta de rede (\\\\<ip>\\$SHARE)"
@@ -105,6 +107,21 @@ samba_user() {
     ui_ok "usuário $USER cadastrado no Samba"
 }
 
+avahi_lan() {
+    [[ -f $AVAHI_CONF ]] || return 0
+    if grep -qx "$AVAHI_DENY" "$AVAHI_CONF"; then
+        ui_ok "anúncio na rede (Avahi) só na rede local"
+        return
+    fi
+    if grep -q '^deny-interfaces=' "$AVAHI_CONF"; then
+        ui_warn "$AVAHI_CONF já tem um deny-interfaces próprio: confira se ele inclui o tailscale0"
+        return
+    fi
+    sudo sed -i "/^\[server\]/a $AVAHI_DENY" "$AVAHI_CONF"
+    sudo systemctl try-restart avahi-daemon.service
+    ui_ok "anúncio na rede (Avahi) só na rede local: pelo Tailscale, o nome .local apontava para o IP dele"
+}
+
 cmd_install() {
     state_setup
     ui_step "Configuração"
@@ -118,6 +135,7 @@ cmd_install() {
     write_conf
     selinux_label
     samba_user
+    avahi_lan
     sudo systemctl enable -q "$(smb_service)"
     sudo systemctl restart "$(smb_service)"
     ui_ok "Samba ativo (sobe no boot)"
@@ -125,7 +143,7 @@ cmd_install() {
 
     ui_step "Acesso"
     ui_ok "Windows: \\\\$(host_lan_ip)\\$SHARE (no Explorador de Arquivos)"
-    ui_ok "macOS, Linux e iPhone: smb://$(host_lan_ip)/$SHARE"
+    ui_ok "macOS, Linux e iPhone: smb://$(host_lan_ip)/$SHARE (na rede de casa, a máquina aparece sozinha em Rede)"
     ui_info "entre com o usuário $USER e a senha do Samba"
     ui_info "arquivos movidos para $SHARE_DIR por fora mantêm o rótulo do SELinux de onde vieram: rode a instalação de novo se algum não aparecer"
 }
@@ -158,6 +176,11 @@ cmd_remove() {
         sudo semanage fcontext -d "$SHARE_DIR(/.*)?"
         [[ -d $SHARE_DIR ]] && sudo restorecon -R "$SHARE_DIR"
         ui_ok "SELinux de $SHARE_DIR de volta ao padrão"
+    fi
+    if [[ -f $AVAHI_CONF ]] && grep -qx "$AVAHI_DENY" "$AVAHI_CONF"; then
+        sudo sed -i "/^$AVAHI_DENY\$/d" "$AVAHI_CONF"
+        sudo systemctl try-restart avahi-daemon.service
+        ui_ok "anúncio na rede (Avahi) de volta ao padrão"
     fi
     host_firewall_remove samba
     state_purge

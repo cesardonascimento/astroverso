@@ -32,6 +32,10 @@ máquina, e a pasta compartilhada é do usuário que instala.
   a instalação rodar de novo (ou `restorecon -R ~/Public`).
 - **Senha:** cadastra quem instala no banco de senhas do Samba (`smbpasswd -s -a`, senha pela entrada padrão). Ela
   é separada da senha do login e vale só para a pasta de rede.
+- **Avahi só na rede local:** acrescenta `deny-interfaces=tailscale0` na seção `[server]` do
+  `/etc/avahi/avahi-daemon.conf`. O Samba se anuncia pelo Avahi (mDNS) e aparece sozinho em "Rede" nos outros
+  computadores da casa; sem isso, o anúncio saía também pelo Tailscale, o nome `<máquina>.local` apontava para o IP
+  do Tailscale e o Nautilus de outra máquina não listava o compartilhamento.
 - Habilita e reinicia o `smb.service` (`smbd` no Debian).
 - Libera o serviço `samba` no firewalld (porta 445 e as do NetBIOS) para a rede local.
 
@@ -44,7 +48,7 @@ Entre com o usuário que instalou e a senha do Samba.
 
 ## Remoção
 
-Tira o bloco do `smb.conf`, o usuário do Samba, o rótulo do SELinux e a liberação no firewall, e desliga o
+Tira o bloco do `smb.conf`, a linha do Avahi, o usuário do Samba, o rótulo do SELinux e a liberação no firewall, e desliga o
 `smb.service`. Ficam o pacote e os arquivos da `~/Public`.
 
 ## Arquivos
@@ -53,4 +57,5 @@ Tira o bloco do `smb.conf`, o usuário do Samba, o rótulo do SELinux e a libera
 |---|---|
 | `~/.astro/samba/.env` | `SHARE_DIR` (a pasta compartilhada) |
 | `/etc/samba/smb.conf` | bloco `[Public]` entre as marcas do astro |
+| `/etc/avahi/avahi-daemon.conf` | `deny-interfaces=tailscale0` na seção `[server]` |
 | `/var/lib/samba/private/passdb.tdb` | senha do Samba (do sistema, fora do backup) |
