@@ -14,6 +14,7 @@ instalação.
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
+| [**samba**](samba/) | **Pasta de rede.** Uma pasta compartilhada aparece nos outros computadores como se fosse um disco deles: no Windows, no Explorador de Arquivos; no Mac, no iPhone e no Linux, no app de arquivos. Serve para passar arquivos entre os aparelhos da casa sem pendrive nem nuvem. Aqui, só a pasta `Public` do seu usuário fica na rede, e só você entra, com usuário e senha. |
 | [**sunshine**](sunshine/) | **Acesso remoto à tela da máquina.** Um servidor de streaming (Sunshine) transmite a tela, o som, o teclado, o mouse e os controles para o celular, o notebook ou a TV pelo app Moonlight, com pouca latência e a imagem codificada pela placa de vídeo. Serve para usar a área de trabalho da máquina de qualquer lugar, como se estivesse na frente dela. A máquina entra sozinha no boot com a tela bloqueada: pelo Moonlight, você destrava com a sua senha. |
 
 ## Como usar
@@ -33,7 +34,7 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `sunshine` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `sunshine`, `samba` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
@@ -311,6 +312,16 @@ Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado,
 sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
 "Backup: local 🔄 nuvem (agora)", no menu do rclone, mostra o aviso e pergunta se libera.
+
+### samba
+
+- **Senha do Samba:** a senha para abrir a pasta de rede, com o seu usuário. É separada da senha de login da
+  máquina (pode ser a mesma) e vale só para a pasta. Na reinstalação, o assistente pergunta se mantém a atual.
+
+No Windows, abra `\\<ip>\Public` no Explorador de Arquivos (ou use "Mapear unidade de rede" para ela virar uma
+letra de disco). No Mac, no Linux e no iPhone, conecte ao servidor `smb://<ip>/Public`. Só a pasta `Public` fica
+na rede: o resto do seu home não aparece. Um arquivo movido para a pasta de outro lugar do home pode não aparecer
+pela rede até a instalação do `samba` rodar de novo.
 
 ### sunshine
 

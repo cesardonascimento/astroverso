@@ -12,7 +12,7 @@ trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
 [[ -t 0 ]] || ui_fail "execute em um terminal interativo"
 
-ORDER=(caddy adguard cockpit nextcloud mailserver discord n8n sunshine rclone)
+ORDER=(caddy adguard cockpit nextcloud mailserver discord n8n sunshine samba rclone)
 IMPLODE_WORD=IMPLODIR
 DONE_DIR="$ASTRO_HOME/.concluidas"
 
