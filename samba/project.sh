@@ -48,6 +48,14 @@ share_block() {
         "$MARK_BEGIN" \
         "[global]" \
         "    multicast dns register = no" \
+        "    load printers = no" \
+        "    disable spoolss = yes" \
+        "[homes]" \
+        "    available = no" \
+        "[printers]" \
+        "    available = no" \
+        "[print\$]" \
+        "    available = no" \
         "[$SHARE]" \
         "    path = $SHARE_DIR" \
         "    valid users = $USER" \

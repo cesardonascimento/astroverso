@@ -25,9 +25,12 @@ máquina, e a pasta compartilhada é do usuário que instala.
   compartilhamento `[Public]` e, num `[global]` próprio, `multicast dns register = no`: `path = ~/Public`, `valid users = <usuário>`, gravação liberada. O resto do arquivo
   fica como veio do sistema (cópia em `smb.conf.astro-bak` antes da primeira mudança). A configuração é conferida
   pelo `testparm`; se falhar, o arquivo volta ao que era.
+- **Só a `Public` na rede:** no mesmo bloco, desliga os compartilhamentos que vêm prontos no Fedora (`[homes]`,
+  o home inteiro; `[printers]` e `[print$]`, impressoras e drivers para Windows) com `available = no`, e o suporte
+  a impressoras (`load printers = no`, `disable spoolss = yes`). O Samba aceita repetir uma seção, e o valor do
+  astro, no fim do arquivo, vale.
 - **SELinux:** marca `~/Public` com `samba_share_t` (`semanage fcontext` + `restorecon`), o único lugar do home
-  que o Samba lê e grava. O compartilhamento `[homes]` que vem no Fedora continua bloqueado
-  (`samba_enable_home_dirs` desligado): o resto do home não aparece na rede. Arquivos criados dentro da pasta
+  que o Samba lê e grava. Arquivos criados dentro da pasta
   herdam o rótulo; um arquivo **movido** de outro lugar do home mantém o rótulo antigo e não aparece pela rede até
   a instalação rodar de novo (ou `restorecon -R ~/Public`).
 - **Senha:** cadastra quem instala no banco de senhas do Samba (`smbpasswd -s -a`, senha pela entrada padrão). Ela
@@ -58,5 +61,5 @@ Tira o bloco do `smb.conf`, o usuário do Samba, o rótulo do SELinux e a libera
 | Caminho | O que é |
 |---|---|
 | `~/.astro/samba/.env` | `SHARE_DIR` (a pasta compartilhada) |
-| `/etc/samba/smb.conf` | bloco `[global]` (sem mDNS) e `[Public]` entre as marcas do astro |
+| `/etc/samba/smb.conf` | bloco `[global]` (sem mDNS e sem impressoras), `[homes]`/`[printers]`/`[print$]` desligados e `[Public]` entre as marcas do astro |
 | `/var/lib/samba/private/passdb.tdb` | senha do Samba (do sistema, fora do backup) |
