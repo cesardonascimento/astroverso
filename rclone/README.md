@@ -93,6 +93,9 @@ Sunshine e o resto da máquina sempre vêm primeiro.
   pula o que já está igual e grava cada arquivo com nome temporário até terminar.
 - Uma rodada por vez (`flock`): a sincronização de 2 em 2 horas pula a vez se outra estiver rodando; a das 03:00
   espera.
+- Uma sincronização interrompida (reinício, queda de energia) deixa a trava do `rclone bisync` em
+  `~/.cache/rclone/bisync/*.lck`, e as seguintes falhariam com "prior lock file found". Como a rodada só começa
+  com o `flock` na mão, nenhuma outra está rodando: a trava velha é apagada ali.
 - A sincronização para se for apagar mais de 5% dos arquivos (veja acima).
 
 ## Avisos no Discord

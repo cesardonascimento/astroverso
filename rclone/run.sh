@@ -80,6 +80,12 @@ lock() {
         ui_info "outra rodada ainda em andamento, esta fica para a próxima"
         exit 0
     fi
+    [[ -z ${2:-} ]] || return 0
+    local stale
+    while read -r stale; do
+        rm -f "$stale"
+        ui_info "trava de uma sincronização interrompida (reinício ou queda) apagada: ${stale##*/}"
+    done < <(find "$HOME/.cache/rclone/bisync" -name '*.lck' 2>/dev/null)
 }
 
 disk_ready() {
