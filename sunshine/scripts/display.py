@@ -85,10 +85,40 @@ def undo(display):
     log(f"tela restaurada para {original[0]}")
 
 
+def wake(bus):
+    bus.call_sync("org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
+                  "org.freedesktop.DBus.Properties", "Set",
+                  GLib.Variant("(ssv)", ("org.gnome.Mutter.DisplayConfig", "PowerSaveMode", GLib.Variant("i", 0))),
+                  None, Gio.DBusCallFlags.NONE, -1, None)
+
+
+def power_changed(bus, sender, path, interface, signal, params):
+    _, props, _ = params.unpack()
+    if props.get("PowerSaveMode") in (None, 0):
+        return
+    try:
+        wake(bus)
+        log("tela acesa de novo: o Sunshine só captura a tela acesa")
+    except GLib.Error as error:
+        log(f"não foi possível acender a tela: {error.message}")
+
+
+def awake():
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    bus.signal_subscribe("org.gnome.Mutter.DisplayConfig", "org.freedesktop.DBus.Properties", "PropertiesChanged",
+                         "/org/gnome/Mutter/DisplayConfig", None, Gio.DBusSignalFlags.NONE, power_changed)
+    wake(bus)
+    log("tela mantida acesa para o Sunshine, mesmo com a sessão bloqueada")
+    GLib.MainLoop().run()
+
+
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else ""
+    if action == "awake":
+        awake()
+        return
     if action not in ("do", "undo"):
-        log("uso: astro-sunshine-display do | undo")
+        log("uso: astro-sunshine-display do | undo | awake")
         return
     try:
         display = proxy()

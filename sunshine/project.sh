@@ -21,7 +21,10 @@ PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated
 CONFIG_DIR="$STATE/config"
 CONFIG_LINK="$HOME/.config/sunshine"
 LOCK_UNIT=astro-sunshine-lock.service
-LOCK_FILE="$HOME/.config/systemd/user/$LOCK_UNIT"
+USER_UNITS="$HOME/.config/systemd/user"
+LOCK_FILE="$USER_UNITS/$LOCK_UNIT"
+AWAKE_UNIT=astro-sunshine-awake.service
+AWAKE_FILE="$USER_UNITS/$AWAKE_UNIT"
 IDLE_LOCK=300
 
 cmd_describe() {
@@ -367,16 +370,43 @@ screen_lock() {
         gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
     " >/dev/null 2>&1
     ui_ok "tela de $USER bloqueia depois de $((IDLE_LOCK / 60)) minutos parada"
-    mkdir -p "${LOCK_FILE%/*}"
-    lock_unit > "$LOCK_FILE.new"
-    if cmp -s "$LOCK_FILE.new" "$LOCK_FILE"; then
-        rm -f "$LOCK_FILE.new"
-    else
-        mv "$LOCK_FILE.new" "$LOCK_FILE"
-    fi
+    lock_unit | user_file "$LOCK_FILE"
     systemctl --user daemon-reload
     systemctl --user enable -q "$LOCK_UNIT"
     ui_ok "a sessão de $USER bloqueia logo depois do login automático ($LOCK_UNIT)"
+}
+
+user_file() {
+    mkdir -p "${1%/*}"
+    cat > "$1.new"
+    if cmp -s "$1.new" "$1"; then
+        rm -f "$1.new"
+    else
+        mv "$1.new" "$1"
+    fi
+}
+
+awake_unit() {
+    printf '%s\n' \
+        "[Unit]" \
+        "Description=astro sunshine: mantém a tela acesa para a captura" \
+        "After=graphical-session.target" \
+        "PartOf=graphical-session.target" \
+        "" \
+        "[Service]" \
+        "ExecStart=$DISPLAY_BIN awake" \
+        "Restart=on-failure" \
+        "RestartSec=5" \
+        "" \
+        "[Install]" \
+        "WantedBy=graphical-session.target"
+}
+
+sunshine_dropin() {
+    printf '%s\n' \
+        "[Unit]" \
+        "Wants=$AWAKE_UNIT" \
+        "After=$AWAKE_UNIT $LOCK_UNIT"
 }
 
 lock_unit() {
@@ -397,10 +427,14 @@ lock_unit() {
 enable_service() {
     local unit
     unit="$(sunshine_unit)"
+    awake_unit | user_file "$AWAKE_FILE"
+    sunshine_dropin | user_file "$USER_UNITS/$unit.d/astro.conf"
     systemctl --user daemon-reload
-    systemctl --user enable -q "$unit"
-    ui_ok "Sunshine inicia com a sessão gráfica de $USER"
+    systemctl --user enable -q "$AWAKE_UNIT" "$unit"
+    ui_ok "tela mantida acesa durante a sessão ($AWAKE_UNIT): com ela apagada, o Sunshine não captura nada"
+    ui_ok "Sunshine inicia com a sessão gráfica de $USER, depois do bloqueio"
     if session_active; then
+        systemctl --user restart "$AWAKE_UNIT"
         systemctl --user restart "$unit"
         ui_ok "Sunshine reiniciado na sessão de $USER"
     fi
@@ -490,9 +524,15 @@ cmd_remove() {
         ui_ok "a sessão de $USER não bloqueia mais sozinha no login"
     fi
     for unit in "${UNITS[@]}"; do
+        rm -rf "$USER_UNITS/${unit##*/}.d"
         [[ -f $unit ]] || continue
         systemctl --user disable -q --now "${unit##*/}" 2>/dev/null || true
     done
+    if [[ -f $AWAKE_FILE ]]; then
+        systemctl --user disable -q --now "$AWAKE_UNIT" 2>/dev/null || true
+        rm -f "$AWAKE_FILE"
+    fi
+    systemctl --user daemon-reload
     ui_ok "Sunshine não inicia mais com a sessão de $USER"
     if command -v sunshine >/dev/null; then
         bin="$(readlink -f "$(command -v sunshine)")"

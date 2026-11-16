@@ -64,6 +64,13 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf`. No início de cada stream,
   ele troca a tela, pelo DBus do Mutter, para a resolução exata do aparelho (se a tela aceitar) e volta no fim.
   Se o `sunshine.conf` já tiver um `global_prep_cmd` próprio, não mexe e avisa.
+- **Tela sempre acesa:** com a sessão bloqueada, o GNOME apaga a tela em segundos, e o Sunshine não captura uma
+  tela apagada: ao iniciar, falha ("Unable to initialize capture method") e não se recupera; numa conexão, testa
+  os codificadores antes do `global_prep_cmd`. O serviço de usuário `astro-sunshine-awake`
+  (`astro-sunshine-display awake`) acende a tela de novo (`PowerSaveMode` do Mutter pelo DBus) sempre que o GNOME a
+  apaga. Com a tampa fechada, só a saída HDMI fica acesa, mostrando a tela de bloqueio; o painel do notebook
+  continua desligado. Um drop-in no serviço do Sunshine (`~/.config/systemd/user/<serviço>.d/astro.conf`) o faz
+  subir depois do bloqueio e com a tela acesa.
 - Habilita o serviço de usuário do Sunshine: ele sobe com a sessão gráfica, aberta pelo login automático.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
   `48010`.
@@ -76,7 +83,7 @@ nele, escolha a máquina e digite no painel (PIN) o código que o Moonlight most
 
 ## Remoção
 
-Desliga o login automático e o serviço de bloqueio no login, desabilita o serviço do Sunshine, tira o `setcap`, o ajuste de
+Desliga o login automático, o serviço de bloqueio no login e o que mantém a tela acesa, desabilita o serviço do Sunshine, tira o `setcap`, o ajuste de
 resolução, a regra da placa principal e a espera do GDM, fecha as portas, tira a rota do Caddy e apaga
 `~/.astro/sunshine` com o atalho `~/.config/sunshine`. Ficam o pacote do Sunshine e o driver da NVIDIA.
 
@@ -88,6 +95,8 @@ resolução, a regra da placa principal e a espera do GDM, fecha as portas, tira
 | `~/.astro/sunshine/config/` | configuração do Sunshine (`sunshine.conf`, `apps.json`, pareamentos, credenciais) |
 | `~/.astro/sunshine/.proxy` | rota do painel no Caddy |
 | `~/.config/systemd/user/astro-sunshine-lock.service` | bloqueio da tela logo depois do login automático |
-| `/usr/local/bin/astro-sunshine-display` | troca de resolução durante o stream |
+| `/usr/local/bin/astro-sunshine-display` | troca de resolução durante o stream (`do`/`undo`) e tela acesa (`awake`) |
+| `~/.config/systemd/user/astro-sunshine-awake.service` | mantém a tela acesa durante a sessão |
+| `~/.config/systemd/user/<serviço do Sunshine>.d/astro.conf` | Sunshine depois do bloqueio e da tela acesa |
 | `/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules` | NVIDIA como placa principal do GNOME |
 | `/etc/systemd/system/gdm.service.d/astro-nvidia.conf` | GDM espera a NVIDIA no boot |

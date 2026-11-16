@@ -331,7 +331,9 @@ porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo de
 Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência. Sem tela nela, o assistente
 avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante cada stream, a tela do servidor muda
 para a resolução pedida pelo aparelho no Moonlight, se ela aceitar essa resolução, e volta ao final. No Moonlight,
-aparece o app **Desktop**. Ao terminar, reinicie a máquina e pareie cada aparelho pelo painel do Sunshine (PIN).
+aparece o app **Desktop**. A tela do HDMI fica sempre acesa (mostrando a tela de bloqueio), porque o Sunshine não
+transmite uma tela apagada; a do notebook, com a tampa fechada, fica desligada. Ao terminar, reinicie a máquina e
+pareie cada aparelho pelo painel do Sunshine (PIN).
 
 ### Implodir Astro
 
