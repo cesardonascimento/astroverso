@@ -33,6 +33,11 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   que começa, e no boot a NVIDIA aparece alguns segundos depois da Intel: por isso o GDM espera por ela
   (`gdm.service.d/astro-nvidia.conf`, `udevadm wait` de até 30s no `/dev/dri/by-path/pci-<placa>-card`). Se ela
   não aparecer, o GDM sobe mesmo assim.
+- **Apps Flatpak com a NVIDIA:** com a NVIDIA como placa principal, um app Flatpak que desenha pela placa de vídeo
+  (ex.: a loja Bazaar) só abre com a extensão `org.freedesktop.Platform.GL.nvidia-<versão>` (ramo `1.4`) igual à do
+  driver carregado; sem ela, fecha na hora com "Lost connection to Wayland compositor". A instalação instala a do
+  driver atual pelo Flathub e tira as de versões antigas. Depois de uma atualização do driver, rode a instalação
+  de novo.
 - **Login automático com a tela bloqueada:** configura o GDM (`custom.conf`) para entrar com o usuário que
   instala no boot, e o serviço de usuário `astro-sunshine-lock` (com a `graphical-session.target`) bloqueia a
   sessão logo depois: `loginctl lock-session` na sessão gráfica, repetido a cada 2s até o GNOME confirmar

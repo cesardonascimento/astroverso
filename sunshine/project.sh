@@ -14,6 +14,7 @@ STREAM_PORTS=(47984/tcp 47989/tcp 48010/tcp 47998-48000/udp 48002/udp 48010/udp)
 GDM_CONFS=(/etc/gdm/custom.conf /etc/gdm3/custom.conf /etc/gdm3/daemon.conf)
 UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/systemd/user/sunshine.service)
 NVIDIA_VENDOR=0x10de
+FLATPAK_GL_BRANCH=1.4
 MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
 GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
 DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
@@ -287,6 +288,34 @@ primary_gpu() {
         ui_ok "NVIDIA definida como placa principal do GNOME (desenha a tela e roda os aplicativos)"
     fi
     gdm_wait "$pci"
+    flatpak_gl
+}
+
+flatpak_gl() {
+    local version ref old log
+    command -v flatpak >/dev/null || return 0
+    version="$(cat /sys/module/nvidia/version 2>/dev/null)" || version=""
+    [[ -n $version ]] || version="$(host_nvidia_version)" || return 0
+    ref="org.freedesktop.Platform.GL.nvidia-${version//./-}"
+    if flatpak info --system "$ref//$FLATPAK_GL_BRANCH" >/dev/null 2>&1; then
+        ui_ok "apps Flatpak já usam o driver da NVIDIA $version"
+    elif ! flatpak remotes --system --columns=name | grep -qx flathub; then
+        ui_warn "sem o Flathub, os apps Flatpak não abrem com a NVIDIA como placa principal: instale $ref"
+        return 0
+    else
+        ui_info "instalando no Flatpak o driver da NVIDIA $version, igual ao da máquina..."
+        if ! log="$(sudo flatpak install -y --noninteractive --system flathub "$ref//$FLATPAK_GL_BRANCH" 2>&1)"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_warn "falha ao instalar $ref: os apps Flatpak não abrem com a NVIDIA como placa principal"
+            return 0
+        fi
+        ui_ok "apps Flatpak usam o driver da NVIDIA $version (sem ele, não abrem com a NVIDIA como placa principal)"
+    fi
+    while read -r old; do
+        [[ -n $old && $old != "$ref" ]] || continue
+        sudo flatpak uninstall -y --noninteractive --system "$old//$FLATPAK_GL_BRANCH" >/dev/null 2>&1 || true
+        ui_ok "driver antigo da NVIDIA tirado do Flatpak (${old#org.freedesktop.Platform.GL.nvidia-})"
+    done < <(flatpak list --system --runtime --columns=application 2>/dev/null | grep '^org\.freedesktop\.Platform\.GL\.nvidia-[0-9]' || true)
 }
 
 gdm_wait() {
