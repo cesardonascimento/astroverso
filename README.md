@@ -7,7 +7,6 @@ instalação.
 | Projeto | Para que serve |
 |---|---|
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
-| [**arcade**](arcade/) | **Videogame retrô transmitido pela rede.** Um frontend de jogos (ES-DE) mostra a coleção com capas e vídeos, e os emuladores (RetroArch) rodam os jogos de consoles antigos. Um servidor de streaming (Sunshine) transmite a tela, o som e os controles para a TV, o celular ou o notebook pelo app Moonlight, com pouca latência: quem roda o jogo é o servidor. Tudo fica num usuário próprio para jogos, que entra sozinho no boot, separado do usuário que cuida do homelab. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
 | [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
@@ -15,6 +14,7 @@ instalação.
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
 | [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
+| [**sunshine**](sunshine/) | **Acesso remoto à tela da máquina.** Um servidor de streaming (Sunshine) transmite a tela, o som, o teclado, o mouse e os controles para o celular, o notebook ou a TV pelo app Moonlight, com pouca latência e a imagem codificada pela placa de vídeo. Serve para usar a área de trabalho da máquina de qualquer lugar, como se estivesse na frente dela. A máquina entra sozinha no boot com a tela bloqueada: pelo Moonlight, você destrava com a sua senha. |
 
 ## Como usar
 
@@ -33,7 +33,7 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `arcade` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `sunshine` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
 | Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
 | Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
@@ -57,7 +57,6 @@ mostra esta lista.
 | Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
 | Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
-| Backup: Arcade ➡️ local | RetroArch e ES-DE na pasta `Arcade`, e as mídias do ES-DE na pasta de backup delas | 01:00, junto com o das configurações | `backup:arcade` |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
 | Contas: e-mail do mês | manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM` para outro mês) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
@@ -77,8 +76,7 @@ tampa de um notebook, para não perder o acesso remoto.
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
 respostas e tudo o que a instalação gera (dados, certificados, logins) ficam em `~/.astro/<projeto>`, fora do
-repositório: o repositório tem só o código. Serviços que rodam com outro usuário (ex.: o de jogos) guardam a configuração no `~/.astro`
-desse usuário.
+repositório: o repositório tem só o código.
 
 ### Em todos os projetos
 
@@ -109,8 +107,8 @@ login), podman-compose, início dos containers no boot, SSH e Tailscale.
 ### Discos da máquina
 
 É a primeira etapa da instalação, antes dos projetos, e também fica em Gerenciar Astro → Administração. Os discos
-de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud, rclone,
-arcade) só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
+de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud, rclone)
+só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
 Fedora o monta para quem está na tela, e de longe ele é acessado pelo Cockpit (Armazenamento e Arquivos, com o
 acesso administrativo ligado).
 
@@ -124,7 +122,7 @@ acesso administrativo ligado).
   continua travado. Se um dia ele não destravar sozinho (depois de mexer no Secure Boot, por exemplo), rode
   esta opção de novo: ela pede a senha e cadastra o TPM outra vez.
 - **Quais são compartilhados com todos os usuários?** Os marcados ficam abertos a todos os usuários da
-  máquina e aparecem no Arquivos (ex.: discos de jogos, que o usuário de jogos também usa). Os outros são
+  máquina e aparecem no Arquivos de qualquer usuário. Os outros são
   privados: só o seu usuário entra. Use privado para dados pessoais. A criptografia protege o disco desligado
   ou levado embora; com a máquina ligada, quem decide o acesso é essa resposta.
 
@@ -161,63 +159,6 @@ só volta a funcionar depois de reiniciar a máquina.
   o AdGuard responder e volta a usá-lo se tiver ficado preso no secundário.
 - **Aviso de Split DNS do Tailscale:** aparece se o Tailscale estiver mandando o seu domínio para outro
   servidor DNS. Corrija no painel do Tailscale apontando o domínio para o IP local do servidor.
-
-### arcade
-
-O arcade é a única exceção ao "um usuário só": os jogos rodam num usuário próprio, que entra sozinho no boot e
-fica com a tela aberta, enquanto o seu usuário (com os dados sensíveis) nunca fica logado.
-
-- **Senha temporária do Secure Boot:** só aparece se a máquina tiver uma placa NVIDIA sem o driver
-  proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
-  aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
-  senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
-- **Nome do usuário de jogos:** o usuário cuja tela é transmitida. É nele que ficam o ES-DE, o RetroArch e as
-  configurações deles. Ele é criado sem `sudo`, para que quem estiver jogando não tenha acesso ao homelab.
-  Por padrão, `ristar`.
-- **Entrar sozinho com o usuário de jogos no boot, sem bloqueio de tela?** Com **S** (padrão), a máquina liga
-  direto na sessão de jogos, pronta para o Moonlight, e a tela não bloqueia sozinha (dá para bloquear e
-  trocar de usuário à mão). Com **N**, é preciso entrar com ele na tela antes de jogar, e a tela bloqueia
-  depois de 5 minutos parada.
-- **Senha do usuário de jogos:** para entrar na tela, trocar de usuário e desbloquear. Não dá acesso ao
-  `sudo`. Na reinstalação, o assistente pergunta se mantém a atual.
-- **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
-  aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
-- **Onde está a pasta de mídias do ES-DE?** A pasta com as capas, telas e vídeos dos jogos (uma subpasta por
-  sistema). Ela é usada onde está, sem cópia. Escolha com as setas, entrando nas pastas dos discos, ou digite o
-  caminho.
-- **Onde estão as ROMs?** Uma pasta com uma subpasta por sistema (`snes`, `psx`...). Pode escolher mais de uma
-  (ex.: uma por disco): a primeira é a principal do ES-DE, e os sistemas das outras aparecem do mesmo jeito.
-  As ROMs também ficam onde estão.
-- **Guardar o RetroArch e o ES-DE todas as noites?** Copia, toda noite à 01:00, o que é seu no RetroArch
-  (configuração, saves, states, BIOS, capturas e gravações) e no ES-DE (configuração, coleções, gamelists e
-  temas) para uma pasta comum. Por padrão, **S**.
-  - **Pasta do backup do RetroArch e do ES-DE:** por padrão, `Arcade` ao lado do backup das configurações do
-    rclone, dentro da pasta da nuvem: assim a cópia segue para a nuvem e para o disco de backup.
-- **Guardar as mídias do ES-DE todas as noites?** Copia, toda noite à 01:00, a pasta de mídias (capas, telas e
-  vídeos) para outra pasta, como backup. O que for apagado das mídias também sai da cópia. Por padrão, **S**.
-  - **Pasta do backup das mídias do ES-DE:** por padrão, `<primeiro disco privado>/astro/arcade/media`, fora da
-    pasta da nuvem: as mídias têm muitos arquivos e deixariam a sincronização com a nuvem lenta.
-- **Restaurar o RetroArch/ES-DE do backup?** Só aparece numa instalação nova, com o backup cheio. Com **S** (padrão),
-  tudo volta como estava, inclusive saves e gamelists.
-- **Carregar uma configuração existente do RetroArch?** Só aparece na primeira vez. Com **S**, você escolhe a
-  pasta de outra instalação (com `retroarch.cfg`, saves, states, BIOS), que é copiada para o usuário de
-  jogos. Uma configuração do Windows serve: caminhos e drivers do Windows são limpos.
-- **Carregar uma configuração existente do ES-DE?** Igual, para o ES-DE (a pasta `ES-DE` do Windows também
-  serve), com as gamelists (a lista de jogos com nomes e descrições), coleções e temas. As pastas de ROMs e
-  mídias passam a ser as respondidas acima.
-
-Depois, as mesmas cópias podem ser feitas pelas ações do projeto, em Gerenciar Astro → arcade.
-
-Os discos de jogos (ROMs, emuladores) entram em "Discos da máquina" como **compartilhados**: assim o usuário de
-jogos os acessa e eles aparecem no Arquivos dele.
-
-Antes de instalar, ligue uma TV, um monitor ou um plugue HDMI fantasma (um adaptador barato que finge
-ser um monitor) na porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada,
-e com uma tela nela o Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência.
-Sem tela nela, o assistente avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante
-cada stream, a tela do servidor muda para a resolução pedida pelo aparelho no Moonlight, se ela aceitar
-essa resolução, e volta ao final. Com algo plugado no HDMI, o som da máquina sai por ele; sem nada, sai
-pelo notebook (o som do stream não é afetado). Com um plugue HDMI fantasma, a máquina fica em silêncio. No Moonlight, aparecem dois apps: **Desktop** e **ES-DE**. Para o ES-DE ter capa, coloque uma imagem PNG em pé (proporção 2:3) em `~/.config/sunshine/covers/es-de.png` do usuário de jogos e reinstale o arcade. Ao terminar, reinicie a máquina.
 
 ### caddy
 
@@ -370,14 +311,34 @@ sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais n
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
 "Backup: local 🔄 nuvem (agora)", no menu do rclone, mostra o aviso e pergunta se libera.
 
+### sunshine
+
+O Sunshine roda na sessão do seu usuário. Para ele estar no ar depois de um reinício feito de longe, a máquina
+entra sozinha com o seu usuário no boot e bloqueia a tela logo em seguida: na tela da máquina e no Moonlight,
+aparece a tela de bloqueio, e só a sua senha destrava. Parada por 5 minutos, a tela bloqueia de novo. Com o login
+automático, o chaveiro do GNOME não abre no boot: programas que guardam senhas nele pedem a senha na primeira vez.
+
+- **Senha temporária do Secure Boot:** só aparece se a máquina tiver uma placa NVIDIA sem o driver
+  proprietário e o Secure Boot estiver ligado. O driver é instalado automaticamente, mas o Secure Boot só
+  aceita o driver depois que você confirma a chave dele na tela azul do próximo boot, digitando essa
+  senha. Ela é usada uma única vez, pode ser simples. Esse passo exige teclado e tela na máquina.
+- **Endereço do Sunshine no Caddy:** o nome do painel de administração do Sunshine, onde se pareiam os
+  aparelhos. Por padrão, `sunshine.<nome-da-máquina>.<domínio>`, para permitir mais de um Sunshine na rede.
+
+Antes de instalar, ligue um monitor ou um plugue HDMI fantasma (um adaptador barato que finge ser um monitor) na
+porta HDMI e feche a tampa do notebook. A porta HDMI sai pela placa de vídeo dedicada, e com uma tela nela o
+Sunshine captura e codifica o vídeo na própria placa (NVENC), com menos latência. Sem tela nela, o assistente
+avisa: o Sunshine usa a placa integrada, e só com a tampa aberta. Durante cada stream, a tela do servidor muda
+para a resolução pedida pelo aparelho no Moonlight, se ela aceitar essa resolução, e volta ao final. No Moonlight,
+aparece o app **Desktop**. Ao terminar, reinicie a máquina e pareie cada aparelho pelo painel do Sunshine (PIN).
+
 ### Implodir Astro
 
 Fica em Gerenciar Astro → Administração. Desfaz tudo o que o Astro criou, na ordem inversa da instalação:
-containers, imagens, serviços e a configuração de todos os projetos (`~/.astro`), o usuário de jogos com a home
-inteira, a pasta local de arquivos do Nextcloud, as montagens dos discos em `/srv` (o TPM dos discos criptografados
+containers, imagens, serviços e a configuração de todos os projetos (`~/.astro`), a pasta local de arquivos do Nextcloud, as montagens dos discos em `/srv` (o TPM dos discos criptografados
 é descadastrado e eles voltam a abrir só com a senha) e os ajustes da máquina feitos para o Astro: suspensão,
 firewall, DNS, portas baixas, a rede anunciada no Tailscale e o início automático no boot. Ficam os pacotes
-instalados (sistema atualizado, Tailscale, driver da NVIDIA, Cockpit, Sunshine, RetroArch, rclone), os dados dos
+instalados (sistema atualizado, Tailscale, driver da NVIDIA, Cockpit, Sunshine, rclone), os dados dos
 discos, o SSH ligado (só volta o login por senha) e o repositório.
 
 - **Para confirmar, digite IMPLODIR:** qualquer outra resposta cancela sem mudar nada.

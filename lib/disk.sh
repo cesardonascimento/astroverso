@@ -508,7 +508,7 @@ disk_manage() {
         for i in "${!picked[@]}"; do
             [[ ${current[${picked[i]}]:-} == compartilhado ]] && preset+="$i "
         done
-        ui_info "privado: só $USER acessa (dados pessoais). compartilhado: todos os usuários da máquina acessam (ex.: jogos)"
+        ui_info "privado: só $USER acessa (dados pessoais). compartilhado: todos os usuários da máquina acessam"
         ui_checklist shared "Quais são compartilhados com todos os usuários?" --selected "$preset" "${picked_lines[@]}"
         for i in "${!picked[@]}"; do
             type=privado

@@ -45,7 +45,7 @@ cmd_remote_actions() {
         "backup:cloud-check|Backup: local 🔄 nuvem (teste): o que a sincronização apagaria, sem efeito (argumento: armazenamento)|nao" \
         "backup:cloud-force|Backup: local 🔄 nuvem (liberar exclusões acima do limite na próxima rodada; argumento: armazenamento)|sim"
     [[ -n $(env_get BACKUP_MOUNT) ]] && echo "backup:daily|Backup: local ➡️ backup diário agora (sincroniza com a nuvem antes)|nao"
-    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup:configs|Backup: configurações ➡️ local agora (e Backup: Arcade ➡️ local)|nao"
+    [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup:configs|Backup: configurações ➡️ local agora|nao"
     return 0
 }
 

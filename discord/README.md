@@ -52,7 +52,7 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 | `<projeto>:start` | | `podman start` nos containers `astro-<projeto>*` |
 | `<projeto>:stop` | sim | `podman stop`. Com `restart: always`, o container fica parado até o `start`, mesmo depois de reiniciar a máquina |
 | `<projeto>:restart` | sim | `podman restart` |
-| ações dos projetos | conforme o projeto | `remote-actions` de cada projeto, com o prefixo do projeto (`<projeto>:<ação>`) ou com um nome próprio, como `backup:cloud` (rclone) e `backup:arcade` (arcade); ver o README de cada um |
+| ações dos projetos | conforme o projeto | `remote-actions` de cada projeto, com o prefixo do projeto (`<projeto>:<ação>`) ou com um nome próprio, como `backup:cloud` (rclone); ver o README de cada um |
 
 O catálogo (`fila/catalogo.json`) guarda, para cada comando, o projeto que o atende, a ação e o tipo (`host`,
 `container` ou `remote`). A ajuda (`fila/ajuda.json`) junta as linhas do comando opcional `help` de cada projeto

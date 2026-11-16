@@ -79,10 +79,10 @@ avisam. Uma rodada pulada porque a anterior ainda está rodando não avisa. O "B
 ## Prioridade e streams do Sunshine
 
 - As rotinas rodam com prioridade mínima (`Nice=19`, `CPUSchedulingPolicy=idle`, `IOSchedulingClass=idle`): só usam a
-  CPU e o disco que sobrarem. Listar a Proton inteira a cada rodada é pesado (cada nome é decifrado), e assim jogos,
-  ES-DE e Sunshine sempre vêm primeiro.
+  CPU e o disco que sobrarem. Listar a Proton inteira a cada rodada é pesado (cada nome é decifrado), e assim o
+  Sunshine e o resto da máquina sempre vêm primeiro.
 - Durante um stream do Sunshine (marcador `/tmp/astro-sunshine-stream`, criado e apagado pelo
-  `astro-sunshine-display` do arcade), a sincronização com a nuvem pula as rodadas agendadas. Se um stream começar
+  `astro-sunshine-display` do sunshine), a sincronização com a nuvem pula as rodadas agendadas. Se um stream começar
   no meio de uma rodada, ela é interrompida (`SIGINT`, com aviso ⏸️ no Discord) e a próxima continua de onde parou.
   Um marcador com mais de 6 horas é ignorado. O "agora" manual (`backup:cloud` e o menu) roda mesmo com stream.
   O backup das configurações (01:00) e o backup diário (03:00) não pausam.
@@ -123,7 +123,7 @@ pode ficar de fora). A lista completa, com as outras operações, está no READM
 | `backup:cloud-check` | Backup: local 🔄 nuvem (teste) | Teste sem efeito (`./run.sh preview <nome>`, `bisync --dry-run --force`): quantos arquivos seriam apagados de cada lado, por pasta |
 | `backup:cloud-force` | Backup: local 🔄 nuvem (liberar exclusões) | Com confirmação: libera o limite na próxima rodada e a começa |
 | `backup:daily` | Backup: local ➡️ backup diário | A rodada das 03:00 agora (só com disco de backup) |
-| `backup:configs` | Backup: configurações ➡️ local | Backup das configurações agora (e o do Arcade, junto) |
+| `backup:configs` | Backup: configurações ➡️ local | Backup das configurações agora |
 
 ## Backup das configurações
 
@@ -135,9 +135,7 @@ o Astro reinstalado. A instalação instala também o `zstd`, usado na compacta�
 
 1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud) e o que deixar de fora (bancos em uso, código, caches);
 2. empacota cada `~/.astro/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
-   com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O que o projeto
-   inclui de fora vai para uma subpasta com nome fixo (ex.: `arcade/sunshine`, com o `~/.astro/arcade/sunshine` do usuário
-   de jogos, lido por ACL, sem os logs). O `host.env` vira `host/`;
+   com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O `host.env` vira `host/`;
 3. compacta (`zstd`), criptografa com `gpg --symmetric` (AES-256) e grava
    `<pasta escolhida>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, uma pasta por backup;
 4. apaga as versões com mais de `CONFIG_KEEP_DAYS` dias (padrão 90; só pastas com nome de versão). Na pasta do armazenamento em nuvem, isso segue para a nuvem
@@ -158,9 +156,6 @@ Astro/Configurações/
 
 O "Implodir Astro" grava uma versão `antes-de-implodir` com o mesmo `run.sh config`. Sem o backup das
 configurações ligado, ele pergunta uma pasta e uma senha (`ASTRO_BACKUP_DEST` e `ASTRO_BACKUP_KEY`).
-
-A parte de outro usuário (ex.: `arcade/sunshine`) é gravada como do usuário que instala (`--owner=0`): a
-restauração devolve o dono certo.
 
 Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos
 arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-owner`.

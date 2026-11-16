@@ -307,7 +307,6 @@ service_parts() {
     local project="../$1/project.sh" output kind rest
     PART_EXCLUDES=()
     PART_ADDS=()
-    PART_INCLUDES=()
     [[ -f $project ]] && grep -q '^    backup)' "$project" || return 0
     if ! output="$("$project" backup)"; then
         ui_error "$1: falha ao preparar o backup (dump do banco ou cópia consistente)"
@@ -317,7 +316,6 @@ service_parts() {
         case $kind in
             exclude) PART_EXCLUDES+=("--exclude=${rest#/}") ;;
             add)     PART_ADDS+=("${rest#/}") ;;
-            include) PART_INCLUDES+=("$rest") ;;
         esac
     done <<< "$output"
 }
@@ -329,26 +327,13 @@ tar_ok() {
 }
 
 service_archive() {
-    local service=$1 archive=$2 source=$3 entry name path runner=() owner=() target=$1
+    local service=$1 archive=$2 source=$3 target=$1
     [[ -f /$source ]] && target="$service/${source##*/}"
     local transform="s|^$(regex_escape "$source")|$target|"
     tar_ok podman unshare tar -cf "$archive" -C / "${PART_EXCLUDES[@]}" --transform="$transform" "$source" || return 1
     if ((${#PART_ADDS[@]})); then
         tar_ok podman unshare tar -rf "$archive" -C / --transform="$transform" "${PART_ADDS[@]}" || return 1
     fi
-    for entry in "${PART_INCLUDES[@]}"; do
-        name="${entry%% *}"
-        path="${entry#* }"
-        path="${path#/}"
-        runner=()
-        owner=(--owner=0 --group=0 --numeric-owner)
-        if [[ /$path == "$HOME"/* ]]; then
-            runner=(podman unshare)
-            owner=()
-        fi
-        tar_ok "${runner[@]}" tar -rf "$archive" -C / "${owner[@]}" "${PART_EXCLUDES[@]}" \
-            --transform="s|^$(regex_escape "$path")|$service/$name|" "$path" || return 1
-    done
     zstd -q --rm -f "$archive" -o "$archive.zst"
 }
 
@@ -407,7 +392,6 @@ config_backup() {
     if [[ -f $ASTRO_HOME/host.env ]]; then
         PART_EXCLUDES=()
         PART_ADDS=()
-        PART_INCLUDES=()
         if service_archive host "$work/host.tar" "${ASTRO_HOME#/}/host.env" && service_publish host "$work" "$dest/$version"; then
             saved+=(host)
         else

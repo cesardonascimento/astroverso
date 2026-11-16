@@ -12,7 +12,7 @@ trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
 [[ -t 0 ]] || ui_fail "execute em um terminal interativo"
 
-ORDER=(caddy adguard cockpit nextcloud mailserver discord n8n arcade rclone)
+ORDER=(caddy adguard cockpit nextcloud mailserver discord n8n sunshine rclone)
 IMPLODE_WORD=IMPLODIR
 DONE_DIR="$ASTRO_HOME/.concluidas"
 
@@ -221,12 +221,10 @@ implode_backup() {
 }
 
 implode() {
-    local answer games i name failed=() succeeded=()
-    games="$(env_get GAMES_USER "" "$ASTRO_HOME/arcade/.env")"
+    local answer i name failed=() succeeded=()
     ui_step "Implodir Astro"
     ui_warn "isto desfaz tudo o que o Astro criou nesta máquina:"
     ui_info "  containers, imagens, serviços e a configuração de todos os projetos ($ASTRO_HOME)"
-    [[ -z $games ]] || ui_info "  o usuário de jogos $games, com a home inteira (saves, states, BIOS e núcleos)"
     ui_info "  a pasta local de arquivos do Nextcloud"
     ui_info "  as montagens dos discos em $DISK_ROOT e o TPM dos discos criptografados"
     ui_info "  os ajustes da máquina: suspensão, firewall, DNS, portas, rede anunciada no Tailscale e início no boot"
