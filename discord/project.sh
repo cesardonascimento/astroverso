@@ -14,7 +14,8 @@ FILA="$STATE/fila"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 RUNNER=astro-discord-runner
 DISCORD_API=https://discord.com/api/v10
-PERMISSIONS=84992
+PERMISSIONS=378225642512
+CHANNELS=(financeiro dados sistema)
 
 cmd_describe() {
     echo "Discord: avisos do servidor e comandos /astro por um bot"
@@ -93,6 +94,40 @@ check_channel() {
     [[ $code == 200 ]]
 }
 
+invite_link() {
+    ui_info "convide o bot para o seu servidor por este link (permissões: ver e enviar mensagens, gerenciar canais e"
+    ui_info "permissões, para criar os canais de avisos só de leitura):"
+    ui_info "  https://discord.com/oauth2/authorize?client_id=$BOT_ID&scope=bot+applications.commands&permissions=$PERMISSIONS"
+}
+
+env_put() {
+    sed -i "/^$1=/d" "$ENV_FILE"
+    printf "%s='%s'\n" "$1" "$2" >> "$ENV_FILE"
+}
+
+notify_channels() {
+    local kind text list=() denied=false
+    ui_step "Canais dos avisos"
+    while read -r kind text; do
+        case $kind in
+            ok)     ui_ok "$text" ;;
+            warn)   ui_warn "$text" ;;
+            canal)  list+=("$text") ;;
+            denied) denied=true ;;
+        esac
+    done < <(python3 -I channels.py "$(env_get DISCORD_CHANNEL)" "${CHANNELS[@]}" <<< "$(env_get DISCORD_TOKEN)")
+    env_put DISCORD_CHANNELS "${list[*]}"
+    if $denied; then
+        ui_warn "o bot não tem permissão para criar canais nem ajustar quem escreve neles"
+        invite_link
+        ui_info "abra o link, confirme no mesmo servidor e rode a instalação do discord de novo"
+        ui_info "ou crie à mão os canais ${CHANNELS[*]/#/#} (só de leitura) e rode a instalação de novo"
+    fi
+    if ((${#list[@]} < ${#CHANNELS[@]})); then
+        ui_info "avisos sem canal próprio vão para #$CHANNEL_NAME"
+    fi
+}
+
 configure() {
     ui_step "Configuração"
     local token channel users
@@ -114,8 +149,7 @@ configure() {
     done
 
     ui_info "no Discord, ligue o Modo desenvolvedor (Configurações → Avançado) para copiar IDs com o botão direito"
-    ui_info "convide o bot para o seu servidor por este link (permissões: ver o canal e enviar mensagens):"
-    ui_info "  https://discord.com/oauth2/authorize?client_id=$BOT_ID&scope=bot+applications.commands&permissions=$PERMISSIONS"
+    invite_link
     while true; do
         ui_input channel "ID do canal dos avisos (botão direito no canal → Copiar ID do canal)" "$(env_get DISCORD_CHANNEL)" is_snowflake
         if check_channel "$token" "$channel"; then
@@ -195,6 +229,7 @@ cmd_install() {
     state_setup
     configure
     bot_avatar
+    notify_channels
 
     ui_step "Container"
     local log

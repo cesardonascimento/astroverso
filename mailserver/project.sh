@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 ASTRO_PROJECT=mailserver
+NOTIFY_CHANNEL=sistema
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh

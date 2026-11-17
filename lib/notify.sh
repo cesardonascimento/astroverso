@@ -10,13 +10,13 @@ notify_write() {
     tmp="$NOTIFY_QUEUE/tmp/$name.json"
     if ! python3 -I -c '
 import json, sys
-host, project, silent, text, *buttons = sys.argv[1:]
+host, project, channel, silent, text, *buttons = sys.argv[1:]
 items = []
 for button in buttons:
     label, action, arg = (button.split("|") + ["", ""])[:3]
     items.append({"rotulo": label, "acao": action, "arg": arg})
-print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items, "silencioso": silent == "1"}, ensure_ascii=False))
-' "$(hostname -s)" "${ASTRO_PROJECT:-astro}" "$silent" "$@" > "$tmp"; then
+print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items, "silencioso": silent == "1", "canal": channel}, ensure_ascii=False))
+' "$(hostname -s)" "${ASTRO_PROJECT:-astro}" "${NOTIFY_CHANNEL:-astro}" "$silent" "$@" > "$tmp"; then
         rm -f "$tmp"
         ui_warn "não foi possível preparar o aviso para o Discord"
         return 1

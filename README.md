@@ -16,7 +16,7 @@ instalação.
 | [**adguard**](adguard/) | **Servidor DNS da rede.** Todo aparelho pergunta ao DNS qual é o endereço de cada site antes de acessá-lo. Com o AdGuard nesse papel, anúncios, rastreadores e domínios maliciosos são bloqueados para a casa inteira, sem instalar nada nos aparelhos. Ele também responde os nomes internos dos seus serviços (ex.: `*.<seu-domínio>`) com o IP do servidor. |
 | [**caddy**](caddy/) | **Proxy reverso com HTTPS.** As aplicações da rede escutam em portas diferentes (`http://<ip>:3000`, `http://<ip>:8080`...). O Caddy recebe os acessos por nome (`https://app.<seu-domínio>`) e encaminha cada um para a aplicação e a porta certas, em qualquer máquina da rede. Assim ninguém precisa decorar IPs e portas, e todo serviço ganha HTTPS com certificado válido do Let's Encrypt, emitido e renovado automaticamente. |
 | [**cockpit**](cockpit/) | **Painel de administração do servidor pelo navegador.** Mostra uso de CPU, memória e disco, logs, serviços e atualizações do sistema, abre um terminal, gerencia os containers (ver logs, reiniciar, parar) e os discos (montar, ejetar) e navega pelos arquivos (enviar, baixar, renomear). Serve para cuidar do servidor sem SSH, inclusive pelo celular, e acessar os discos da máquina de longe. |
-| [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos num canal seu, com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
+| [**discord**](discord/) | **Avisos e comandos pelo celular.** Um servidor em casa trabalha sozinho, e ninguém fica olhando os logs: quando algo dá errado (um backup parado, um disco que não montou), o problema passa despercebido. Um bot do Discord manda esses avisos em canais seus, separados por assunto (financeiro, dados, sistema), com botões para resolver na hora, e aceita comandos como `/astro machine:status` ou `/astro nextcloud:restart`. Só os comandos de uma lista fixa funcionam, e só para as contas que você autorizar. |
 | [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. Para avisar alguém por e-mail (ex.: o resumo das contas do mês), as automações enviam pela própria Cloudflare, só para endereços que você cadastrou e que confirmaram o cadastro. |
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
@@ -189,15 +189,20 @@ só volta a funcionar depois de reiniciar a máquina.
 - **Token do bot:** a senha da conta do bot. Crie em https://discord.com/developers/applications → **New
   Application** → menu **Bot** → **Reset Token**, e deixe **Public Bot** desligado. O assistente confere o token
   no Discord e não o mostra na tela.
-- **ID do canal dos avisos:** o canal onde chegam os avisos e onde o comando `/astro` aparece (de preferência
-  um só seu, ex.: `#astro`). Ligue o **Modo desenvolvedor** do Discord (Configurações → Avançado) e use
+- **ID do canal principal:** o canal onde o comando `/astro` aparece e onde você conversa com o bot (de
+  preferência um só seu, ex.: `#astro`). Ligue o **Modo desenvolvedor** do Discord (Configurações → Avançado) e use
   **botão direito no canal → Copiar ID do canal**. Antes, convide o bot pelo link que o assistente mostra.
 - **IDs dos usuários autorizados:** quem pode usar os comandos e os botões (**botão direito no seu nome →
   Copiar ID do usuário**). Os outros recebem "sem permissão".
 
+Depois, a instalação cria ao lado dele, na mesma categoria, os canais só de leitura dos avisos: `#financeiro`
+(contas a pagar), `#dados` (sincronização e backups) e `#sistema` (discos e serviços da máquina). Se eles já
+existirem com esses nomes, ela só ajusta as permissões. Para isso, o bot precisa das permissões de gerenciar
+canais e permissões, que já vêm no link de convite; um bot convidado antes delas recebe o link de novo.
+
 No fim, chega uma mensagem de teste com um botão "Máquina: estado". No Discord, digite `/astro` e escolha um
 comando (comece por `help`, que mostra a lista de operações; os nomes são em inglês, ex.: `backup:cloud`). Comandos que param ou apagam algo pedem confirmação. No celular, deixe as
-notificações do canal em "Todas as mensagens".
+notificações dos canais de avisos em "Todas as mensagens".
 
 ### mailserver
 

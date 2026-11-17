@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 ASTRO_PROJECT=rclone
+NOTIFY_CHANNEL=dados
 source ../lib/ui.sh
 source ../lib/env.sh
 source ../lib/notify.sh

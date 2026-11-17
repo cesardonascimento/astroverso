@@ -19,6 +19,8 @@ CATALOGO = FILA / "catalogo.json"
 AJUDA = FILA / "ajuda.json"
 TOKEN = os.environ["DISCORD_TOKEN"]
 CANAL = int(os.environ["DISCORD_CHANNEL"])
+CANAIS = {nome: int(id_) for nome, _, id_ in (item.partition("=") for item in os.environ.get("DISCORD_CHANNELS", "").split())
+          if id_.isdigit()}
 USUARIOS = {int(x) for x in os.environ.get("DISCORD_USERS", "").replace(",", " ").split()}
 ARGUMENTO = re.compile(r"^[A-Za-z0-9._-]{0,64}$")
 ESPERA = 840
@@ -148,7 +150,15 @@ class Bot(discord.Client):
 
     async def enviar_saida(self):
         await self.wait_until_ready()
-        canal = await self.fetch_channel(CANAL)
+        principal = await self.fetch_channel(CANAL)
+        canais = {}
+        for nome, id_ in CANAIS.items():
+            try:
+                canais[nome] = await self.fetch_channel(id_)
+            except discord.HTTPException as erro:
+                log.warning("canal de %s indisponível, os avisos dele vão para #%s: %s", nome, principal.name, erro)
+        if canais:
+            log.info("avisos por canal: %s", ", ".join(f"{n} → #{c.name}" for n, c in canais.items()))
         while not self.is_closed():
             for arquivo in sorted(SAIDA.glob("*.json")):
                 try:
@@ -157,6 +167,7 @@ class Bot(discord.Client):
                     log.warning("aviso ilegível descartado: %s", arquivo.name)
                     arquivo.unlink(missing_ok=True)
                     continue
+                canal = canais.get(dados.get("canal", ""), principal)
                 try:
                     await canal.send(dados.get("texto", "")[:1900], view=botoes(dados.get("botoes")),
                                      silent=bool(dados.get("silencioso")))

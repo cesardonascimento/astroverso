@@ -87,6 +87,8 @@ Bibliotecas compartilhadas:
   avisa que ele acabou, só se houve aviso, em mensagem silenciosa. `notify_send <texto> [botões]` manda direto;
   `notify_info <texto> [botões]` também, mas silenciosa (fica no canal, sem notificar o celular). Cada botão é
   `"Rótulo|<projeto>:<ação>|<argumento>"` e roda a ação como o `/astro`. Nenhuma delas derruba o chamador.
+  O canal do Discord vem de `NOTIFY_CHANNEL` (definido pelo projeto ao lado do `ASTRO_PROJECT`: `dados`,
+  `sistema`, `financeiro`); sem ele, o canal principal.
   Precisa de `lib/ui.sh`.
 - `lib/brand.sh`: a paleta (`BRAND_BACKGROUND`, `BRAND_CREAM`, `BRAND_NAVY`, `BRAND_RED`, `BRAND_ACCENT`), o nome
   (`BRAND_NAME`) e a pasta das imagens (`BRAND_DIR`, a `logo/` do repositório). Ver `logo/README.md`.

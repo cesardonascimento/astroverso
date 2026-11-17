@@ -1,6 +1,6 @@
 # discord
 
-Bot do Discord que manda os avisos do servidor num canal e aceita comandos `/astro`. O bot roda num container
+Bot do Discord que manda os avisos do servidor em canais por assunto e aceita comandos `/astro`. O bot roda num container
 sem acesso à máquina: ele só troca arquivos numa pasta de fila com um executor no host, que roda apenas as
 ações de uma lista.
 
@@ -14,11 +14,33 @@ ações de uma lista.
 | Pergunta | Padrão |
 |---|---|
 | Token do bot | (secreto, conferido na API do Discord) |
-| ID do canal dos avisos | (o bot precisa enxergar o canal; o assistente mostra o link de convite) |
+| ID do canal principal (comandos) | (o bot precisa enxergar o canal; o assistente mostra o link de convite) |
 | IDs dos usuários autorizados | separados por espaço |
 
-O link de convite pede os escopos `bot` e `applications.commands` e só as permissões de ver o canal, enviar mensagens, incorporar
-links e ler o histórico (`84992`). O bot não lê as mensagens do servidor (sem intents privilegiadas).
+O link de convite pede os escopos `bot` e `applications.commands` e as permissões de ver canais, enviar mensagens,
+incorporar links, ler o histórico, gerenciar canais e permissões e as de tópicos (`378225642512`): as de gerenciar
+servem só para criar os canais de avisos e deixá-los só de leitura. O bot não lê as mensagens do servidor (sem
+intents privilegiadas). Para um bot já convidado, abrir o link de novo atualiza as permissões.
+
+## Canais
+
+| Canal | O que recebe | Quem escreve |
+|---|---|---|
+| principal (ex.: `#astro`) | comandos `/astro`, botões, respostas, `help`, mensagem de teste e avisos sem canal próprio | você e o bot |
+| `#financeiro` | rotinas de contas a pagar (n8n: `canal_discord` no `⚙️ Configuração` de cada rotina) | só o bot |
+| `#dados` | `rclone`: sincronização com a nuvem, backup diário e backup das configurações | só o bot |
+| `#sistema` | discos da máquina (`astro-disk-check`), busca de e-mails do `mailserver` e, no futuro, outros avisos da máquina | só o bot |
+
+A instalação (`channels.py`, token pela entrada padrão) descobre o servidor pelo canal principal, procura os
+outros pelo nome e cria os que faltam na mesma categoria dele. Em todos eles, `@everyone` não pode enviar
+mensagens, criar tópicos nem escrever em tópicos, e o bot pode ver, enviar, incorporar links e ler o histórico
+(sobrescritas de permissão, refeitas a cada instalação). Os IDs ficam em `DISCORD_CHANNELS`
+(`financeiro=<id> dados=<id> sistema=<id>`). Sem permissão (HTTP 403), a instalação mostra o link de convite de
+novo; dá também para criar os canais à mão, com esses nomes, e rodar a instalação outra vez. Os botões dos avisos
+funcionam nos canais só de leitura.
+
+Cada aviso leva o canal na fila (`canal`, de `NOTIFY_CHANNEL` do projeto que avisa; sem ele, `astro`). O bot
+entrega no canal de `DISCORD_CHANNELS` com esse nome; sem ele (ou se o canal sumiu), no principal.
 
 ## Foto do bot
 
@@ -38,7 +60,7 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 | `fila/catalogo.json` | executor | Lista de ações permitidas (o autocompletar do `/astro` vem daqui) |
 | `fila/pedidos/<id>.json` | bot | Ação, argumento e quem pediu |
 | `fila/respostas/<id>.json` | executor | Resultado (o bot responde no Discord e apaga; sobras somem depois de 1 dia) |
-| `fila/saida/<n>.json` | `notify_send` / `notify_info` (qualquer projeto) | Aviso e botões, enviados pelo bot ao canal; com `silencioso`, sai como mensagem silenciosa do Discord (sem notificar o celular) |
+| `fila/saida/<n>.json` | `notify_send` / `notify_info` (qualquer projeto) | Aviso, canal e botões, enviados pelo bot ao canal do assunto; com `silencioso`, sai como mensagem silenciosa do Discord (sem notificar o celular) |
 | `fila/tmp/` | todos | Arquivos em escrita: só entram nas outras pastas prontos (`mv`) |
 
 1. `/astro command:<projeto>:<ação> argument:<opcional>` ou um botão de um aviso. Os nomes dos comandos são
