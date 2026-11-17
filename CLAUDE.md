@@ -73,6 +73,7 @@ lib/env.sh           env_get CHAVE [padrão], state_setup / state_purge, images_
 lib/proxy.sh         proxy_publish / proxy_unpublish (rotas do projeto no Caddy via .proxy)
 lib/disk.sh          disk_manage / disk_setup / disk_mounts / disk_responds / disk_release_all (discos da máquina no fstab e crypttab, TPM; privado ou compartilhado; timer astro-disk-check → lib/disk-check.sh)
 lib/notify.sh        avisos pelo bot do discord (fila): notify_send / notify_info (silenciosa), notify_problem / notify_resolved (1 por dia), com botões
+logo/               identidade visual: variantes em PNG transparente (símbolo, horizontal, texto, vertical; -alt para fundo claro) e a paleta no logo/README.md
 <projeto>/project.sh describe | status | actions | action <id> | install | remove
                      opcionais: global-actions | remote-actions | remote <id> [arg] | help | backup | restore <pasta> | domain <antigo> <novo>
 ```
