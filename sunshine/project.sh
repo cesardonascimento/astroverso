@@ -7,6 +7,7 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
+source ../lib/brand.sh
 
 REPO=LizardByte/Sunshine
 WEB_PORT=47990
@@ -238,13 +239,19 @@ display_switch() {
 }
 
 apps() {
-    local kind text
+    local kind text cover=""
+    if [[ -f $BRAND_DIR/capa-moonlight.png ]]; then
+        mkdir -p "$CONFIG_DIR/covers"
+        cp "$BRAND_DIR/capa-moonlight.png" "$CONFIG_DIR/covers/desktop.png"
+        cover="$CONFIG_DIR/covers/desktop.png"
+        ui_ok "capa do $BRAND_NAME no app Desktop do Moonlight"
+    fi
     while read -r kind text; do
         case $kind in
             ok) ui_ok "$text" ;;
             *)  ui_info "$text" ;;
         esac
-    done < <(python3 -I scripts/apps.py "$CONFIG_DIR/apps.json")
+    done < <(python3 -I scripts/apps.py "$CONFIG_DIR/apps.json" "$cover")
 }
 
 nvidia_pci() {

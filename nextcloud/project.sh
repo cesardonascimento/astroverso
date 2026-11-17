@@ -7,6 +7,7 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
+source ../lib/brand.sh
 source ../lib/disk.sh
 
 CONTAINER=astro-nextcloud
@@ -303,6 +304,24 @@ tune() {
     ui_ok "banco de dados conferido (índices e reparos)"
 }
 
+theme() {
+    local item key file target
+    occ theming:config name "$BRAND_NAME" >/dev/null
+    occ theming:config primary_color "$BRAND_ACCENT" >/dev/null
+    occ theming:config background_color "$BRAND_BACKGROUND" >/dev/null
+    occ theming:config background backgroundColor >/dev/null
+    for item in logo:simbolo.png logoheader:simbolo.png favicon:icone.png; do
+        key="${item%%:*}"
+        file="$BRAND_DIR/${item#*:}"
+        [[ -f $file ]] || continue
+        target="/tmp/astro-$key.png"
+        podman cp "$file" "$CONTAINER:$target"
+        occ theming:config "$key" "$target" >/dev/null
+        podman exec "$CONTAINER" rm -f "$target"
+    done
+    ui_ok "visual do $BRAND_NAME: logo, ícone, fundo $BRAND_BACKGROUND e destaque $BRAND_ACCENT"
+}
+
 cmd_install() {
     state_setup
     configure
@@ -323,6 +342,7 @@ cmd_install() {
 
     ui_step "Ajustes"
     tune "$host"
+    theme
     external_storage "$admin"
 
     ui_step "Caddy"

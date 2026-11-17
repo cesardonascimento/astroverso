@@ -7,6 +7,7 @@ source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/notify.sh
+source ../lib/brand.sh
 
 CONTAINER=astro-discord
 FILA="$STATE/fila"
@@ -170,9 +171,30 @@ for a in json.load(open(sys.argv[1])):
 ' "$FILA/catalogo.json" | ui_prefix
 }
 
+bot_avatar() {
+    local image="$BRAND_DIR/icone.png" mark="$STATE/.avatar" sum body code
+    [[ -f $image ]] || return 0
+    sum="$(sha256sum "$image" | cut -d' ' -f1)"
+    if [[ $(cat "$mark" 2>/dev/null) == "$sum" ]]; then
+        ui_ok "foto do bot já é a logo do $BRAND_NAME"
+        return
+    fi
+    body="$(mktemp)"
+    printf '{"avatar":"data:image/png;base64,%s"}' "$(base64 -w0 "$image")" > "$body"
+    code="$(curl -s -m 30 -o /dev/null -w '%{http_code}' -X PATCH -H @- -H 'Content-Type: application/json' \
+        --data-binary "@$body" "$DISCORD_API/users/@me" <<< "Authorization: Bot $(env_get DISCORD_TOKEN)")" || code=000
+    rm -f "$body"
+    case $code in
+        200) printf '%s\n' "$sum" > "$mark"; ui_ok "foto do bot trocada pela logo do $BRAND_NAME" ;;
+        429) ui_warn "o Discord limita trocas de foto seguidas: a logo entra na próxima instalação" ;;
+        *)   ui_warn "o Discord recusou a foto do bot (HTTP $code): troque à mão no portal, com $image" ;;
+    esac
+}
+
 cmd_install() {
     state_setup
     configure
+    bot_avatar
 
     ui_step "Container"
     local log

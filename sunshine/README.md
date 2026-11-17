@@ -65,6 +65,7 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
 - **Apps no Moonlight:** o `apps.json` fica com **Desktop** (`scripts/apps.py`). Os apps de fábrica que não
   servem aqui ("Low Res Desktop", com `xrandr`, e "Steam Big Picture") saem; um app criado pelo painel é mantido.
+  A capa do Desktop é `logo/capa-moonlight.png`, copiada para `~/.astro/sunshine/config/covers/desktop.png`.
 - **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf`. No início de cada stream,
   ele troca a tela, pelo DBus do Mutter, para a resolução exata do aparelho (se a tela aceitar) e volta no fim.

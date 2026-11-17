@@ -20,6 +20,13 @@ ações de uma lista.
 O link de convite pede os escopos `bot` e `applications.commands` e só as permissões de ver o canal, enviar mensagens, incorporar
 links e ler o histórico (`84992`). O bot não lê as mensagens do servidor (sem intents privilegiadas).
 
+## Foto do bot
+
+A instalação troca a foto do bot por `logo/icone.png` (`PATCH users/@me`, token pelo cabeçalho na entrada
+padrão). O hash da imagem fica em `~/.astro/discord/.avatar`: só troca de novo quando a logo muda. O Discord limita
+trocas seguidas; se recusar (HTTP 429), a próxima instalação tenta de novo. O ícone do aplicativo no portal do
+Discord não muda pela API: troque à mão em General Information → App Icon, se quiser.
+
 ## Como funciona
 
 ```

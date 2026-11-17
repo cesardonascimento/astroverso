@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo/horizontal.png">
+    <img alt="Astroverso" src="logo/horizontal-alt.png" width="480">
+  </picture>
+</p>
+
 # astro
 
 Homelab em containers (Podman), versionado para reinstalar tudo em minutos em qualquer máquina

@@ -69,6 +69,10 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   `https://<endereço>` (`ServerName` com `https://` e `UseCanonicalName On`). Sem isso, o Apache, que recebe
   o acesso do Caddy em HTTP, redireciona `/.well-known/caldav` e `/.well-known/carddav` para `http://`. O
   mesmo arquivo liga o HSTS (`Strict-Transport-Security`, 180 dias), para o navegador nunca usar HTTP.
+- **Visual do Astroverso** (`occ theming:config`, a cada instalação): nome `Astroverso`, cor de destaque
+  laranja solar, fundo liso azul espacial (`background backgroundColor`), `logo/simbolo.png` como logo do login e
+  da barra de cima e `logo/icone.png` como ícone (favicon). As imagens entram no container por `podman cp` num
+  arquivo temporário. Cores em `lib/brand.sh`.
 - Publica a rota `https://<endereço> → http://astro-nextcloud:80` no Caddy.
 
 ## Arquivos gerados
