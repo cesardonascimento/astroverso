@@ -54,11 +54,11 @@ rotinas apontam para esses `id`, que não mudam entre instalações:
 | Astroverso: bot do Discord (`astroDiscordBot01`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
 | Astroverso: Nextcloud (`astroNextcloud001`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astroverso-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
 | Astroverso: API da Anthropic (`astroAnthropic001`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
-| Astroverso: envio de e-mail (`astroEnvioEmail01`) | cabeçalho `X-Astro-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
-| Astroverso: chamadas do assistente (`astroHookAstro001`) | cabeçalho `X-Astro-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo Astroverso |
+| Astroverso: envio de e-mail (`astroEnvioEmail01`) | cabeçalho `X-Astroverso-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
+| Astroverso: chamadas do assistente (`astroHookAstro001`) | cabeçalho `X-Astroverso-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo Astroverso |
 
 **Pelo Discord:** `contas:email [AAAA-MM]` (`remote-actions` do projeto) chama o webhook `POST
-/webhook/astro-contas-email` de dentro do container `astroverso-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave
+/webhook/astroverso-contas-email` de dentro do container `astroverso-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave
 das chamadas pela entrada padrão, corpo `{"mes": "AAAA-MM"}`; sem mês, a rotina usa o atual) e devolve o campo `mensagem` da resposta. A rotina
 que atende esse webhook precisa da credencial "chamadas do assistente" e de resposta pelo último nó; sem ela
 ligada, o comando avisa. O comando `help` do projeto põe `mailserver:fetch` e `contas:email` no grupo Contas.
@@ -67,10 +67,10 @@ ligada, o comando avisa. O comando `help` do projeto põe `mailserver:fetch` e `
 
 O `astroverso-n8n-runners` usa uma imagem própria (`Dockerfile`, construída na instalação a partir de `n8nio/runners` na
 mesma versão do n8n): as bibliotecas `qrcode` e `pngjs` (versões fixadas, usadas pelas rotinas de contas para desenhar o QR
-Code do Pix e o código de barras), `mupdf` e `zxing-wasm` (leitura de QR Codes) e o módulo `astro-qr` (pasta
-`astro-qr`: abre o PDF, com as senhas se precisar, desenha as páginas e devolve os QR Codes encontrados; também lê
+Code do Pix e o código de barras), `mupdf` e `zxing-wasm` (leitura de QR Codes) e o módulo `astroverso-qr` (pasta
+`astroverso-qr`: abre o PDF, com as senhas se precisar, desenha as páginas e devolve os QR Codes encontrados; também lê
 imagens) ficam em `/opt/astroverso/node_modules` (`NODE_PATH`), e o `/etc/n8n-task-runners.json` libera `qrcode`, `pngjs`
-e `astro-qr` em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A rotina Contas: leitura lê o Pix
+e `astroverso-qr` em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A rotina Contas: leitura lê o Pix
 dos QR Codes dos anexos antes de chamar o Claude. A versão
 do `ARG N8N_VERSION` acompanha a do `n8nio/n8n` no `docker-compose.yml`.
 

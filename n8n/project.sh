@@ -16,7 +16,7 @@ IMAGE="$(sed -n 's/^ *image: *\(.*n8nio\/n8n:.*\)$/\1/p' docker-compose.yml | he
 BCRYPT=/usr/local/lib/node_modules/n8n/node_modules/bcryptjs
 IMPORT_FILE=/home/node/.n8n/.astroverso-importar.json
 NEXTCLOUD=astroverso-nextcloud
-EMAIL_HOOK=astro-contas-email
+EMAIL_HOOK=astroverso-contas-email
 
 cmd_describe() {
     echo "n8n: automações e integrações entre serviços, montadas pelo navegador"
@@ -242,10 +242,10 @@ if n8n.get("ANTHROPIC_API_KEY"):
         "name": "x-api-key", "value": n8n["ANTHROPIC_API_KEY"]}})
 if mail.get("SEND_KEY"):
     creds.append({"id": "astroEnvioEmail01", "name": "Astroverso: envio de e-mail", "type": "httpHeaderAuth", "data": {
-        "name": "X-Astro-Chave", "value": mail["SEND_KEY"]}})
+        "name": "X-Astroverso-Chave", "value": mail["SEND_KEY"]}})
 if n8n.get("N8N_HOOK_TOKEN"):
     creds.append({"id": "astroHookAstro001", "name": "Astroverso: chamadas do assistente", "type": "httpHeaderAuth", "data": {
-        "name": "X-Astro-Chave", "value": n8n["N8N_HOOK_TOKEN"]}})
+        "name": "X-Astroverso-Chave", "value": n8n["N8N_HOOK_TOKEN"]}})
 json.dump(creds, open(out, "w"))
 print(", ".join(c["name"].replace("Astroverso: ", "") for c in creds))
 PYEOF
@@ -356,14 +356,14 @@ process.stdin.on("data", (d) => chave += d).on("end", async () => {
   try {
     const r = await fetch(`http://127.0.0.1:5678/webhook/${process.argv[1]}`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-astro-chave": chave },
+      headers: { "content-type": "application/json", "x-astroverso-chave": chave },
       body: JSON.stringify(process.argv[2] ? { mes: process.argv[2] } : {}),
       signal: AbortSignal.timeout(280000),
     });
     const texto = await r.text();
     let mensagem = texto;
     try { mensagem = JSON.parse(texto).mensagem || texto; } catch (e) {}
-    if (r.status === 404) mensagem = "a rotina Contas: notificação mensal não está ligada no n8n (ou não tem mais o webhook astro-contas-email)";
+    if (r.status === 404) mensagem = "a rotina Contas: notificação mensal não está ligada no n8n (ou não tem mais o webhook astroverso-contas-email)";
     console.log(mensagem);
     process.exit(r.ok ? 0 : 1);
   } catch (e) {

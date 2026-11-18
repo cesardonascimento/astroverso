@@ -36,7 +36,7 @@ astroverso-mailserver (Dovecot)  usuário inbox, pastas INBOX e Quarentena
 - **Sem perda:** um e-mail só sai do KV depois que o Dovecot o aceita. Falhas ficam para a próxima rodada e
   avisam no Discord (uma vez por dia), com aviso de volta quando passam. Rodadas não se sobrepõem (`flock`).
 - **Envio:** o Worker também atende `POST https://astroverso-mailserver.<subdomínio>.workers.dev/enviar`, com o
-  cabeçalho `X-Astro-Chave` (`SEND_KEY`, gerada na instalação; sem ela, 401) e o corpo `{"para": [...], "assunto",
+  cabeçalho `X-Astroverso-Chave` (`SEND_KEY`, gerada na instalação; sem ela, 401) e o corpo `{"para": [...], "assunto",
   "texto", "html", "anexos": [{"nome", "tipo", "base64", "cid"}]}` (anexo com `cid` vai embutido no HTML, como
   `<img src="cid:...">`). Envia um e-mail por destinatário, de `<endereço da caixa>`, pela ligação `send_email` do
   Worker, e responde `{"enviados": [...], "erros": [...]}`. A Cloudflare só entrega para os endereços de destino

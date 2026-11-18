@@ -8,7 +8,7 @@ USER root
 RUN mkdir -p /opt/astroverso && cd /opt/astroverso \
     && printf '{"name":"astroverso-runners","private":true}\n' > package.json \
     && pnpm add --config.node-linker=hoisted "qrcode@${QRCODE_VERSION}" "pngjs@${PNGJS_VERSION}" "mupdf@${MUPDF_VERSION}" "zxing-wasm@${ZXING_WASM_VERSION}" \
-    && python3 -I -c 'import json; p = "/etc/n8n-task-runners.json"; c = json.load(open(p)); r = next(x for x in c["task-runners"] if x["runner-type"] == "javascript"); r["env-overrides"]["NODE_FUNCTION_ALLOW_EXTERNAL"] = "moment,qrcode,pngjs,astro-qr"; json.dump(c, open(p, "w"), indent=2)'
-COPY astro-qr /opt/astroverso/node_modules/astro-qr
+    && python3 -I -c 'import json; p = "/etc/n8n-task-runners.json"; c = json.load(open(p)); r = next(x for x in c["task-runners"] if x["runner-type"] == "javascript"); r["env-overrides"]["NODE_FUNCTION_ALLOW_EXTERNAL"] = "moment,qrcode,pngjs,astroverso-qr"; json.dump(c, open(p, "w"), indent=2)'
+COPY astroverso-qr /opt/astroverso/node_modules/astroverso-qr
 ENV NODE_PATH=/opt/astroverso/node_modules
 USER runner

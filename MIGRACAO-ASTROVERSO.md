@@ -3,7 +3,8 @@
 Arquivo temporário: depois de concluir todos os passos e confirmar que tudo funciona, apague
 este arquivo e comite a remoção. Ele só existe para levar o contexto desta mudança para a
 sessão do Claude que roda no servidor real (`rigel`), onde há acesso a `sudo`, systemd,
-containers e Cloudflare de verdade — o que não existe na sessão que fez o refactoring do código.
+containers, n8n e Cloudflare de verdade — o que não existe na sessão que fez o refactoring do
+código.
 
 ## O que já mudou no código (comitado e no GitHub)
 
@@ -23,34 +24,28 @@ que identifica o módulo como sistema:
 - rótulos de menu: "Instalar/Reinstalar/Gerenciar/Implodir Astro" → "...Astroverso"
 - Worker e KV do Cloudflare do mailserver: `astro-mailserver` → `astroverso-mailserver`
 - cabeçalho informativo `X-Astro-Mailserver` → `X-Astroverso-Mailserver`
+- módulo Node do n8n: `astro-qr` → `astroverso-qr` (pasta `n8n/astroverso-qr`, Dockerfile,
+  `NODE_FUNCTION_ALLOW_EXTERNAL`)
+- caminho do webhook do n8n: `astro-contas-email` → `astroverso-contas-email` (`EMAIL_HOOK` em
+  `n8n/project.sh`)
+- cabeçalho `X-Astro-Chave`/`x-astro-chave` → `X-Astroverso-Chave`/`x-astroverso-chave`, nas
+  credenciais `astroEnvioEmail01` e `astroHookAstro001` e no `mailserver/worker.js`
 
 **"astro" continua existindo**, só que com outro sentido: é o nome de usuário padrão dos módulos
 do Astroverso (ex.: admin padrão do Nextcloud) e o nome/comando do bot do Discord (`/astro`,
-autocompletar, `custom_id`, etc.). Isso é proposital, não ficou pela metade.
-
-### O que NÃO foi renomeado, de propósito, e não deve ser renomeado agora
-
-Estes itens são referenciados por **rotinas reais do n8n que vivem só no banco de dados**, fora
-deste repositório. Renomear qualquer um deles no código sem editar também o fluxo real no editor
-do n8n quebra a automação em produção:
-
-- os IDs de credencial do n8n: `astroImapInbox01`, `astroDiscordBot01`, `astroNextcloud001`,
-  `astroAnthropic001`, `astroEnvioEmail01`, `astroHookAstro001`
-- o caminho do webhook `astro-contas-email` (`EMAIL_HOOK` em `n8n/project.sh`)
-- o cabeçalho `X-Astro-Chave` / `x-astro-chave` (usado tanto para o `N8N_HOOK_TOKEN` quanto para o
-  `SEND_KEY` do mailserver)
-- o módulo Node `astro-qr` (pasta `n8n/astro-qr`, exigido por `require("astro-qr")` dentro de nós
-  Code de fluxos reais)
-
-Se um dia quiser renomear isso também, é uma tarefa separada e deliberada: precisa abrir cada
-fluxo afetado no editor do n8n e editar manualmente, porque eles não estão versionados aqui.
+autocompletar, `custom_id`, etc.). Isso é proposital, não ficou pela metade. Os **IDs** de
+credencial do n8n (`astroImapInbox01`, `astroDiscordBot01`, `astroNextcloud001`,
+`astroAnthropic001`, `astroEnvioEmail01`, `astroHookAstro001`) também continuam "astro" — são só
+identificadores internos (não aparecem para ninguém), não precisam mudar.
 
 ## O problema a resolver aqui
 
 O código já está renomeado e no GitHub. A instalação **real** deste servidor ainda está toda sob
 os nomes antigos (`~/.astro`, containers `astro-*`, unidades systemd, marcas no fstab/crypttab/
-samba, Worker/KV do Cloudflare). Depois do `git pull`, o código passa a esperar os nomes novos,
-então é preciso migrar o que está rodando — sem perder segredos nem dados.
+samba, Worker/KV do Cloudflare, e as rotinas do n8n que usam `astro-qr`, `astro-contas-email` e
+`X-Astro-Chave`). Depois do `git pull`, o código passa a esperar os nomes novos, então é preciso
+migrar o que está rodando — sem perder segredos nem dados, e sem quebrar as automações do n8n (que
+vivem só no banco de dados dele, fora deste repositório).
 
 ## Passo a passo
 
@@ -61,6 +56,8 @@ então é preciso migrar o que está rodando — sem perder segredos nem dados.
      (Administração → "Fazer backup agora" ou equivalente).
    - Rode "Buscar os e-mails agora" do mailserver (fetch force), para esvaziar a fila que está no
      KV da Cloudflare antes de ele ser recriado com outro nome mais adiante.
+   - `n8n export:workflow --all` (ou pela ação já usada no projeto para exportar rotinas) para ter
+     uma cópia das rotinas atuais antes de editar qualquer uma.
 
 1. **Atualizar o código**: `cd` no repositório e `git pull`.
 
@@ -109,19 +106,38 @@ então é preciso migrar o que está rodando — sem perder segredos nem dados.
    Discos da máquina e todos os projetos instalados. Em cada um, responder "sim" para "usar a
    configuração já salva?" (os `.env` já foram com o `mv` do passo 2). Isso recria containers,
    imagens, unidades systemd e rotas do Caddy com os nomes novos, com os mesmos segredos de antes.
-   Deixe o n8n para o fim dos serviços (ele reimporta as credenciais com os hostnames novos dos
-   outros projetos).
+   Deixe o n8n para o fim dos serviços (ele reimporta as credenciais com os hostnames e o
+   cabeçalho `X-Astroverso-Chave` novos).
 
-8. **Verificar**:
+8. **Editar as rotinas do n8n** (isso só existe no banco de dados dele, nada aqui faz isso
+   sozinho):
+   - **Cabeçalho `X-Astro-Chave` → `X-Astroverso-Chave`**: abra no editor o nó Webhook da rotina
+     "Contas: notificação mensal" e o nó HTTP Request que chama `POST /enviar` (envio de e-mail).
+     Se os dois usam a autenticação nativa "Header Auth" apontando para a credencial
+     (`astroHookAstro001` e `astroEnvioEmail01`, respectivamente) em vez de um cabeçalho fixado à
+     mão no nó, a troca já é automática — o passo 7 regravou essas credenciais com o nome novo do
+     cabeçalho, e o n8n passa a exigir/mandar `X-Astroverso-Chave` sozinho. **Confirme abrindo os
+     dois nós antes de seguir**; se algum fixa o cabeçalho na mão (Code, Set, ou o próprio
+     parâmetro do nó em vez da credencial), edite esse texto também.
+   - **Webhook `astro-contas-email` → `astroverso-contas-email`**: no nó Webhook da mesma rotina
+     ("Contas: notificação mensal"), troque o campo "Path" para `astroverso-contas-email`.
+   - **`require("astro-qr")` → `require("astroverso-qr")`**: na rotina "Contas: leitura", ache
+     o(s) nó(s) Code que leem o Pix pelos QR Codes e troque a string do `require`.
+   - Siga o padrão que o projeto já usa para editar essas rotinas com segurança (ver `CLAUDE.md`,
+     "Rotinas de contas em uso"): exporte o fluxo (`n8n export:workflow`), edite o JSON trocando
+     só essas strings, teste numa instância de n8n isolada antes de aplicar na real, e só então
+     importe de volta (`n8n import:workflow`) na instância de produção.
+   - Teste de ponta a ponta depois: rode a ação remota `contas:email` pelo Discord (deve chamar o
+     webhook novo com sucesso) e, numa próxima rodada de "Contas: leitura", confirme que um e-mail
+     com boleto/fatura com QR Code de Pix ainda tem o Pix lido normalmente.
+
+9. **Verificar**:
    - `podman ps` só mostra `astroverso-*`, nada `astro-*`.
    - `systemctl --user list-timers` só mostra `astroverso-*`.
    - `/astro` no Discord continua respondendo (esse nome não muda, de propósito).
    - Cada rota do Caddy abre normalmente.
    - `grep astroverso /etc/fstab /etc/crypttab /etc/samba/smb.conf` mostra as marcas novas.
+   - As duas rotinas do passo 8 funcionam de ponta a ponta.
    - `git status` no repositório está limpo.
-
-9. **Não renomear em nenhuma hipótese**, nem pelo editor do n8n: `astro-qr`, os IDs de credencial
-   do n8n, o webhook `astro-contas-email`, nem o cabeçalho `X-Astro-Chave`/`x-astro-chave` — ver a
-   seção acima.
 
 10. Com tudo confirmado, apague este arquivo e comite a remoção.

@@ -19,7 +19,7 @@ function resposta(status, dados) {
 
 async function enviar(request, env) {
   if (request.method !== "POST" || new URL(request.url).pathname !== "/enviar") return resposta(404, { erro: "não encontrado" });
-  if (!env.CHAVE_ENVIO || request.headers.get("x-astro-chave") !== env.CHAVE_ENVIO) return resposta(401, { erro: "chave inválida" });
+  if (!env.CHAVE_ENVIO || request.headers.get("x-astroverso-chave") !== env.CHAVE_ENVIO) return resposta(401, { erro: "chave inválida" });
   let pedido;
   try {
     pedido = await request.json();
