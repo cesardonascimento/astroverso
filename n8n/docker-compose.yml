@@ -1,4 +1,4 @@
-name: astro
+name: astroverso
 
 x-podman:
   in_pod: false
@@ -6,7 +6,7 @@ x-podman:
 services:
   n8n:
     image: docker.io/n8nio/n8n:2.47.5
-    container_name: astro-n8n
+    container_name: astroverso-n8n
     restart: always
     environment:
       N8N_HOST: ${N8N_HOST}
@@ -38,8 +38,8 @@ services:
       N8N_RUNNERS_BROKER_LISTEN_ADDRESS: 0.0.0.0
       N8N_NATIVE_PYTHON_RUNNER: "true"
     volumes:
-      - ${ASTRO_STATE}/data/n8n:/home/node/.n8n:Z,U
-      - ${ASTRO_STATE}/data/owner_password_hash:/run/secrets/owner_password_hash:ro,Z
+      - ${ASTROVERSO_STATE}/data/n8n:/home/node/.n8n:Z,U
+      - ${ASTROVERSO_STATE}/data/owner_password_hash:/run/secrets/owner_password_hash:ro,Z
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5678/healthz"]
       interval: 30s
@@ -49,11 +49,11 @@ services:
 
   n8n-runners:
     build: .
-    image: localhost/astro-n8n-runners:latest
-    container_name: astro-n8n-runners
+    image: localhost/astroverso-n8n-runners:latest
+    container_name: astroverso-n8n-runners
     restart: always
     depends_on:
       - n8n
     environment:
       N8N_RUNNERS_AUTH_TOKEN: ${RUNNERS_TOKEN}
-      N8N_RUNNERS_TASK_BROKER_URI: http://astro-n8n:5679
+      N8N_RUNNERS_TASK_BROKER_URI: http://astroverso-n8n:5679

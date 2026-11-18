@@ -6,7 +6,7 @@ mesmo sem ninguém logado.
 
 ```bash
 ./project.sh install           # disco de backup, agendamentos e (opcional) o primeiro armazenamento em nuvem
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 ## Perguntas da instalação
@@ -33,10 +33,10 @@ Ao adicionar um armazenamento em nuvem (na instalação ou pelo menu):
 
 | Unidade | Quando | O que faz |
 |---|---|---|
-| `astro-rclone-tick` | de 2 em 2 horas, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
-| `astro-rclone-config` | 01:00 | Backup das configurações: cada `~/.astro/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
-| `astro-rclone-local` | 03:00 | Uma sincronização com a nuvem e, em seguida (mesmo se ela falhar), o espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
-| `astro-rclone-import-<nome>` | o horário escolhido | Temporário (`systemd-run`): começa a primeira cópia agendada. Se a máquina reiniciar antes, a primeira cópia começa na sincronização seguinte |
+| `astroverso-rclone-tick` | de 2 em 2 horas, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
+| `astroverso-rclone-config` | 01:00 | Backup das configurações: cada `~/.astroverso/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
+| `astroverso-rclone-local` | 03:00 | Uma sincronização com a nuvem e, em seguida (mesmo se ela falhar), o espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
+| `astroverso-rclone-import-<nome>` | o horário escolhido | Temporário (`systemd-run`): começa a primeira cópia agendada. Se a máquina reiniciar antes, a primeira cópia começa na sincronização seguinte |
 
 Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo depois de ligar.
 
@@ -125,14 +125,14 @@ pode ficar de fora). A lista completa, com as outras operações, está no READM
 
 ## Backup das configurações
 
-A pasta padrão é `Astro/Configurações` dentro do primeiro armazenamento em nuvem ou, sem ele, do disco copiado
+A pasta padrão é `Astroverso/Configurações` dentro do primeiro armazenamento em nuvem ou, sem ele, do disco copiado
 toda noite. Sem nenhum disco da máquina, o backup das configurações fica desligado até um disco ser cadastrado e
-o Astro reinstalado. A instalação instala também o `zstd`, usado na compactação.
+o Astroverso reinstalado. A instalação instala também o `zstd`, usado na compactação.
 
-À 01:00, antes dos espelhos, o `astro-rclone-config`:
+À 01:00, antes dos espelhos, o `astroverso-rclone-config`:
 
 1. pede a cada projeto que tenha o comando `backup` as cópias consistentes (dump do Postgres do Nextcloud) e o que deixar de fora (bancos em uso, código, caches);
-2. empacota cada `~/.astro/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
+2. empacota cada `~/.astroverso/<serviço>` com `podman unshare tar` (guarda os donos dos arquivos dos containers),
    com caminhos relativos ao serviço, sem o home: dentro do arquivo fica só a pasta `<serviço>/`. O `host.env` vira `host/`;
 3. compacta (`zstd`), criptografa com `gpg --symmetric` (AES-256) e grava
    `<pasta escolhida>/<AAAA-MM-DD_HHMMSS>/<serviço>/<serviço>.tar.zst.gpg`, uma pasta por backup;
@@ -140,7 +140,7 @@ o Astro reinstalado. A instalação instala também o `zstd`, usado na compacta�
    e para o disco de backup nas rodadas seguintes.
 
 ```
-Astro/Configurações/
+Astroverso/Configurações/
   2026-11-10_010000/
     caddy/caddy.tar.zst.gpg
     nextcloud/nextcloud.tar.zst.gpg
@@ -152,13 +152,13 @@ Astro/Configurações/
     ...
 ```
 
-O "Implodir Astro" grava uma versão `antes-de-implodir` com o mesmo `run.sh config`. Sem o backup das
-configurações ligado, ele pergunta uma pasta e uma senha (`ASTRO_BACKUP_DEST` e `ASTRO_BACKUP_KEY`).
+O "Implodir Astroverso" grava uma versão `antes-de-implodir` com o mesmo `run.sh config`. Sem o backup das
+configurações ligado, ele pergunta uma pasta e uma senha (`ASTROVERSO_BACKUP_DEST` e `ASTROVERSO_BACKUP_KEY`).
 
 Para abrir um serviço: `gpg -d <serviço>.tar.zst.gpg | tar --zstd -xf -` (pede a senha). Para manter os donos dos
 arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-owner`.
 
-## Ações (Gerenciar Astro → rclone)
+## Ações (Gerenciar Astroverso → rclone)
 
 | Ação | O que faz |
 |---|---|
@@ -168,7 +168,7 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Reconectar a um armazenamento em nuvem | Refaz o login (ex.: depois de ligar a verificação em duas etapas) |
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
 
-Em Gerenciar Astro → Administração (ações globais do rclone):
+Em Gerenciar Astroverso → Administração (ações globais do rclone):
 
 | Ação | O que faz |
 |---|---|
@@ -179,9 +179,9 @@ Em Gerenciar Astro → Administração (ações globais do rclone):
 
 1. Lista as versões em `<pasta do backup>` (da mais nova para a mais antiga, com os serviços de cada uma) e
    pede os serviços a restaurar (todos marcados, com a opção "Todos").
-2. Confere o rclone: rodadas ativas (`astro-rclone-*`) ou processos `rclone` do usuário. Se houver, pergunta e
-   para (a primeira cópia retoma depois). Segura as duas travas (`astro-rclone.lock` e
-   `astro-rclone-config.lock`) até o fim: nenhuma rodada começa durante a restauração. Os comandos dos projetos
+2. Confere o rclone: rodadas ativas (`astroverso-rclone-*`) ou processos `rclone` do usuário. Se houver, pergunta e
+   para (a primeira cópia retoma depois). Segura as duas travas (`astroverso-rclone.lock` e
+   `astroverso-rclone-config.lock`) até o fim: nenhuma rodada começa durante a restauração. Os comandos dos projetos
    rodam sem herdar as travas (`7>&- 8>&-`), senão um container iniciado por eles as seguraria para sempre.
 3. Testa a senha guardada na versão escolhida; se não abrir, pede a senha daquela versão.
 4. Faz um backup da situação atual, `<data>_antes-da-restauracao`. Se falhar, para sem mexer em nada.
@@ -207,17 +207,17 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/rclone/.env` | Disco de backup (`BACKUP_MOUNT`), disco copiado, dias de versões e a pasta do backup das configurações |
-| `~/.astro/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
-| `~/.astro/rclone/data/targets/<nome>.env` | Serviço, disco, pasta, o estado da primeira cópia e o da sincronização (`BISYNC_READY`, `TOO_MANY_DELETES`, `BISYNC_FORCE`) |
+| `~/.astroverso/rclone/.env` | Disco de backup (`BACKUP_MOUNT`), disco copiado, dias de versões e a pasta do backup das configurações |
+| `~/.astroverso/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens (`600`, pasta `700`) |
+| `~/.astroverso/rclone/data/targets/<nome>.env` | Serviço, disco, pasta, o estado da primeira cópia e o da sincronização (`BISYNC_READY`, `TOO_MANY_DELETES`, `BISYNC_FORCE`) |
 | `~/.cache/rclone/bisync/` | Listas de arquivos da última sincronização (fora do backup; se sumirem, a próxima rodada junta os dois lados) |
-| `~/.astro/rclone/data/config-backup.key` | Senha do backup das configurações (`600`) |
-| `~/.config/systemd/user/astro-rclone-*` | Os três serviços e seus timers |
+| `~/.astroverso/rclone/data/config-backup.key` | Senha do backup das configurações (`600`) |
+| `~/.config/systemd/user/astroverso-rclone-*` | Os três serviços e seus timers |
 
-Para acompanhar ao vivo: `journalctl --user -fu astro-rclone-tick`.
+Para acompanhar ao vivo: `journalctl --user -fu astroverso-rclone-tick`.
 
 ## Remoção
 
 `remove` para o que estiver rodando, tira os serviços e os timers, o estado do `bisync` (`~/.cache/rclone/bisync`) e
-apaga `~/.astro/rclone` (logins da nuvem e a senha do backup das configurações). Os arquivos nos discos e na
+apaga `~/.astroverso/rclone` (logins da nuvem e a senha do backup das configurações). Os arquivos nos discos e na
 nuvem, o backup das configurações e o pacote do rclone ficam.

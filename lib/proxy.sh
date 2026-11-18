@@ -1,5 +1,5 @@
 proxy_domain() {
-    env_get CADDY_DOMAIN "" "$ASTRO_HOME/caddy/.env"
+    env_get CADDY_DOMAIN "" "$ASTROVERSO_HOME/caddy/.env"
     return 0
 }
 

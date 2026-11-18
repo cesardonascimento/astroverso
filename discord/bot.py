@@ -67,7 +67,7 @@ def ajuda():
         if not acoes:
             return ["o catálogo de comandos ainda não foi gerado no servidor"]
         return ["**Comandos**\n" + "\n".join(f"`{a['id']}` — {a['descricao']}" for a in acoes.values())]
-    blocos = ["**Operações do astro** (`/astro command:<comando> argument:<opcional>`)"]
+    blocos = ["**Operações do Astroverso** (`/astro command:<comando> argument:<opcional>`)"]
     grupo = None
     for item in itens:
         if item.get("grupo") != grupo:
@@ -103,7 +103,7 @@ async def executar(acao, arg, usuario):
             resposta.unlink(missing_ok=True)
             return dados
         await asyncio.sleep(1)
-    return {"ok": False, "saida": "sem resposta do servidor em 14 minutos (o executor astro-discord-runner está ativo?)"}
+    return {"ok": False, "saida": "sem resposta do servidor em 14 minutos (o executor astroverso-discord-runner está ativo?)"}
 
 
 def botao(rotulo_botao, tipo, acao="", arg="", estilo=discord.ButtonStyle.secondary):

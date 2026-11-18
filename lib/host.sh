@@ -1,11 +1,11 @@
 export PODMAN_COMPOSE_WARNING_LOGS=false
 
-HOST_PORTS_CONF=/etc/sysctl.d/99-astro.conf
-HOST_FORWARD_CONF=/etc/sysctl.d/99-astro-tailscale.conf
-HOST_SSH_CONF=/etc/ssh/sshd_config.d/10-astro.conf
-HOST_GDM_POWER=/etc/dconf/db/gdm.d/95-astro-power
+HOST_PORTS_CONF=/etc/sysctl.d/99-astroverso.conf
+HOST_FORWARD_CONF=/etc/sysctl.d/99-astroverso-tailscale.conf
+HOST_SSH_CONF=/etc/ssh/sshd_config.d/10-astroverso.conf
+HOST_GDM_POWER=/etc/dconf/db/gdm.d/95-astroverso-power
 HOST_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST_COMMAND="$HOME/.local/bin/astro"
+HOST_COMMAND="$HOME/.local/bin/astroverso"
 
 host_compose() {
     if podman compose version >/dev/null 2>&1; then
@@ -198,7 +198,7 @@ host_ssh() {
 }
 
 HOST_SLEEP_TARGETS=(sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target)
-HOST_LOGIND_CONF=/etc/systemd/logind.conf.d/99-astro.conf
+HOST_LOGIND_CONF=/etc/systemd/logind.conf.d/99-astroverso.conf
 
 host_no_sleep() {
     local target masked=true
@@ -301,7 +301,7 @@ host_undo() {
 
     if [[ -L $HOST_COMMAND ]]; then
         rm -f "$HOST_COMMAND"
-        ui_ok "comando astro removido (o assistente continua em $HOST_REPO/setup.sh)"
+        ui_ok "comando astroverso removido (o assistente continua em $HOST_REPO/setup.sh)"
     fi
 
     systemctl --user disable -q --now podman-restart.service 2>/dev/null || true
@@ -314,12 +314,12 @@ host_undo() {
 host_command() {
     local target="$HOST_REPO/setup.sh"
     if [[ $(readlink "$HOST_COMMAND" 2>/dev/null) == "$target" ]]; then
-        ui_ok "comando astro já disponível"
+        ui_ok "comando astroverso já disponível"
         return
     fi
     mkdir -p "${HOST_COMMAND%/*}"
     ln -sfn "$target" "$HOST_COMMAND"
-    ui_ok "comando astro disponível: digite astro para abrir este assistente"
+    ui_ok "comando astroverso disponível: digite astroverso para abrir este assistente"
     if [[ ":$PATH:" != *":${HOST_COMMAND%/*}:"* ]]; then
         ui_info "abra um terminal novo (ou entre de novo pelo SSH) para o comando aparecer"
     fi
@@ -340,7 +340,7 @@ host_lan_subnet() {
     ip -4 route show dev "$device" scope link proto kernel | awk '{ print $1; exit }'
 }
 
-HOST_STATE="$HOME/.astro/host.env"
+HOST_STATE="$HOME/.astroverso/host.env"
 
 host_tailscale_port() {
     local port

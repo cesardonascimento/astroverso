@@ -2,17 +2,17 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=discord
+ASTROVERSO_PROJECT=discord
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/notify.sh
 source ../lib/brand.sh
 
-CONTAINER=astro-discord
+CONTAINER=astroverso-discord
 FILA="$STATE/fila"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-RUNNER=astro-discord-runner
+RUNNER=astroverso-discord-runner
 DISCORD_API=https://discord.com/api/v10
 PERMISSIONS=378225642512
 CHANNELS=(financeiro dados sistema)
@@ -179,8 +179,8 @@ write_unit() {
 
 runner_units() {
     mkdir -p "$UNIT_DIR" "$FILA"/{pedidos,respostas,saida,tmp,andamento}
-    write_unit "$RUNNER.service" "$(printf '[Unit]\nDescription=astro discord: executa os comandos pedidos pelo bot\n\n[Service]\nType=oneshot\nTimeoutStartSec=1h\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s run\n' "$PWD/runner.sh")"
-    write_unit "$RUNNER.path" "$(printf '[Unit]\nDescription=astro discord: fila de comandos do bot\n\n[Path]\nDirectoryNotEmpty=%s\nMakeDirectory=yes\n\n[Install]\nWantedBy=default.target\n' "$FILA/pedidos")"
+    write_unit "$RUNNER.service" "$(printf '[Unit]\nDescription=astroverso discord: executa os comandos pedidos pelo bot\n\n[Service]\nType=oneshot\nTimeoutStartSec=1h\nEnvironment=ASTROVERSO_PLAIN=1\nExecStart=%s run\n' "$PWD/runner.sh")"
+    write_unit "$RUNNER.path" "$(printf '[Unit]\nDescription=astroverso discord: fila de comandos do bot\n\n[Path]\nDirectoryNotEmpty=%s\nMakeDirectory=yes\n\n[Install]\nWantedBy=default.target\n' "$FILA/pedidos")"
     systemctl --user daemon-reload
     systemctl --user enable -q --now "$RUNNER.path"
     ui_ok "executor de comandos ativo ($RUNNER): roda só as ações da lista, com o seu usuário"

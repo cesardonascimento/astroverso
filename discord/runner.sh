@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=discord
+ASTROVERSO_PROJECT=discord
 source ../lib/ui.sh
 source ../lib/env.sh
 
@@ -12,7 +12,7 @@ SELF=discord
 CONTAINER_OPS="start stop restart"
 
 project_containers() {
-    podman ps -a --format '{{.Names}}' | grep -E "^astro-$1(-[a-z0-9-]+)?$" | sort -r || true
+    podman ps -a --format '{{.Names}}' | grep -E "^astroverso-$1(-[a-z0-9-]+)?$" | sort -r || true
 }
 
 catalog_lines() {
@@ -112,7 +112,7 @@ host_status() {
     fi
     echo
     echo "containers:"
-    podman ps -a --format '{{.Names}}: {{.Status}}' | grep '^astro-' | sed 's/^/  /' || echo "  nenhum"
+    podman ps -a --format '{{.Names}}: {{.Status}}' | grep '^astroverso-' | sed 's/^/  /' || echo "  nenhum"
     echo
     echo "discos:"
     df -h --output=target,used,size,pcent / /home $(findmnt -rn -o TARGET | grep '^/srv/' | sort) 2>/dev/null \
@@ -121,8 +121,8 @@ host_status() {
     echo "próximos agendamentos:"
     while read -r timer; do
         [[ -n $timer ]] && printf '  %s: %s\n' "${timer%.timer}" "$(next_run "$timer")"
-    done < <(systemctl --user list-timers 'astro-*' --all --no-pager --no-legend --plain 2>/dev/null \
-        | grep -oE 'astro-[A-Za-z0-9-]+\.timer' | sort -u)
+    done < <(systemctl --user list-timers 'astroverso-*' --all --no-pager --no-legend --plain 2>/dev/null \
+        | grep -oE 'astroverso-[A-Za-z0-9-]+\.timer' | sort -u)
     return 0
 }
 
@@ -138,7 +138,7 @@ container_op() {
         stop)    podman stop "${names[@]}" >/dev/null ;;
         restart) podman restart "${names[@]}" >/dev/null ;;
     esac
-    podman ps -a --format '{{.Names}}: {{.Status}}' | grep -E "^astro-$project(-[a-z0-9-]+)?:" || true
+    podman ps -a --format '{{.Names}}: {{.Status}}' | grep -E "^astroverso-$project(-[a-z0-9-]+)?:" || true
 }
 
 respond() {

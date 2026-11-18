@@ -2,18 +2,18 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=adguard
+ASTROVERSO_PROJECT=adguard
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
 
-CONTAINER=astro-adguard
-IMAGE=localhost/astro-adguard:latest
+CONTAINER=astroverso-adguard
+IMAGE=localhost/astroverso-adguard:latest
 CONF_FILE="$STATE/data/conf/AdGuardHome.yaml"
-DNS_CHECK_BIN=/usr/local/bin/astro-dns-check
-DNS_CHECK_UNIT=/etc/systemd/system/astro-dns-check.service
-DNS_CHECK_HOOK=/etc/NetworkManager/dispatcher.d/90-astro-dns-check
+DNS_CHECK_BIN=/usr/local/bin/astroverso-dns-check
+DNS_CHECK_UNIT=/etc/systemd/system/astroverso-dns-check.service
+DNS_CHECK_HOOK=/etc/NetworkManager/dispatcher.d/90-astroverso-dns-check
 
 cmd_describe() {
     echo "AdGuard Home: DNS da rede com bloqueio de anúncios"
@@ -124,7 +124,7 @@ save_password_hash() {
 setup_port53() {
     host_unprivileged_ports 53
 
-    local conf=/etc/systemd/resolved.conf.d/99-astro-adguard.conf
+    local conf=/etc/systemd/resolved.conf.d/99-astroverso-adguard.conf
     if ! systemctl is-active --quiet systemd-resolved; then
         ui_ok "systemd-resolved inativo, porta 53 livre"
     elif [[ -f $conf ]]; then
@@ -168,7 +168,7 @@ setup_host_dns() {
 dns_check_unit() {
     printf '%s\n' \
         '[Unit]' \
-        'Description=astro: AdGuard como DNS primário' \
+        'Description=astroverso: AdGuard como DNS primário' \
         'After=network-online.target' \
         '' \
         '[Service]' \
@@ -180,7 +180,7 @@ dns_check_unit() {
 dns_check_hook() {
     printf '%s\n' \
         '#!/bin/sh' \
-        'case "$2" in up|dhcp4-change) systemctl start --no-block astro-dns-check.service ;; esac'
+        'case "$2" in up|dhcp4-change) systemctl start --no-block astroverso-dns-check.service ;; esac'
 }
 
 install_dns_check() {
@@ -196,7 +196,7 @@ install_dns_check() {
     sudo chmod 0755 "$DNS_CHECK_HOOK"
     ! command -v restorecon >/dev/null || sudo restorecon -q "$DNS_CHECK_BIN" "$DNS_CHECK_UNIT" "$DNS_CHECK_HOOK"
     sudo systemctl daemon-reload
-    sudo systemctl start --no-block astro-dns-check.service
+    sudo systemctl start --no-block astroverso-dns-check.service
     ui_ok "a cada conexão de rede, o AdGuard volta a ser o DNS primário (log: journalctl -t adguard)"
 }
 
@@ -378,7 +378,7 @@ restore_host_dns() {
 }
 
 restore_port53() {
-    local conf=/etc/systemd/resolved.conf.d/99-astro-adguard.conf
+    local conf=/etc/systemd/resolved.conf.d/99-astroverso-adguard.conf
     [[ -f $conf ]] || return 0
     sudo rm -f "$conf"
     sudo ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf

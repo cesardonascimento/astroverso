@@ -3,7 +3,7 @@ DISK_CRYPTTAB=/etc/crypttab
 DISK_ROOT=/srv
 DISK_MOUNTS=()
 DISK_CHECK_BIN="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/disk-check.sh"
-DISK_CHECK_UNIT=astro-disk-check
+DISK_CHECK_UNIT=astroverso-disk-check
 
 disk_scan() {
     lsblk -J -b --tree -o PATH,UUID,LABEL,SIZE,FSTYPE,TYPE,MOUNTPOINTS,MODEL | python3 -I -c '
@@ -73,21 +73,21 @@ disk_awk() {
 
 disk_block() {
     disk_awk "$1" '
-        /^# astro / { marker = $0; uuid = $3; next }
+        /^# astroverso / { marker = $0; uuid = $3; next }
         marker != "" { if (ours($0) && owns(uuid, $0)) { print marker; print }; marker = "" }
     '
 }
 
 disk_orphans() {
     disk_awk "$1" '
-        /^# astro / { uuid = $3; next }
+        /^# astroverso / { uuid = $3; next }
         { if (ours($0) && !owns(uuid, $0)) print; uuid = "" }
     '
 }
 
 disk_configured() {
     disk_block "$DISK_FSTAB" | awk '
-        /^# astro / {
+        /^# astroverso / {
             uuid = $3
             type = ($4 == "compartilhado") ? "compartilhado" : "privado"
             getline
@@ -118,9 +118,9 @@ disk_responds() {
 disk_check_units() {
     local dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     mkdir -p "$dir"
-    printf '[Unit]\nDescription=astro: confere se os discos da máquina respondem\n\n[Service]\nType=oneshot\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s\n' \
+    printf '[Unit]\nDescription=astroverso: confere se os discos da máquina respondem\n\n[Service]\nType=oneshot\nEnvironment=ASTROVERSO_PLAIN=1\nExecStart=%s\n' \
         "$DISK_CHECK_BIN" > "$dir/$DISK_CHECK_UNIT.service"
-    printf '[Unit]\nDescription=astro: confere os discos a cada 15 minutos\n\n[Timer]\nOnBootSec=5min\nOnUnitActiveSec=15min\n\n[Install]\nWantedBy=timers.target\n' \
+    printf '[Unit]\nDescription=astroverso: confere os discos a cada 15 minutos\n\n[Timer]\nOnBootSec=5min\nOnUnitActiveSec=15min\n\n[Install]\nWantedBy=timers.target\n' \
         > "$dir/$DISK_CHECK_UNIT.timer"
     systemctl --user daemon-reload
     systemctl --user enable -q --now "$DISK_CHECK_UNIT.timer"
@@ -141,7 +141,7 @@ disk_type() {
 }
 
 disk_line() {
-    disk_block "$1" | awk -v uuid="$2" '/^# astro / { match_uuid = ($3 == uuid); next } match_uuid { print; match_uuid = 0 }'
+    disk_block "$1" | awk -v uuid="$2" '/^# astroverso / { match_uuid = ($3 == uuid); next } match_uuid { print; match_uuid = 0 }'
 }
 
 disk_block_write() {
@@ -150,15 +150,15 @@ disk_block_write() {
     current="$(disk_read "$file")"
     wanted="$(
         if [[ -n $current ]]; then
-            disk_awk "$file" '/^# astro / { next } ours($0) { next } { print }'
+            disk_awk "$file" '/^# astroverso / { next } ours($0) { next } { print }'
         fi
         if (($#)); then
             printf '%s\n' "$@"
         fi
     )"
     [[ $wanted == "$current" ]] && return 0
-    if [[ -e $file && ! -e $file.astro-bak ]]; then
-        sudo cp -a "$file" "$file.astro-bak"
+    if [[ -e $file && ! -e $file.astroverso-bak ]]; then
+        sudo cp -a "$file" "$file.astroverso-bak"
     fi
     printf '%s\n' "$wanted" | sudo tee "$file" >/dev/null
     [[ $file == "$DISK_CRYPTTAB" ]] && sudo chmod 600 "$file"
@@ -267,8 +267,8 @@ disk_release_unused() {
 disk_release_all() {
     local uuid file luks=()
     mapfile -t luks < <(disk_awk "$DISK_CRYPTTAB" 'ours($0) { sub(/^UUID=/, "", $2); print $2 }')
-    if [[ -z $(disk_awk "$DISK_FSTAB" '/^# astro / || ours($0)') && -z $(disk_awk "$DISK_CRYPTTAB" '/^# astro / || ours($0)') ]]; then
-        ui_ok "nenhum disco montado pelo Astro"
+    if [[ -z $(disk_awk "$DISK_FSTAB" '/^# astroverso / || ours($0)') && -z $(disk_awk "$DISK_CRYPTTAB" '/^# astroverso / || ours($0)') ]]; then
+        ui_ok "nenhum disco montado pelo Astroverso"
         disk_check_remove
         return 0
     fi
@@ -277,7 +277,7 @@ disk_release_all() {
     disk_block_write "$DISK_CRYPTTAB"
     disk_block_write "$DISK_FSTAB"
     for file in "$DISK_FSTAB" "$DISK_CRYPTTAB"; do
-        sudo rm -f "$file.astro-bak"
+        sudo rm -f "$file.astroverso-bak"
     done
     disk_check_remove
     sudo systemctl daemon-reload
@@ -348,8 +348,8 @@ disk_setup() {
             local old_crypttab
             if [[ -n ${old[$uuid]:-} ]]; then
                 old_crypttab="$(disk_line "$DISK_CRYPTTAB" "$uuid")"
-                fstab+=("# astro $uuid $type" "${old[$uuid]}")
-                [[ -n $old_crypttab ]] && crypttab+=("# astro $uuid" "$old_crypttab")
+                fstab+=("# astroverso $uuid $type" "${old[$uuid]}")
+                [[ -n $old_crypttab ]] && crypttab+=("# astroverso $uuid" "$old_crypttab")
                 keep+=("$uuid")
                 DISK_MOUNTS+=("$(awk '{ print $2 }' <<< "${old[$uuid]}")")
                 ui_warn "disco $uuid não encontrado: a montagem dele fica configurada e volta quando ele for ligado"
@@ -370,7 +370,7 @@ disk_setup() {
                 continue
             fi
             hotplug+=("/dev/disk/by-uuid/$uuid systemd-cryptsetup@$(systemd-escape "$mapper").service")
-            crypttab+=("# astro $uuid"
+            crypttab+=("# astroverso $uuid"
                 "$mapper UUID=$uuid none tpm2-device=auto,headless=true,nofail,x-systemd.device-timeout=10s,x-udisks-auth")
             udevadm settle 2>/dev/null || true
             device="/dev/mapper/$mapper"
@@ -391,7 +391,7 @@ disk_setup() {
         [[ $fs_type == ntfs ]] && fs_type=ntfs3
         [[ $fs_type == ext4 || $fs_type == xfs || $fs_type == btrfs ]] && pass=2 || pass=0
         local line="UUID=$fs_uuid $target $fs_type nofail,nosuid,nodev,$wait_options,x-udisks-auth,$(disk_options "$fs_type" "$type") 0 $pass"
-        fstab+=("# astro $uuid $type" "$line")
+        fstab+=("# astroverso $uuid $type" "$line")
         keep+=("$uuid")
         disk_hotplug_unlink "$(systemd-escape -p --suffix=mount "$target")"
         hotplug+=("${trigger:-/dev/disk/by-uuid/$fs_uuid} $(systemd-escape -p --suffix=mount "$target")")

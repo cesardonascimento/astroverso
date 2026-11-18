@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=discos
+ASTROVERSO_PROJECT=discos
 NOTIFY_CHANNEL=sistema
 source ui.sh
 source env.sh

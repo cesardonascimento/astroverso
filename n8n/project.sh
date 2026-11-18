@@ -2,20 +2,20 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=n8n
+ASTROVERSO_PROJECT=n8n
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 source ../lib/proxy.sh
 
-CONTAINER=astro-n8n
-CONTAINERS=(astro-n8n-runners astro-n8n)
+CONTAINER=astroverso-n8n
+CONTAINERS=(astroverso-n8n-runners astroverso-n8n)
 DATA="$STATE/data/n8n"
 HASH_FILE="$STATE/data/owner_password_hash"
 IMAGE="$(sed -n 's/^ *image: *\(.*n8nio\/n8n:.*\)$/\1/p' docker-compose.yml | head -1)"
 BCRYPT=/usr/local/lib/node_modules/n8n/node_modules/bcryptjs
-IMPORT_FILE=/home/node/.n8n/.astro-importar.json
-NEXTCLOUD=astro-nextcloud
+IMPORT_FILE=/home/node/.n8n/.astroverso-importar.json
+NEXTCLOUD=astroverso-nextcloud
 EMAIL_HOOK=astro-contas-email
 
 cmd_describe() {
@@ -36,7 +36,7 @@ cmd_remote_actions() {
 
 cmd_help() {
     printf '%s\n' \
-        "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do astro, e a rotina Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
+        "Contas|Contas: buscar e-mails|traz os e-mails encaminhados para a caixa do Astroverso, e a rotina Contas: leitura lê as cobranças novas|de 5 em 5 minutos, das 08:00 às 20:00|mailserver:fetch|10" \
         "Contas|Contas: e-mail do mês|manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras|dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada)|contas:email|20"
 }
 
@@ -92,7 +92,7 @@ configure() {
         first="$(env_get OWNER_FIRST_NAME)"
         last="$(env_get OWNER_LAST_NAME)"
         ui_ok "configuração existente mantida"
-        if [[ ${ASTRO_REUSE_CONFIG:-} != 1 ]] && ui_confirm "trocar a senha do administrador?" n; then
+        if [[ ${ASTROVERSO_REUSE_CONFIG:-} != 1 ]] && ui_confirm "trocar a senha do administrador?" n; then
             ask_password
         fi
     else
@@ -143,7 +143,7 @@ start_containers() {
         podman logs --tail 30 "$CONTAINER" 2>&1 | ui_prefix >&2
         ui_fail "o n8n não respondeu em 3 minutos"
     fi
-    ui_ok "containers ${CONTAINERS[*]} rodando (código dos fluxos roda no astro-n8n-runners, com JavaScript e Python)"
+    ui_ok "containers ${CONTAINERS[*]} rodando (código dos fluxos roda no astroverso-n8n-runners, com JavaScript e Python)"
 }
 
 env_put() {
@@ -173,22 +173,22 @@ nextcloud_app_password() {
     local user out password
     [[ -z $(env_get NEXTCLOUD_APP_PASSWORD) ]] || return 0
     podman container exists "$NEXTCLOUD" || return 0
-    user="$(env_get ADMIN_USER "" "$ASTRO_HOME/nextcloud/.env")"
+    user="$(env_get ADMIN_USER "" "$ASTROVERSO_HOME/nextcloud/.env")"
     [[ -n $user ]] || return 0
-    out="$(podman exec -u www-data "$NEXTCLOUD" php occ user:auth-tokens:add -n --name=astro-n8n "$user" 2>/dev/null)" || out=""
+    out="$(podman exec -u www-data "$NEXTCLOUD" php occ user:auth-tokens:add -n --name=astroverso-n8n "$user" 2>/dev/null)" || out=""
     password="$(tail -1 <<< "$out" | grep -oE '[A-Za-z0-9-]{20,}$' || true)"
     if [[ -z $password ]]; then
         ui_warn "não foi possível criar a senha de app do Nextcloud para o n8n"
         return 0
     fi
     env_put NEXTCLOUD_APP_PASSWORD "$password"
-    ui_ok "senha de app \"astro-n8n\" criada no Nextcloud de $user (para as rotinas gravarem arquivos)"
+    ui_ok "senha de app \"astroverso-n8n\" criada no Nextcloud de $user (para as rotinas gravarem arquivos)"
 }
 
 anthropic_key() {
     local key
     [[ -z $(env_get ANTHROPIC_API_KEY) || ${1:-} == trocar ]] || return 0
-    [[ ${ASTRO_REUSE_CONFIG:-} != 1 ]] || return 0
+    [[ ${ASTROVERSO_REUSE_CONFIG:-} != 1 ]] || return 0
     ui_info "as rotinas de contas usam a API da Anthropic (Claude) para ler os e-mails de cobrança"
     ui_info "crie uma chave em https://console.anthropic.com → API Keys (Enter vazio deixa para depois)"
     read -rsp "$(_ui_tag)     $(printf '\033[35m?\033[0m') chave da API da Anthropic: " key </dev/tty
@@ -210,7 +210,7 @@ credentials_sync() {
     nextcloud_app_password
     [[ -n $(env_get N8N_HOOK_TOKEN) ]] || env_put N8N_HOOK_TOKEN "$(random_key 48)"
     tmp="$(mktemp)"
-    names="$(python3 -I - "$ASTRO_HOME" "$tmp" <<'PYEOF'
+    names="$(python3 -I - "$ASTROVERSO_HOME" "$tmp" <<'PYEOF'
 import json, sys
 home, out = sys.argv[1:]
 
@@ -227,27 +227,27 @@ def env(projeto):
 n8n, mail, discord, nextcloud = env("n8n"), env("mailserver"), env("discord"), env("nextcloud")
 creds = []
 if mail.get("IMAP_PASSWORD"):
-    creds.append({"id": "astroImapInbox01", "name": "Astro: caixa inbox (IMAP)", "type": "imap", "data": {
-        "user": "inbox", "password": mail["IMAP_PASSWORD"], "host": "astro-mailserver", "port": 31143,
+    creds.append({"id": "astroImapInbox01", "name": "Astroverso: caixa inbox (IMAP)", "type": "imap", "data": {
+        "user": "inbox", "password": mail["IMAP_PASSWORD"], "host": "astroverso-mailserver", "port": 31143,
         "secure": False, "allowUnauthorizedCerts": False}})
 if discord.get("DISCORD_TOKEN"):
-    creds.append({"id": "astroDiscordBot01", "name": "Astro: bot do Discord", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroDiscordBot01", "name": "Astroverso: bot do Discord", "type": "httpHeaderAuth", "data": {
         "name": "Authorization", "value": "Bot " + discord["DISCORD_TOKEN"]}})
 if n8n.get("NEXTCLOUD_APP_PASSWORD") and nextcloud.get("NEXTCLOUD_HOST") and nextcloud.get("ADMIN_USER"):
-    creds.append({"id": "astroNextcloud001", "name": "Astro: Nextcloud", "type": "nextCloudApi", "data": {
+    creds.append({"id": "astroNextcloud001", "name": "Astroverso: Nextcloud", "type": "nextCloudApi", "data": {
         "webDavUrl": f"https://{nextcloud['NEXTCLOUD_HOST']}/remote.php/dav/files/{nextcloud['ADMIN_USER']}",
         "user": nextcloud["ADMIN_USER"], "password": n8n["NEXTCLOUD_APP_PASSWORD"]}})
 if n8n.get("ANTHROPIC_API_KEY"):
-    creds.append({"id": "astroAnthropic001", "name": "Astro: API da Anthropic", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroAnthropic001", "name": "Astroverso: API da Anthropic", "type": "httpHeaderAuth", "data": {
         "name": "x-api-key", "value": n8n["ANTHROPIC_API_KEY"]}})
 if mail.get("SEND_KEY"):
-    creds.append({"id": "astroEnvioEmail01", "name": "Astro: envio de e-mail", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroEnvioEmail01", "name": "Astroverso: envio de e-mail", "type": "httpHeaderAuth", "data": {
         "name": "X-Astro-Chave", "value": mail["SEND_KEY"]}})
 if n8n.get("N8N_HOOK_TOKEN"):
-    creds.append({"id": "astroHookAstro001", "name": "Astro: chamadas do assistente", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroHookAstro001", "name": "Astroverso: chamadas do assistente", "type": "httpHeaderAuth", "data": {
         "name": "X-Astro-Chave", "value": n8n["N8N_HOOK_TOKEN"]}})
 json.dump(creds, open(out, "w"))
-print(", ".join(c["name"].replace("Astro: ", "") for c in creds))
+print(", ".join(c["name"].replace("Astroverso: ", "") for c in creds))
 PYEOF
 )"
     chmod 600 "$tmp"

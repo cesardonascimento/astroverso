@@ -1,4 +1,4 @@
-name: astro
+name: astroverso
 
 x-podman:
   in_pod: false
@@ -6,9 +6,9 @@ x-podman:
 services:
   discord:
     build: .
-    image: localhost/astro-discord:latest
-    container_name: astro-discord
+    image: localhost/astroverso-discord:latest
+    container_name: astroverso-discord
     restart: always
-    env_file: ${ASTRO_STATE}/.env
+    env_file: ${ASTROVERSO_STATE}/.env
     volumes:
-      - ${ASTRO_STATE}/fila:/fila:Z
+      - ${ASTROVERSO_STATE}/fila:/fila:Z

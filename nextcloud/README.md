@@ -5,22 +5,22 @@ e pelos apps do Nextcloud no celular e no computador.
 
 ```bash
 ./project.sh install           # instala, configura e publica o endereço no Caddy
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 ## Containers
 
 | Container | Imagem | Função |
 |---|---|---|
-| `astro-nextcloud` | `nextcloud:<versão>-apache` | O Nextcloud (PHP + Apache), na porta 80 só da rede dos containers |
-| `astro-nextcloud-db` | `postgres:<versão>-alpine` | Banco de dados |
-| `astro-nextcloud-redis` | `valkey/valkey:<versão>-alpine` | Cache e travas de arquivo, sem gravar nada em disco |
-| `astro-nextcloud-cron` | a mesma do Nextcloud | Roda as tarefas em segundo plano a cada 5 minutos |
+| `astroverso-nextcloud` | `nextcloud:<versão>-apache` | O Nextcloud (PHP + Apache), na porta 80 só da rede dos containers |
+| `astroverso-nextcloud-db` | `postgres:<versão>-alpine` | Banco de dados |
+| `astroverso-nextcloud-redis` | `valkey/valkey:<versão>-alpine` | Cache e travas de arquivo, sem gravar nada em disco |
+| `astroverso-nextcloud-cron` | a mesma do Nextcloud | Roda as tarefas em segundo plano a cada 5 minutos |
 
 As versões ficam fixadas no `docker-compose.yml`. O Nextcloud só atualiza uma versão principal por vez
 (ex.: da 35 para a 36).
 
-Nenhuma porta é aberta na máquina: o Caddy alcança o `astro-nextcloud` pelo nome, na rede `astro_default`.
+Nenhuma porta é aberta na máquina: o Caddy alcança o `astroverso-nextcloud` pelo nome, na rede `astroverso_default`.
 
 ## Perguntas da instalação
 
@@ -48,7 +48,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   O disco entra nos containers em `/mnt/<rótulo>` por um `docker-compose.override.yml` gerado, e no Nextcloud do
   administrador como a pasta `<rótulo>` (app Armazenamento externo, verificação de mudanças a cada acesso). Assim,
   arquivos gravados por fora, por exemplo pela sincronização com outra nuvem, aparecem no Nextcloud.
-- Gera a senha do banco em `~/.astro/nextcloud/data/secrets/db_password` (pasta `700`). Os containers a leem pelas variáveis
+- Gera a senha do banco em `~/.astroverso/nextcloud/data/secrets/db_password` (pasta `700`). Os containers a leem pelas variáveis
   `*_FILE`, então ela nunca vai para o `.env`.
 - Prepara a pasta dos arquivos para o usuário `www-data` do container (`podman unshare chown 33:33`,
   permissão `770`).
@@ -58,7 +58,7 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   vazada em algum site), ela é pedida de novo.
 - Ajusta pelo `occ`, a cada instalação:
   - `trusted_domains` e `overwrite.cli.url` com o endereço do Caddy;
-  - `trusted_proxies` com a sub-rede da `astro_default`, para ver o IP real de quem acessa;
+  - `trusted_proxies` com a sub-rede da `astroverso_default`, para ver o IP real de quem acessa;
   - `overwriteprotocol` em `https`;
   - fuso da máquina e região dos telefones, tirada do fuso (`zone.tab`);
   - janela de manutenção às 3h no fuso da máquina;
@@ -73,23 +73,23 @@ são movidos para a pasta nova (que precisa estar vazia); com **N**, a pasta ant
   laranja solar, fundo liso azul espacial (`background backgroundColor`), `logo/simbolo.png` como logo do login e
   da barra de cima e `logo/icone.png` como ícone (favicon). As imagens entram no container por `podman cp` num
   arquivo temporário. Cores em `lib/brand.sh`.
-- Publica a rota `https://<endereço> → http://astro-nextcloud:80` no Caddy.
+- Publica a rota `https://<endereço> → http://astroverso-nextcloud:80` no Caddy.
 
 ## Arquivos gerados
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo caminho em `/srv`) |
-| `~/.astro/nextcloud/docker-compose.override.yml` | Volumes dos discos |
-| `~/.astro/nextcloud/data/secrets/` | Senha do banco |
-| `~/.astro/nextcloud/data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
-| `~/.astro/nextcloud/data/db/` | Banco de dados |
-| `~/.astro/nextcloud/backup/` | Dump do banco (`pg_dump`), gerado à 01:00 para o backup das configurações |
+| `~/.astroverso/nextcloud/.env` | Respostas da instalação (os discos ficam em `DISKS`, pelo caminho em `/srv`) |
+| `~/.astroverso/nextcloud/docker-compose.override.yml` | Volumes dos discos |
+| `~/.astroverso/nextcloud/data/secrets/` | Senha do banco |
+| `~/.astroverso/nextcloud/data/html/` | Código, configuração (`config/config.php`) e apps do Nextcloud |
+| `~/.astroverso/nextcloud/data/db/` | Banco de dados |
+| `~/.astroverso/nextcloud/backup/` | Dump do banco (`pg_dump`), gerado à 01:00 para o backup das configurações |
 | `~/.nextcloud/` | Arquivos dos usuários (pasta padrão) |
 
 ## Backup das configurações
 
-À 01:00, o rclone pede ao projeto um dump do banco (`pg_dump -Fc`, em `~/.astro/nextcloud/backup`). No arquivo
+À 01:00, o rclone pede ao projeto um dump do banco (`pg_dump -Fc`, em `~/.astroverso/nextcloud/backup`). No arquivo
 do backup entram o `.env`, a senha do banco, o dump, `config/`, `custom_apps/`, `themes/` e `version.php`; o
 banco em uso e o código (que a imagem recria) ficam de fora. A pasta dos arquivos (`~/.nextcloud`) também fica
 de fora: os arquivos do dia a dia ficam nos discos da máquina, que têm o próprio backup.
@@ -98,7 +98,7 @@ de fora: os arquivos do dia a dia ficam nos discos da máquina, que têm o próp
 
 `restore` (chamado pela opção "Restaurar uma versão das configurações"):
 
-- para os containers, troca `~/.astro/nextcloud` pela configuração do backup e **mantém o código** que já está na
+- para os containers, troca `~/.astroverso/nextcloud` pela configuração do backup e **mantém o código** que já está na
   máquina (`cp --update=none`), já que o backup só tem `config/`, `custom_apps/`, `themes/` e `version.php`;
 - prepara a pasta dos arquivos, se ela não existir (com o `.ncdata`, que o Nextcloud exige);
 - recria o banco do zero: sobe só o Postgres, recria o usuário do banco que o Nextcloud criou na instalação
@@ -109,5 +109,5 @@ de fora: os arquivos do dia a dia ficam nos discos da máquina, que têm o próp
 ## Remoção
 
 `remove` derruba os containers, apaga as imagens, tira a ACL do Nextcloud dos discos privados, apaga a pasta local
-dos arquivos (padrão `~/.nextcloud`, só se for mesmo uma pasta de dados do Nextcloud) e `~/.astro/nextcloud`, e
+dos arquivos (padrão `~/.nextcloud`, só se for mesmo uma pasta de dados do Nextcloud) e `~/.astroverso/nextcloud`, e
 tira a rota do Caddy. Os discos continuam montados (são da máquina) e os arquivos neles nunca são apagados.

@@ -1,8 +1,8 @@
-ASTRO_PROJECT="${ASTRO_PROJECT:-astro}"
+ASTROVERSO_PROJECT="${ASTROVERSO_PROJECT:-astroverso}"
 
-_ui_tag() { printf '\033[1;36m[%s]\033[0m' "$ASTRO_PROJECT"; }
+_ui_tag() { printf '\033[1;36m[%s]\033[0m' "$ASTROVERSO_PROJECT"; }
 
-export SUDO_PROMPT=$'\033[1;36m'"[$ASTRO_PROJECT]"$'\033[0m     \033[35m?\033[0m senha do sudo: '
+export SUDO_PROMPT=$'\033[1;36m'"[$ASTROVERSO_PROJECT]"$'\033[0m     \033[35m?\033[0m senha do sudo: '
 
 ui_step()  { printf '\n%s \033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$(_ui_tag)" "$*"; }
 ui_info()  { printf '%s     %s\n' "$(_ui_tag)" "$*"; }
@@ -226,8 +226,8 @@ ui_checklist() {
     return 0
 }
 
-if [[ ${ASTRO_PLAIN:-} == 1 ]]; then
-    _ui_tag()  { printf '[%s]' "$ASTRO_PROJECT"; }
+if [[ ${ASTROVERSO_PLAIN:-} == 1 ]]; then
+    _ui_tag()  { printf '[%s]' "$ASTROVERSO_PROJECT"; }
     ui_step()  { printf '%s ==> %s\n' "$(_ui_tag)" "$*"; }
     ui_info()  { printf '%s     %s\n' "$(_ui_tag)" "$*"; }
     ui_ok()    { printf '%s     ok: %s\n' "$(_ui_tag)" "$*"; }

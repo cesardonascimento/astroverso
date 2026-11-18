@@ -6,7 +6,7 @@ ações de uma lista.
 
 ```bash
 ./project.sh install           # perguntas, imagem, executor de comandos, container e mensagem de teste
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 ## Perguntas da instalação
@@ -29,7 +29,7 @@ intents privilegiadas). Para um bot já convidado, abrir o link de novo atualiza
 | principal (ex.: `#astro`) | comandos `/astro`, botões, respostas, `help`, mensagem de teste e avisos sem canal próprio | você e o bot |
 | `#financeiro` | rotinas de contas a pagar (n8n: `canal_discord` no `⚙️ Configuração` de cada rotina) | só o bot |
 | `#dados` | `rclone`: sincronização com a nuvem, backup diário e backup das configurações | só o bot |
-| `#sistema` | discos da máquina (`astro-disk-check`), busca de e-mails do `mailserver` e, no futuro, outros avisos da máquina | só o bot |
+| `#sistema` | discos da máquina (`astroverso-disk-check`), busca de e-mails do `mailserver` e, no futuro, outros avisos da máquina | só o bot |
 
 A instalação (`channels.py`, token pela entrada padrão) descobre o servidor pelo canal principal, procura os
 outros pelo nome e cria os que faltam na mesma categoria dele. Em todos eles, `@everyone` não pode enviar
@@ -39,20 +39,20 @@ mensagens, criar tópicos nem escrever em tópicos, e o bot pode ver, enviar, in
 novo; dá também para criar os canais à mão, com esses nomes, e rodar a instalação outra vez. Os botões dos avisos
 funcionam nos canais só de leitura.
 
-Cada aviso leva o canal na fila (`canal`, de `NOTIFY_CHANNEL` do projeto que avisa; sem ele, `astro`). O bot
+Cada aviso leva o canal na fila (`canal`, de `NOTIFY_CHANNEL` do projeto que avisa; sem ele, `astroverso`). O bot
 entrega no canal de `DISCORD_CHANNELS` com esse nome; sem ele (ou se o canal sumiu), no principal.
 
 ## Foto do bot
 
 A instalação troca a foto do bot por `logo/icone.png` (`PATCH users/@me`, token pelo cabeçalho na entrada
-padrão). O hash da imagem fica em `~/.astro/discord/.avatar`: só troca de novo quando a logo muda. O Discord limita
+padrão). O hash da imagem fica em `~/.astroverso/discord/.avatar`: só troca de novo quando a logo muda. O Discord limita
 trocas seguidas; se recusar (HTTP 429), a próxima instalação tenta de novo. O ícone do aplicativo no portal do
 Discord não muda pela API: troque à mão em General Information → App Icon, se quiser.
 
 ## Como funciona
 
 ```
-Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runner (host) → <projeto>/project.sh remote
+Discord ⇄ astroverso-discord (bot) ⇄ ~/.astroverso/discord/fila ⇄ astroverso-discord-runner (host) → <projeto>/project.sh remote
 ```
 
 | Pasta ou arquivo | Quem grava | Conteúdo |
@@ -67,7 +67,7 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
    sempre em inglês.
 2. O bot confere se quem pediu está em `DISCORD_USERS`. Ações marcadas pedem confirmação (botões Confirmar e
    Cancelar).
-3. O bot grava o pedido. O `astro-discord-runner.path` (systemd do usuário) acorda o executor (`runner.sh run`).
+3. O bot grava o pedido. O `astroverso-discord-runner.path` (systemd do usuário) acorda o executor (`runner.sh run`).
 4. O executor refaz o catálogo, recusa o que não está nele (ou argumento fora de `[A-Za-z0-9._-]`, até 64
    caracteres), roda a ação com até 10 minutos de limite e grava a resposta.
 5. O bot responde no Discord (até 14 minutos de espera). Cada pedido fica no journal do executor e no canal.
@@ -76,9 +76,9 @@ Discord ⇄ astro-discord (bot) ⇄ ~/.astro/discord/fila ⇄ astro-discord-runn
 
 | Comando | Confirmação | O que faz |
 |---|---|---|
-| `help` | | Lista as operações do astro por grupo (nome, o que é, quando roda e o comando), em uma ou mais mensagens só para quem pediu |
-| `machine:status` | | Máquina: estado. Containers do astro, espaço nos discos, kernel novo pendente e próximos agendamentos |
-| `<projeto>:start` | | `podman start` nos containers `astro-<projeto>*` |
+| `help` | | Lista as operações do Astroverso por grupo (nome, o que é, quando roda e o comando), em uma ou mais mensagens só para quem pediu |
+| `machine:status` | | Máquina: estado. Containers do Astroverso, espaço nos discos, kernel novo pendente e próximos agendamentos |
+| `<projeto>:start` | | `podman start` nos containers `astroverso-<projeto>*` |
 | `<projeto>:stop` | sim | `podman stop`. Com `restart: always`, o container fica parado até o `start`, mesmo depois de reiniciar a máquina |
 | `<projeto>:restart` | sim | `podman restart` |
 | ações dos projetos | conforme o projeto | `remote-actions` de cada projeto, com o prefixo do projeto (`<projeto>:<ação>`) ou com um nome próprio, como `backup:cloud` (rclone); ver o README de cada um |
@@ -90,7 +90,7 @@ executor a cada rodada.
 
 O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltaria pelo Discord.
 
-## Ações (Gerenciar Astro → discord)
+## Ações (Gerenciar Astroverso → discord)
 
 | Ação | O que faz |
 |---|---|
@@ -101,13 +101,13 @@ O próprio bot não aparece em `start`/`stop`/`restart`: parado, ele não voltar
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/discord/.env` | `DISCORD_TOKEN`, `DISCORD_CHANNEL`, `DISCORD_USERS` (`600`) |
-| `~/.astro/discord/fila/` | A fila (fora do backup das configurações) |
-| `~/.config/systemd/user/astro-discord-runner.{path,service}` | O executor de comandos |
+| `~/.astroverso/discord/.env` | `DISCORD_TOKEN`, `DISCORD_CHANNEL`, `DISCORD_USERS` (`600`) |
+| `~/.astroverso/discord/fila/` | A fila (fora do backup das configurações) |
+| `~/.config/systemd/user/astroverso-discord-runner.{path,service}` | O executor de comandos |
 
-Logs: `podman logs -f astro-discord` (bot) e `journalctl --user -fu astro-discord-runner` (comandos executados).
+Logs: `podman logs -f astroverso-discord` (bot) e `journalctl --user -fu astroverso-discord-runner` (comandos executados).
 
 ## Remoção
 
-`remove` tira o container, as imagens e o executor de comandos (`astro-discord-runner`), e apaga
-`~/.astro/discord` (token, canal e fila).
+`remove` tira o container, as imagens e o executor de comandos (`astroverso-discord-runner`), e apaga
+`~/.astroverso/discord` (token, canal e fila).

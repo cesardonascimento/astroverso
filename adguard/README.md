@@ -4,7 +4,7 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 
 ```bash
 ./project.sh install           # pergunta a configuração, prepara o host e sobe o container
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 ## O que vem customizado
@@ -39,8 +39,8 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 Cada domínio informado (`dominio.com` ou `*.dominio.com`) vira a reescrita `*.dominio.com → IP`,
 que cobre todos os subdomínios mas não o domínio puro.
 
-As respostas ficam em `~/.astro/adguard/.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
-a config do AdGuard é regerada, e a anterior fica em `~/.astro/adguard/data/conf/AdGuardHome.yaml.bak`.
+As respostas ficam em `~/.astroverso/adguard/.env`. Ao reinstalar, dá para reaproveitá-las. Se você responder de novo,
+a config do AdGuard é regerada, e a anterior fica em `~/.astroverso/adguard/data/conf/AdGuardHome.yaml.bak`.
 
 ## Rede do host
 
@@ -65,8 +65,8 @@ Depois que o container sobe:
 - Pergunta se esta máquina deve usar só o AdGuard como DNS (via NetworkManager), ignorando o secundário
   do roteador (padrão: não). Só o AdGuard garante os nomes internos na própria máquina, mas a deixa sem
   DNS quando ele está parado; com o secundário ela nunca fica sem DNS
-- Mantendo o secundário, instala a verificação do DNS primário: `astro-dns-check.service`, disparado pelo
-  NetworkManager a cada conexão (`/etc/NetworkManager/dispatcher.d/90-astro-dns-check`). Ela renova a
+- Mantendo o secundário, instala a verificação do DNS primário: `astroverso-dns-check.service`, disparado pelo
+  NetworkManager a cada conexão (`/etc/NetworkManager/dispatcher.d/90-astroverso-dns-check`). Ela renova a
   conexão até 3 vezes se o primeiro DNS entregue pelo roteador não for o AdGuard, espera o AdGuard responder
   (até 5 min) e reinicia o `systemd-resolved` se ele estiver usando o secundário. Log: `journalctl -t adguard`.
   Removida ao escolher "só o AdGuard" ou ao remover o projeto
@@ -76,7 +76,7 @@ Depois que o container sobe:
 
 ## Mudando a configuração padrão
 
-- **Pelo painel**: as alterações ficam em `~/.astro/adguard/data/conf/AdGuardHome.yaml` (entram no backup das
+- **Pelo painel**: as alterações ficam em `~/.astroverso/adguard/data/conf/AdGuardHome.yaml` (entram no backup das
   configurações; a pasta `data/work`, com estatísticas e cache, fica de fora).
 - **Para todas as máquinas**: edite `config/AdGuardHome.yaml.template`, faça commit e reinstale
   respondendo a configuração de novo.
@@ -98,4 +98,4 @@ verificação) e republica o painel no Caddy.
 
 `remove` volta o DNS desta máquina para o automático (se ele estava em "só o AdGuard"), reativa o DNS stub do
 `systemd-resolved`, tira a verificação do DNS primário, o container, as imagens, as liberações e o bloqueio da
-porta no firewall e a rota do Caddy, e apaga `~/.astro/adguard`.
+porta no firewall e a rota do Caddy, e apaga `~/.astroverso/adguard`.

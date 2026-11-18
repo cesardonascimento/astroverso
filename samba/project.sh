@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=samba
+ASTROVERSO_PROJECT=samba
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
@@ -10,8 +10,8 @@ source ../lib/env.sh
 SHARE=Public
 SHARE_DIR="$HOME/Public"
 CONF=/etc/samba/smb.conf
-MARK_BEGIN="# astro samba: inicio"
-MARK_END="# astro samba: fim"
+MARK_BEGIN="# astroverso samba: inicio"
+MARK_END="# astroverso samba: fim"
 
 cmd_describe() {
     echo "Samba: a pasta $SHARE de $USER como pasta de rede (\\\\<ip>\\$SHARE)"
@@ -81,10 +81,10 @@ write_conf() {
         ui_ok "pasta $SHARE já compartilhada em $CONF"
         return
     fi
-    [[ -e $CONF.astro-bak ]] || sudo cp -a "$CONF" "$CONF.astro-bak"
+    [[ -e $CONF.astroverso-bak ]] || sudo cp -a "$CONF" "$CONF.astroverso-bak"
     printf '%s\n' "$wanted" | sudo tee "$CONF" >/dev/null
     if ! testparm -s "$CONF" >/dev/null 2>&1; then
-        sudo cp -a "$CONF.astro-bak" "$CONF"
+        sudo cp -a "$CONF.astroverso-bak" "$CONF"
         ui_fail "configuração do Samba inválida (testparm): $CONF voltou ao que era"
     fi
     ui_ok "pasta $SHARE compartilhada só para $USER ($CONF)"
@@ -137,7 +137,7 @@ cmd_install() {
     ui_step "Acesso"
     ui_ok "Windows: \\\\$(host_lan_ip)\\$SHARE (no Explorador de Arquivos)"
     ui_ok "macOS, Linux e iPhone: smb://$(host_lan_ip)/$SHARE"
-    domain="$(env_get CADDY_DOMAIN "" "$ASTRO_HOME/caddy/.env")"
+    domain="$(env_get CADDY_DOMAIN "" "$ASTROVERSO_HOME/caddy/.env")"
     if [[ -n $domain ]]; then
         ui_ok "pelo nome (em casa e pelo Tailscale, via AdGuard): smb://$(hostname -s).$domain/$SHARE"
     fi

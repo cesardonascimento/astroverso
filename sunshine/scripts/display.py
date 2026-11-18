@@ -5,7 +5,7 @@ import sys
 
 from gi.repository import Gio, GLib
 
-STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "astro-sunshine-display.json")
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "astroverso-sunshine-display.json")
 
 
 def log(message):
@@ -118,7 +118,7 @@ def main():
         awake()
         return
     if action not in ("do", "undo"):
-        log("uso: astro-sunshine-display do | undo | awake")
+        log("uso: astroverso-sunshine-display do | undo | awake")
         return
     try:
         display = proxy()

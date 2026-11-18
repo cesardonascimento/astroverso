@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-# astro
+# Astroverso Homelab
 
 Homelab em containers (Podman), versionado para reinstalar tudo em minutos em qualquer máquina
 se algo der errado. Domínio, IPs, portas e senhas não ficam no código: são perguntados durante a
@@ -30,26 +30,26 @@ Numa máquina com Fedora recém-instalado:
 
 ```bash
 sudo dnf install -y git
-git clone <url-deste-repositório> ~/Projects/astro
-~/Projects/astro/setup.sh
+git clone <url-deste-repositório> ~/Projects/astroverso-homelab
+~/Projects/astroverso-homelab/setup.sh
 ```
 
-Depois da primeira instalação, o assistente abre com o comando `astro`, de qualquer pasta (num terminal novo ou
+Depois da primeira instalação, o assistente abre com o comando `astroverso`, de qualquer pasta (num terminal novo ou
 numa nova entrada pelo SSH).
 
 Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; no menu inicial, fecha o assistente.
 
 | Opção | O que faz |
 |---|---|
-| Instalar Astro | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `sunshine`, `samba` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
-| Reinstalar Astro | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
-| Gerenciar Astro | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
-| Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astro. Ao sair do Claude, `astro` abre o assistente de novo |
-| Gerenciar Astro → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
-| Gerenciar Astro → Administração → Trocar o domínio | Passa todos os serviços para outro domínio (ex.: `app.<domínio-antigo>` → `app.<domínio-novo>`): mostra o que fazer antes na Cloudflare, troca os endereços salvos (guardando uma cópia da configuração), reaplica cada serviço sem refazer as perguntas e, no fim, lista o que mudar fora da máquina (Tailscale, apps do Nextcloud, favoritos) |
-| Gerenciar Astro → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
-| Gerenciar Astro → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
-| Gerenciar Astro → Administração → Implodir Astro | Faz um backup das configurações e desfaz tudo o que o Astro criou na máquina (veja abaixo) |
+| Instalar Astroverso | Instala tudo, sempre na mesma ordem: atualiza o sistema (só na primeira vez), prepara a máquina (uma vez), os discos da máquina, `caddy`, `adguard`, `cockpit`, `nextcloud`, `mailserver`, `discord`, `n8n`, `sunshine`, `samba` e `rclone`. Cada projeto usa o que os anteriores já deixaram pronto (o domínio do Caddy, os discos) |
+| Reinstalar Astroverso | O mesmo, com algum projeto já instalado. Antes, mostra todas as etapas (a data de cada concluída, ou "pendente") e pergunta quais rodar: as pendentes, interrompidas ou com falha já vêm marcadas. Esc volta sem rodar nada. Cada projeto refeito pergunta se usa a configuração já salva |
+| Gerenciar Astroverso | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
+| Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astroverso. Ao sair do Claude, `astroverso` abre o assistente de novo |
+| Gerenciar Astroverso → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
+| Gerenciar Astroverso → Administração → Trocar o domínio | Passa todos os serviços para outro domínio (ex.: `app.<domínio-antigo>` → `app.<domínio-novo>`): mostra o que fazer antes na Cloudflare, troca os endereços salvos (guardando uma cópia da configuração), reaplica cada serviço sem refazer as perguntas e, no fim, lista o que mudar fora da máquina (Tailscale, apps do Nextcloud, favoritos) |
+| Gerenciar Astroverso → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
+| Gerenciar Astroverso → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
+| Gerenciar Astroverso → Administração → Implodir Astroverso | Faz um backup das configurações e desfaz tudo o que o Astroverso criou na máquina (veja abaixo) |
 
 ## Operações e comandos do Discord
 
@@ -83,21 +83,21 @@ tampa de um notebook, para não perder o acesso remoto.
 
 Rode em um terminal normal: o `sudo` pede senha na primeira vez. Enter aceita o valor sugerido entre
 `[ ]`, e respostas em formato inválido (porta, IP, endereço) são recusadas e perguntadas de novo. As
-respostas e tudo o que a instalação gera (dados, certificados, logins) ficam em `~/.astro/<projeto>`, fora do
+respostas e tudo o que a instalação gera (dados, certificados, logins) ficam em `~/.astroverso/<projeto>`, fora do
 repositório: o repositório tem só o código.
 
 ### Em todos os projetos
 
 - **Usar a configuração já salva?** Reaproveita as respostas da última instalação. Responda **N** para
   mudar alguma.
-- **Quais etapas concluídas reinstalar?** Só aparece no "Reinstalar Astro". Uma etapa (Máquina, Discos da
+- **Quais etapas concluídas reinstalar?** Só aparece no "Reinstalar Astroverso". Uma etapa (Máquina, Discos da
   máquina ou um projeto) só conta como concluída quando termina sem erro; uma instalação interrompida no meio
   continua de onde parou. Antes da lista, uma linha mostra as pendentes, que sempre rodam. Enter sem marcar nada pula todas as concluídas; marque com Espaço as que quer refazer
   (ou "Todos").
 
 ### Máquina
 
-Feita uma vez, no início, para todos os projetos: o comando `astro`, suspensão desligada (inclusive na tela de
+Feita uma vez, no início, para todos os projetos: o comando `astroverso`, suspensão desligada (inclusive na tela de
 login), podman-compose, início dos containers no boot, SSH e Tailscale.
 
 - **Anunciar a rede local no Tailscale?** Transforma o servidor em ponte para a rede de casa: de fora,
@@ -114,7 +114,7 @@ login), podman-compose, início dos containers no boot, SSH e Tailscale.
 
 ### Discos da máquina
 
-É a primeira etapa da instalação, antes dos projetos, e também fica em Gerenciar Astro → Administração. Os discos
+É a primeira etapa da instalação, antes dos projetos, e também fica em Gerenciar Astroverso → Administração. Os discos
 de dados são da máquina, não de um projeto: o seu usuário é sempre o dono, e os projetos (Nextcloud, rclone)
 só escolhem quais usar. Um disco plugado de passagem (pendrive, HD externo) não precisa entrar aqui: o
 Fedora o monta para quem está na tela, e de longe ele é acessado pelo Cockpit (Armazenamento e Arquivos, com o
@@ -208,11 +208,11 @@ notificações dos canais de avisos em "Todas as mensagens".
 
 - **Endereço da caixa:** o endereço para onde você encaminha os e-mails. Por padrão, `inbox@<domínio do Caddy>`.
   O domínio do endereço não pode ter outro e-mail: ativar o Email Routing nele troca os registros MX, e o e-mail
-  que já chegava por eles deixaria de chegar. Use um domínio só do astro.
+  que já chegava por eles deixaria de chegar. Use um domínio só do Astroverso.
 - **Domínios autorizados:** de quais domínios a caixa aceita e-mails, separados por vírgula (ex.: o domínio do
   seu e-mail, de onde você encaminha). E-mails de outros domínios, ou sem a autenticação da Cloudflare (SPF ou
   DMARC), vão para a pasta **Quarentena**, que nenhuma automação lê. Assim, um e-mail falso enviado ao endereço não
-  vira uma conta a pagar. Depois, a lista muda em Gerenciar Astro → mailserver → **Domínios autorizados**, que
+  vira uma conta a pagar. Depois, a lista muda em Gerenciar Astroverso → mailserver → **Domínios autorizados**, que
   também oferece mover para a entrada o que já estava na Quarentena vindo de um domínio recém-autorizado.
 - **Usuário do Nextcloud:** aparece com o Nextcloud instalado. A caixa entra no app **Mail** desse usuário como
   "Astro Inbox". Por padrão, o administrador do Nextcloud.
@@ -223,7 +223,7 @@ notificações dos canais de avisos em "Todas as mensagens".
 A instalação ativa sozinha o Email Routing no domínio do endereço. Se esse domínio já recebe e-mail por outro
 serviço, ela para sem mudar nada, porque ativar desviaria esse e-mail.
 
-Quem recebe os e-mails das automações é cadastrado em Gerenciar Astro → mailserver → **Destinatários de e-mail**.
+Quem recebe os e-mails das automações é cadastrado em Gerenciar Astroverso → mailserver → **Destinatários de e-mail**.
 A Cloudflare manda a cada endereço novo um e-mail com um link de confirmação; até a pessoa clicar, nada é enviado
 para ele.
 
@@ -236,7 +236,7 @@ para ele.
 - **Senha do administrador:** pelo menos 8 caracteres. Fica guardada só como hash. Ao reinstalar, o assistente
   pergunta se quer trocá-la.
 - **Chave da API da Anthropic:** usada pelas rotinas de contas para o Claude ler os e-mails de cobrança. Crie em
-  https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astro → n8n →
+  https://console.anthropic.com → API Keys. Enter vazio deixa para depois (em Gerenciar Astroverso → n8n →
   Trocar a chave da API da Anthropic). O conteúdo dos e-mails de cobrança vai para a API da Anthropic.
 
 As **rotinas** ficam no banco do próprio n8n: você as cria, muda e liga pelo editor, e cada versão salva entra no
@@ -250,7 +250,7 @@ As rotinas de contas a pagar usadas hoje:
 
 | Rotina | O que faz |
 |---|---|
-| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai o tipo da conta (Internet, Energia, Água: o tipo da despesa, não o nome da empresa), titular, valor, vencimento, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o astro confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do **mês de vencimento**, numa pasta do cofre do Obsidian, com aviso no Discord. Confia em todo e-mail da caixa e lê o corpo e **todos os anexos**: PDFs (inclusive com senha, guardadas no nó ⚙️ Configuração, e escaneados) e fotos ou imagens de boletos. O Pix é lido direto do QR Code dos anexos, sem IA; o Claude só procura códigos quando não há QR Code e preenche nome, valor e vencimento. Cada código de pagamento vira uma conta, então um e-mail pode trazer várias. Anexo que não deu para ler e mês que não foi gravado (arquivo aberto no Nextcloud) aparecem no aviso do Discord; e-mail sem nenhuma conta vira um item "⚠️ revisar". Sem PDF anexo, baixa o boleto pelo link do e-mail (escolhido pelo texto do link, como "Visualizar boleto" ou "2ª via"). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. |
+| Contas: leitura | A cada e-mail na entrada do mailserver, o Claude extrai o tipo da conta (Internet, Energia, Água: o tipo da despesa, não o nome da empresa), titular, valor, vencimento, código (boleto ou Pix) e quem enviou o e-mail original (num encaminhamento); o Astroverso confere os dígitos do código e grava a conta no arquivo `AAAA-MM.md` do **mês de vencimento**, numa pasta do cofre do Obsidian, com aviso no Discord. Confia em todo e-mail da caixa e lê o corpo e **todos os anexos**: PDFs (inclusive com senha, guardadas no nó ⚙️ Configuração, e escaneados) e fotos ou imagens de boletos. O Pix é lido direto do QR Code dos anexos, sem IA; o Claude só procura códigos quando não há QR Code e preenche nome, valor e vencimento. Cada código de pagamento vira uma conta, então um e-mail pode trazer várias. Anexo que não deu para ler e mês que não foi gravado (arquivo aberto no Nextcloud) aparecem no aviso do Discord; e-mail sem nenhuma conta vira um item "⚠️ revisar". Sem PDF anexo, baixa o boleto pelo link do e-mail (escolhido pelo texto do link, como "Visualizar boleto" ou "2ª via"). Cada conta ganha a imagem do código para pagar com a câmera do celular: QR Code do Pix ou, sem Pix, código de barras do boleto. |
 | Contas: notificação mensal | No dia 5 de cada mês, às 08:00, manda por e-mail as contas que vencem no mês, no mesmo formato do arquivo, aos destinatários do ⚙️ Configuração e avisa no Discord. Pelo Discord, `contas:email` envia na hora |
 
 O n8n vem isolado: sem telemetria, sem aviso de versão nova e sem a galeria de modelos, que conversam com os
@@ -285,7 +285,7 @@ O espelho noturno copia um disco inteiro para outro disco da máquina, toda noit
 - **Por quantos dias guardar o que for apagado ou alterado:** cada noite, o que mudou ou sumiu vai para uma
   pasta com a data, em vez de ser perdido. Passado esse prazo, a pasta é apagada. Por padrão, `30`.
 - **Adicionar um armazenamento em nuvem agora?** Liga a cópia fora de casa. Dá para adicionar depois, em
-  Gerenciar Astro → rclone. Sem nenhum disco da máquina, não aparece: a cópia da nuvem precisa de um disco.
+  Gerenciar Astroverso → rclone. Sem nenhum disco da máquina, não aparece: a cópia da nuvem precisa de um disco.
   - **Qual armazenamento em nuvem?** O serviço. Hoje, o Proton Drive.
   - **Nome do armazenamento** e **pasta dentro do disco:** onde a cópia da nuvem fica no disco. Por padrão,
     uma pasta com o nome do serviço (ex.: `proton`). A raiz do disco não é aceita, para caber mais de um
@@ -300,9 +300,9 @@ O espelho noturno copia um disco inteiro para outro disco da máquina, toda noit
   certificados, logins, bancos de dados) vira um arquivo criptografado numa subpasta com o nome do serviço
   (ex.: `nextcloud/nextcloud.tar.zst.gpg`). Dentro dele fica só a pasta do serviço, sem o nome do usuário: dá para
   restaurar em outra máquina, com outro usuário.
-  Por padrão, `Astro/Configurações` dentro da pasta do primeiro armazenamento em nuvem: assim ele segue para a
+  Por padrão, `Astroverso/Configurações` dentro da pasta do primeiro armazenamento em nuvem: assim ele segue para a
   nuvem e para o disco de backup nas rodadas seguintes. Sem nenhum disco da máquina, o backup das configurações
-  fica desligado até um disco ser cadastrado e o Astro reinstalado.
+  fica desligado até um disco ser cadastrado e o Astroverso reinstalado.
 - **Senha do backup das configurações:** criptografa esse arquivo. **Guarde-a fora da máquina** (num gerenciador
   de senhas): sem ela, o backup não abre. Na reinstalação, o assistente pergunta se mantém a atual.
 
@@ -313,7 +313,7 @@ O espelho noturno copia um disco inteiro para outro disco da máquina, toda noit
 Os horários: sincronização com a nuvem de 2 em 2 horas, das 08:00 às 20:00; 01:00 backup das configurações;
 03:00 uma última sincronização com a nuvem e o espelho no disco de backup.
 
-**Restaurar uma versão** (Gerenciar Astro → Administração): mostra as versões da mais nova para a mais antiga e os serviços de
+**Restaurar uma versão** (Gerenciar Astroverso → Administração): mostra as versões da mais nova para a mais antiga e os serviços de
 cada uma. Antes de trocar qualquer coisa, o assistente para o rclone (se estiver copiando algo, pergunta antes) e
 salva a situação atual como uma versão "antes da restauração", para dar para voltar. Depois, para cada serviço
 escolhido: para os containers, troca a configuração pela do backup e sobe de novo. Se a senha atual não abrir a
@@ -360,11 +360,11 @@ aparece o app **Desktop**. A tela do HDMI fica sempre acesa (mostrando a tela de
 transmite uma tela apagada; a do notebook, com a tampa fechada, fica desligada. Ao terminar, reinicie a máquina e
 pareie cada aparelho pelo painel do Sunshine (PIN).
 
-### Implodir Astro
+### Implodir Astroverso
 
-Fica em Gerenciar Astro → Administração. Desfaz tudo o que o Astro criou, na ordem inversa da instalação:
-containers, imagens, serviços e a configuração de todos os projetos (`~/.astro`), a pasta local de arquivos do Nextcloud, as montagens dos discos em `/srv` (o TPM dos discos criptografados
-é descadastrado e eles voltam a abrir só com a senha) e os ajustes da máquina feitos para o Astro: suspensão,
+Fica em Gerenciar Astroverso → Administração. Desfaz tudo o que o Astroverso criou, na ordem inversa da instalação:
+containers, imagens, serviços e a configuração de todos os projetos (`~/.astroverso`), a pasta local de arquivos do Nextcloud, as montagens dos discos em `/srv` (o TPM dos discos criptografados
+é descadastrado e eles voltam a abrir só com a senha) e os ajustes da máquina feitos para o Astroverso: suspensão,
 firewall, DNS, portas baixas, a rede anunciada no Tailscale e o início automático no boot. Ficam os pacotes
 instalados (sistema atualizado, Tailscale, driver da NVIDIA, Cockpit, Sunshine, rclone), os dados dos
 discos, o SSH ligado (só volta o login por senha) e o repositório.
@@ -372,9 +372,9 @@ discos, o SSH ligado (só volta o login por senha) e o repositório.
 - **Para confirmar, digite IMPLODIR:** qualquer outra resposta cancela sem mudar nada.
 - **Pasta e senha do backup:** antes de desfazer qualquer coisa, a configuração de cada serviço vai para uma
   versão `antes-de-implodir` do backup das configurações. Com o backup do rclone ligado, usa a pasta e a senha
-  dele, sem perguntar. Sem ele, pergunta uma pasta (por padrão, `Astro/Configurações` no primeiro disco da máquina)
+  dele, sem perguntar. Sem ele, pergunta uma pasta (por padrão, `Astroverso/Configurações` no primeiro disco da máquina)
   e uma senha. **Guarde a senha fora da máquina.** Depois de reinstalar, use essa pasta como "pasta do backup das
-  configurações" do rclone e restaure em Gerenciar Astro → Administração. Se o backup falhar, nada é desfeito.
+  configurações" do rclone e restaure em Gerenciar Astroverso → Administração. Se o backup falhar, nada é desfeito.
 
 ### Depois de instalar
 
@@ -388,7 +388,7 @@ Filtros, um filtro por remetente (ex.: as empresas das contas) com a ação de e
 de confirmação para o endereço novo: ele chega na pasta Quarentena do app Mail do Nextcloud, com o link para
 confirmar.
 
-Para o **Contas: notificação mensal**: cadastre os destinatários em Gerenciar Astro → mailserver → Destinatários de
+Para o **Contas: notificação mensal**: cadastre os destinatários em Gerenciar Astroverso → mailserver → Destinatários de
 e-mail (cada um confirma pelo link que recebe) e escreva os mesmos endereços em `destinatarios` no ⚙️ Configuração
 da rotina, separados por vírgula.
 

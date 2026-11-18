@@ -1,4 +1,4 @@
-name: astro
+name: astroverso
 
 x-podman:
   in_pod: false
@@ -6,9 +6,9 @@ x-podman:
 services:
   mailserver:
     image: docker.io/dovecot/dovecot:2.4.5
-    container_name: astro-mailserver
+    container_name: astroverso-mailserver
     restart: always
     volumes:
-      - ${ASTRO_STATE}/data/vmail:/srv/vmail:Z,U
-      - ${ASTRO_STATE}/data/users:/etc/dovecot/users:ro,Z
-      - ./dovecot.conf:/etc/dovecot/conf.d/astro.conf:ro,z
+      - ${ASTROVERSO_STATE}/data/vmail:/srv/vmail:Z,U
+      - ${ASTROVERSO_STATE}/data/users:/etc/dovecot/users:ro,Z
+      - ./dovecot.conf:/etc/dovecot/conf.d/astroverso.conf:ro,z

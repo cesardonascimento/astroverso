@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=astro
+ASTROVERSO_PROJECT=astroverso
 source lib/ui.sh
 source lib/host.sh
 source lib/env.sh
@@ -14,7 +14,7 @@ trap '_ui_cursor_show; echo; ui_warn "cancelado"; exit 130' INT
 
 ORDER=(caddy adguard cockpit nextcloud mailserver discord n8n sunshine samba rclone)
 IMPLODE_WORD=IMPLODIR
-DONE_DIR="$ASTRO_HOME/.concluidas"
+DONE_DIR="$ASTROVERSO_HOME/.concluidas"
 
 PROJECTS=()
 for name in "${ORDER[@]}"; do
@@ -103,7 +103,7 @@ run_step() {
     set -e
     if ((status == 0)); then
         mkdir -p "$DONE_DIR"
-        chmod 700 "$ASTRO_HOME" "$DONE_DIR"
+        chmod 700 "$ASTROVERSO_HOME" "$DONE_DIR"
         touch "$DONE_DIR/$step"
         succeeded+=("$(step_label "$step")")
     else
@@ -111,7 +111,7 @@ run_step() {
     fi
 }
 
-install_astro() {
+install_astroverso() {
     local name step label status first=true redo=" " i chosen=() steps=(maquina discos "${PROJECTS[@]}") labels=() preset=""
     local failed=() succeeded=() skipped=() any_done=false
     for i in "${!steps[@]}"; do
@@ -182,9 +182,9 @@ backup_default() {
     local mount
     mount="$(disk_mounts | awk 'NR == 1 { print $1 }')"
     if [[ -n $mount ]]; then
-        printf '%s/Astro/Configurações' "$mount"
+        printf '%s/Astroverso/Configurações' "$mount"
     else
-        printf '%s/astro-backup' "$HOME"
+        printf '%s/astroverso-backup' "$HOME"
     fi
 }
 
@@ -192,8 +192,8 @@ implode_backup() {
     local dest key password status=0
     ui_step "Backup antes de implodir"
     command -v zstd >/dev/null && command -v gpg >/dev/null || ui_fail "o backup precisa do zstd e do gpg: sudo dnf install -y zstd gnupg2"
-    dest="$(env_get CONFIG_BACKUP "" "$ASTRO_HOME/rclone/.env")"
-    key="$ASTRO_HOME/rclone/data/config-backup.key"
+    dest="$(env_get CONFIG_BACKUP "" "$ASTROVERSO_HOME/rclone/.env")"
+    key="$ASTROVERSO_HOME/rclone/data/config-backup.key"
     if [[ -n $dest && -s $key ]]; then
         ui_info "usando a pasta e a senha do backup das configurações do rclone: $dest"
         ./rclone/run.sh config antes-de-implodir
@@ -203,8 +203,8 @@ implode_backup() {
     ui_info "depois de reinstalar, use essa pasta como \"pasta do backup das configurações\" do rclone para restaurar"
     while true; do
         ui_input dest "pasta do backup" "$(backup_default)" is_path
-        if [[ $dest == "$ASTRO_HOME" || $dest == "$ASTRO_HOME"/* ]]; then
-            ui_warn "$ASTRO_HOME é apagada na implosão: escolha outra pasta"
+        if [[ $dest == "$ASTROVERSO_HOME" || $dest == "$ASTROVERSO_HOME"/* ]]; then
+            ui_warn "$ASTROVERSO_HOME é apagada na implosão: escolha outra pasta"
         elif mkdir -p "$dest" 2>/dev/null && [[ -w $dest ]]; then
             break
         else
@@ -213,18 +213,18 @@ implode_backup() {
     done
     ui_warn "guarde esta senha fora da máquina (ex.: gerenciador de senhas): sem ela, o backup não abre"
     ui_secret password "senha do backup"
-    key="$(mktemp -p /var/tmp astro-key.XXXXXX)"
+    key="$(mktemp -p /var/tmp astroverso-key.XXXXXX)"
     printf '%s' "$password" > "$key"
-    ASTRO_BACKUP_DEST="$dest" ASTRO_BACKUP_KEY="$key" ./rclone/run.sh config antes-de-implodir || status=$?
+    ASTROVERSO_BACKUP_DEST="$dest" ASTROVERSO_BACKUP_KEY="$key" ./rclone/run.sh config antes-de-implodir || status=$?
     rm -f "$key"
     return "$status"
 }
 
 implode() {
     local answer i name failed=() succeeded=()
-    ui_step "Implodir Astro"
-    ui_warn "isto desfaz tudo o que o Astro criou nesta máquina:"
-    ui_info "  containers, imagens, serviços e a configuração de todos os projetos ($ASTRO_HOME)"
+    ui_step "Implodir Astroverso"
+    ui_warn "isto desfaz tudo o que o Astroverso criou nesta máquina:"
+    ui_info "  containers, imagens, serviços e a configuração de todos os projetos ($ASTROVERSO_HOME)"
     ui_info "  a pasta local de arquivos do Nextcloud"
     ui_info "  as montagens dos discos em $DISK_ROOT e o TPM dos discos criptografados"
     ui_info "  os ajustes da máquina: suspensão, firewall, DNS, portas, rede anunciada no Tailscale e início no boot"
@@ -257,17 +257,17 @@ implode() {
 
     ui_step "Máquina"
     host_undo
-    if podman network exists astro_default 2>/dev/null; then
-        podman network rm -f astro_default >/dev/null
-        ui_ok "rede astro_default apagada"
+    if podman network exists astroverso_default 2>/dev/null; then
+        podman network rm -f astroverso_default >/dev/null
+        ui_ok "rede astroverso_default apagada"
     fi
     podman image prune -f >/dev/null 2>&1 || true
-    rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/astro"
+    rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/astroverso"
     if ((${#failed[@]})); then
-        ui_warn "$ASTRO_HOME mantida, porque algum projeto falhou: corrija e rode a implosão de novo"
-    elif [[ -e $ASTRO_HOME ]]; then
-        podman unshare rm -rf "$ASTRO_HOME"
-        ui_ok "$ASTRO_HOME apagada"
+        ui_warn "$ASTROVERSO_HOME mantida, porque algum projeto falhou: corrija e rode a implosão de novo"
+    elif [[ -e $ASTROVERSO_HOME ]]; then
+        podman unshare rm -rf "$ASTROVERSO_HOME"
+        ui_ok "$ASTROVERSO_HOME apagada"
     fi
     summary
     ui_info "o repositório continua aqui: para instalar de novo, rode o setup.sh"
@@ -281,7 +281,7 @@ domain_before() {
     ui_info "2. o token do Caddy precisa enxergar a zona nova: https://dash.cloudflare.com/profile/api-tokens →"
     ui_info "   o token do Caddy → Edit → Zone Resources → Include → Specific zone → $new (Zone:Read e DNS:Edit)"
     ui_info "   (se ele não enxergar, a reinstalação do Caddy pede um token novo)"
-    if [[ -f $ASTRO_HOME/mailserver/.env ]]; then
+    if [[ -f $ASTROVERSO_HOME/mailserver/.env ]]; then
         ui_info "3. o mesmo vale para o token do mailserver, se ele já estiver instalado"
     fi
 }
@@ -295,11 +295,11 @@ domain_after() {
     ui_info "- apps do Nextcloud (celular e computador) e agendas/contatos: entre de novo com o endereço novo"
     ui_info "- favoritos e senhas salvas no navegador ou no gerenciador de senhas: atualize os endereços"
     ui_info "- o Moonlight não muda (usa o IP); o painel do Sunshine passa a ter o endereço novo"
-    if [[ -f $ASTRO_HOME/mailserver/.env ]]; then
+    if [[ -f $ASTROVERSO_HOME/mailserver/.env ]]; then
         ui_info "- mailserver: ative o Email Routing em $new pela Cloudflare (o assistente do mailserver mostra como)"
-        ui_info "  e troque o encaminhamento no seu e-mail para $(env_get MAIL_ADDRESS "" "$ASTRO_HOME/mailserver/.env")"
+        ui_info "  e troque o encaminhamento no seu e-mail para $(env_get MAIL_ADDRESS "" "$ASTROVERSO_HOME/mailserver/.env")"
     fi
-    ui_info "- o domínio antigo continua com o que já tinha fora do astro (site, e-mail): nada muda nele"
+    ui_info "- o domínio antigo continua com o que já tinha fora do Astroverso (site, e-mail): nada muda nele"
 }
 
 domain_rewrite() {
@@ -357,13 +357,13 @@ def routes(path, label):
 routes(os.path.join(home, "caddy", ".routes"), "rota manual")
 for name in os.listdir(home):
     routes(os.path.join(home, name, ".proxy"), "")
-' "$ASTRO_HOME" "$1" "$2"
+' "$ASTROVERSO_HOME" "$1" "$2"
 }
 
 change_domain() {
     local old new name key before after backup affected=() failed=() succeeded=() skipped=() redo
     ui_step "Trocar o domínio"
-    old="$(env_get CADDY_DOMAIN "" "$ASTRO_HOME/caddy/.env")"
+    old="$(env_get CADDY_DOMAIN "" "$ASTROVERSO_HOME/caddy/.env")"
     [[ -n $old ]] || { ui_warn "o Caddy não está configurado: não há domínio para trocar"; return 0; }
     ui_info "domínio atual: $old"
     ui_input new "domínio novo" "" is_hostname
@@ -374,13 +374,13 @@ change_domain() {
     domain_before "$new"
     ui_confirm "trocar $old por $new em todos os serviços?" n || { ui_warn "cancelado, nada mudou"; return 0; }
 
-    backup="$ASTRO_HOME/.troca-de-dominio/$(date +%Y-%m-%d_%H%M%S)"
+    backup="$ASTROVERSO_HOME/.troca-de-dominio/$(date +%Y-%m-%d_%H%M%S)"
     mkdir -p "$backup"
-    chmod 700 "$ASTRO_HOME/.troca-de-dominio" "$backup"
-    for name in "$ASTRO_HOME"/*/.env; do
+    chmod 700 "$ASTROVERSO_HOME/.troca-de-dominio" "$backup"
+    for name in "$ASTROVERSO_HOME"/*/.env; do
         cp -p "$name" "$backup/$(basename "$(dirname "$name")").env"
     done
-    [[ ! -f $ASTRO_HOME/caddy/.routes ]] || cp -p "$ASTRO_HOME/caddy/.routes" "$backup/caddy.routes"
+    [[ ! -f $ASTROVERSO_HOME/caddy/.routes ]] || cp -p "$ASTROVERSO_HOME/caddy/.routes" "$backup/caddy.routes"
     ui_ok "configuração atual guardada em $backup"
 
     ui_step "Endereços"
@@ -399,7 +399,7 @@ change_domain() {
         if grep -q '^    domain)' "$name/project.sh"; then
             run_step "$name" project "$name" domain "$old" "$new"
         else
-            run_step "$name" env ASTRO_REUSE_CONFIG=1 "./$name/project.sh" install
+            run_step "$name" env ASTROVERSO_REUSE_CONFIG=1 "./$name/project.sh" install
         fi
     done
     summary || true
@@ -411,7 +411,7 @@ administration() {
     while true; do
         global_actions
         globals=${#GLOBAL_IDS[@]}
-        ui_menu index "Administração" "Discos da máquina" "Trocar o domínio" "${GLOBAL_LABELS[@]}" "Implodir Astro" "Voltar"
+        ui_menu index "Administração" "Discos da máquina" "Trocar o domínio" "${GLOBAL_LABELS[@]}" "Implodir Astroverso" "Voltar"
         if ((index == 0)); then
             disk_manage || true
         elif ((index == 1)); then
@@ -440,7 +440,7 @@ manage() {
             candidates+=("$name")
             labels+=("$(printf '%-14s %s' "$name" "$(project "$name" describe)")")
         done
-        ui_menu index "Gerenciar Astro" "${labels[@]}" "Administração" "Voltar"
+        ui_menu index "Gerenciar Astroverso" "${labels[@]}" "Administração" "Voltar"
         if ((index < ${#candidates[@]})); then
             project_actions "${candidates[index]}" || true
         elif ((index == ${#candidates[@]})); then
@@ -457,29 +457,29 @@ manage() {
 dev_mode() {
     local history="$HOME/.claude/projects/${PWD//[^A-Za-z0-9]/-}"
     ui_step "Modo desenvolvimento"
-    ui_info "abrindo o Claude Code em $PWD (para sair: /exit; para voltar ao assistente: astro)"
+    ui_info "abrindo o Claude Code em $PWD (para sair: /exit; para voltar ao assistente: astroverso)"
     if compgen -G "$history/*.jsonl" >/dev/null; then
         exec claude --continue
     fi
     exec claude
 }
 
-ui_step "Astro: ${#PROJECTS[@]} projeto(s): ${PROJECTS[*]}"
+ui_step "Astroverso: ${#PROJECTS[@]} projeto(s): ${PROJECTS[*]}"
 while true; do
     if installed_any; then
-        install_label="Reinstalar Astro"
+        install_label="Reinstalar Astroverso"
     else
-        install_label="Instalar Astro"
+        install_label="Instalar Astroverso"
     fi
-    options=("$install_label" "Gerenciar Astro")
+    options=("$install_label" "Gerenciar Astroverso")
     command -v claude >/dev/null && options+=("Modo desenvolvimento")
     options+=("Sair")
     ui_menu choice "O que você quer fazer?" "${options[@]}"
     case ${options[choice]} in
-        "Gerenciar Astro")      manage || true ;;
+        "Gerenciar Astroverso")  manage || true ;;
         "Modo desenvolvimento") dev_mode ;;
         "Sair")                 ui_info "até mais!"; break ;;
-        *)                      install_astro || true ;;
+        *)                      install_astroverso || true ;;
     esac
     echo
 done

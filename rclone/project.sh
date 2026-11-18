@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=rclone
+ASTROVERSO_PROJECT=rclone
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
@@ -10,7 +10,7 @@ source ../lib/disk.sh
 source common.sh
 
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-UNIT_PREFIX=astro-rclone
+UNIT_PREFIX=astroverso-rclone
 TICK_CALENDAR=("*-*-* 08..20/2:00:00")
 CONFIG_CALENDAR="*-*-* 01:00:00"
 LOCAL_CALENDAR="*-*-* 03:00:00"
@@ -143,7 +143,7 @@ pick_data_disk() {
         fi
     done < <(data_disks "$skip")
     if ((${#mounts[@]} == 0)); then
-        ui_fail "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astro → Administração → Discos da máquina"
+        ui_fail "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astroverso → Administração → Discos da máquina"
     fi
     ui_menu choice "$title" "${labels[@]}"
     __pick_out=${mounts[choice]}
@@ -218,7 +218,7 @@ backup_disk() {
     mount="$(env_get BACKUP_MOUNT)"
     [[ -n $mount ]] || return 0
     if ! mountpoint -q "$mount"; then
-        ui_warn "$mount não está montado: o espelho fica parado até ele voltar (veja Gerenciar Astro → Administração → Discos da máquina)"
+        ui_warn "$mount não está montado: o espelho fica parado até ele voltar (veja Gerenciar Astroverso → Administração → Discos da máquina)"
         return 0
     fi
     [[ $(disk_type "$mount") == compartilhado ]] && ui_warn "$mount é compartilhado: todos os usuários da máquina leem o espelho"
@@ -234,12 +234,12 @@ write_unit() {
 }
 
 service_unit() {
-    printf '[Unit]\nDescription=astro rclone: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTRO_PLAIN=1\nNice=19\nCPUSchedulingPolicy=idle\nIOSchedulingClass=idle\nExecStart=%s %s\n' \
+    printf '[Unit]\nDescription=astroverso rclone: %s\nAfter=network-online.target\n\n[Service]\nType=oneshot\nTimeoutStartSec=infinity\nEnvironment=ASTROVERSO_PLAIN=1\nNice=19\nCPUSchedulingPolicy=idle\nIOSchedulingClass=idle\nExecStart=%s %s\n' \
         "$1" "$PWD/run.sh" "$2"
 }
 
 timer_unit() {
-    printf '[Unit]\nDescription=astro rclone: %s\n\n[Timer]\n' "$1"
+    printf '[Unit]\nDescription=astroverso rclone: %s\n\n[Timer]\n' "$1"
     shift
     printf 'OnCalendar=%s\n' "$@"
     printf 'Persistent=true\n\n[Install]\nWantedBy=timers.target\n'
@@ -316,7 +316,7 @@ schedule_import() {
     else
         systemctl --user stop "$UNIT_PREFIX-import-$name.timer" 2>/dev/null || true
         systemd-run --user --quiet --collect --unit "$UNIT_PREFIX-import-$name" \
-            --on-calendar "$(date -d "@$at" '+%F %T')" --setenv ASTRO_PLAIN=1 "$PWD/run.sh" tick
+            --on-calendar "$(date -d "@$at" '+%F %T')" --setenv ASTROVERSO_PLAIN=1 "$PWD/run.sh" tick
         ui_ok "primeira cópia agendada para $(date -d "@$at" '+%d/%m às %H:%M')"
         ui_info "se a máquina reiniciar antes, ela começa na próxima sincronização (das 08:00 às 20:00)"
     fi
@@ -449,11 +449,11 @@ cmd_install() {
         done
     elif [[ -z $(disk_mounts) ]]; then
         ui_warn "nenhum disco da máquina: a cópia da nuvem precisa de um disco para ficar"
-        ui_info "cadastre um em Gerenciar Astro → Administração → Discos da máquina e reinstale o Astro"
+        ui_info "cadastre um em Gerenciar Astroverso → Administração → Discos da máquina e reinstale o Astroverso"
     elif ui_confirm "adicionar um armazenamento em nuvem agora?" y; then
         action_add
     else
-        ui_info "adicione depois em Gerenciar Astro → rclone"
+        ui_info "adicione depois em Gerenciar Astroverso → rclone"
     fi
 
     ui_step "Backup das configurações"
@@ -461,7 +461,7 @@ cmd_install() {
 
     ui_step "Agendamentos"
     schedules
-    if ! podman container exists astro-discord 2>/dev/null; then
+    if ! podman container exists astroverso-discord 2>/dev/null; then
         ui_info "para receber avisos com botões quando algo der errado, instale também o projeto discord"
     fi
 }
@@ -470,16 +470,16 @@ config_backup_setup() {
     local dest default="" name password days disk
     name="$(target_names | head -1)"
     if [[ -n $name ]]; then
-        default="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)/Astro/Configurações"
+        default="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)/Astroverso/Configurações"
     else
         disk="$(env_get SOURCE)"
         [[ -n $disk ]] || disk="$(disk_mounts | awk 'NR == 1 { print $1 }')"
-        [[ -z $disk ]] || default="$disk/Astro/Configurações"
+        [[ -z $disk ]] || default="$disk/Astroverso/Configurações"
     fi
     default="$(env_get CONFIG_BACKUP "$default")"
     if [[ -z $default ]]; then
         ui_warn "nenhum disco da máquina: o backup das configurações fica desligado"
-        ui_info "cadastre um em Gerenciar Astro → Administração → Discos da máquina e reinstale o Astro"
+        ui_info "cadastre um em Gerenciar Astroverso → Administração → Discos da máquina e reinstale o Astroverso"
         sed -i '/^CONFIG_BACKUP=/d;/^CONFIG_KEEP_DAYS=/d' "$ENV_FILE"
         printf "CONFIG_BACKUP=''\nCONFIG_KEEP_DAYS='90'\n" >> "$ENV_FILE"
         return 0
@@ -594,7 +594,7 @@ action_restore() {
     flock -n 7 || ui_fail "um backup das configurações está em andamento; tente de novo"
     ui_ok "rclone parado: nenhuma rodada começa até o fim da restauração"
 
-    work="$(mktemp -d -p /var/tmp astro-restore.XXXXXX)"
+    work="$(mktemp -d -p /var/tmp astroverso-restore.XXXXXX)"
     mkdir -p "$work/gnupg" "$work/extract"
     chmod 700 "$work" "$work/gnupg"
     key="$CONFIG_KEY"
@@ -611,7 +611,7 @@ action_restore() {
     fi
 
     ui_step "Backup da situação atual"
-    if ! ASTRO_LOCKED=1 ./run.sh config antes-da-restauracao 7>&- 8>&-; then
+    if ! ASTROVERSO_LOCKED=1 ./run.sh config antes-da-restauracao 7>&- 8>&-; then
         podman unshare rm -rf "$work"
         ui_fail "o backup da situação atual falhou: nada foi alterado"
     fi
@@ -627,7 +627,7 @@ action_restore() {
     for service in "${picked[@]}"; do
         ui_step "Restaurando $service"
         if [[ $service == host ]]; then
-            cp "$work/extract/host/host.env" "$ASTRO_HOME/host.env" && restored+=(host) || failed+=(host)
+            cp "$work/extract/host/host.env" "$ASTROVERSO_HOME/host.env" && restored+=(host) || failed+=(host)
         elif [[ $service == rclone ]]; then
             cmd_restore "$work/extract/rclone" && restored+=(rclone) || failed+=(rclone)
         elif [[ -x ../$service/project.sh ]] && grep -q '^    restore)' "../$service/project.sh"; then

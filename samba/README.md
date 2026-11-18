@@ -5,7 +5,7 @@ das pastas compartilhadas do Windows) para a rede local, só com o usuário e a 
 
 ```bash
 ./project.sh install           # instala o Samba, compartilha a ~/Public e libera a rede local
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 Como o cockpit, não roda em container: o Samba do sistema já entende os usuários, as permissões e o SELinux da
@@ -21,14 +21,14 @@ máquina, e a pasta compartilhada é do usuário que instala.
 ## O que a instalação faz
 
 - Instala o pacote `samba` (Fedora ou Debian/Ubuntu).
-- Acrescenta ao fim do `/etc/samba/smb.conf`, entre `# astro samba: inicio` e `# astro samba: fim`, o
+- Acrescenta ao fim do `/etc/samba/smb.conf`, entre `# astroverso samba: inicio` e `# astroverso samba: fim`, o
   compartilhamento `[Public]` e, num `[global]` próprio, `multicast dns register = no`: `path = ~/Public`, `valid users = <usuário>`, gravação liberada. O resto do arquivo
-  fica como veio do sistema (cópia em `smb.conf.astro-bak` antes da primeira mudança). A configuração é conferida
+  fica como veio do sistema (cópia em `smb.conf.astroverso-bak` antes da primeira mudança). A configuração é conferida
   pelo `testparm`; se falhar, o arquivo volta ao que era.
 - **Só a `Public` na rede:** no mesmo bloco, desliga os compartilhamentos que vêm prontos no Fedora (`[homes]`,
   o home inteiro; `[printers]` e `[print$]`, impressoras e drivers para Windows) com `available = no`, e o suporte
   a impressoras (`load printers = no`, `disable spoolss = yes`). O Samba aceita repetir uma seção, e o valor do
-  astro, no fim do arquivo, vale.
+  Astroverso, no fim do arquivo, vale.
 - **SELinux:** marca `~/Public` com `samba_share_t` (`semanage fcontext` + `restorecon`), o único lugar do home
   que o Samba lê e grava. Arquivos criados dentro da pasta
   herdam o rótulo; um arquivo **movido** de outro lugar do home mantém o rótulo antigo e não aparece pela rede até
@@ -60,6 +60,6 @@ Tira o bloco do `smb.conf`, o usuário do Samba, o rótulo do SELinux e a libera
 
 | Caminho | O que é |
 |---|---|
-| `~/.astro/samba/.env` | `SHARE_DIR` (a pasta compartilhada) |
-| `/etc/samba/smb.conf` | bloco `[global]` (sem mDNS e sem impressoras), `[homes]`/`[printers]`/`[print$]` desligados e `[Public]` entre as marcas do astro |
+| `~/.astroverso/samba/.env` | `SHARE_DIR` (a pasta compartilhada) |
+| `/etc/samba/smb.conf` | bloco `[global]` (sem mDNS e sem impressoras), `[homes]`/`[printers]`/`[print$]` desligados e `[Public]` entre as marcas do Astroverso |
 | `/var/lib/samba/private/passdb.tdb` | senha do Samba (do sistema, fora do backup) |

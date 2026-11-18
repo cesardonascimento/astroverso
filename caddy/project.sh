@@ -2,12 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=caddy
+ASTROVERSO_PROJECT=caddy
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
 
-CONTAINER=astro-caddy
+CONTAINER=astroverso-caddy
 ROUTES="$STATE/.routes"
 CADDYFILE="$STATE/data/etc/Caddyfile"
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
@@ -52,7 +52,7 @@ route_lines() {
 
 project_route_lines() {
     local file owner
-    for file in "$ASTRO_HOME"/*/.proxy; do
+    for file in "$ASTROVERSO_HOME"/*/.proxy; do
         [[ -f $file ]] || continue
         owner="$(basename "$(dirname "$file")")"
         [[ $owner != caddy ]] || continue
@@ -183,7 +183,7 @@ wait_certificate() {
     domain="$(env_get CADDY_DOMAIN)"
     https_port="$(env_get HTTPS_PORT 443)"
     ui_info "aguardando o certificado *.$domain do Let's Encrypt (até 3 minutos)..."
-    if timeout 180 bash -c "until openssl s_client -connect 127.0.0.1:$https_port -servername astro-check.$domain \
+    if timeout 180 bash -c "until openssl s_client -connect 127.0.0.1:$https_port -servername astroverso-check.$domain \
             -verify_return_error </dev/null >/dev/null 2>&1; do sleep 3; done"; then
         ui_ok "certificado válido do Let's Encrypt para *.$domain"
     else

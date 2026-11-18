@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=nextcloud
+ASTROVERSO_PROJECT=nextcloud
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
@@ -10,9 +10,9 @@ source ../lib/proxy.sh
 source ../lib/brand.sh
 source ../lib/disk.sh
 
-CONTAINER=astro-nextcloud
-CONTAINERS=(astro-nextcloud-cron astro-nextcloud astro-nextcloud-redis astro-nextcloud-db)
-NETWORK=astro_default
+CONTAINER=astroverso-nextcloud
+CONTAINERS=(astroverso-nextcloud-cron astroverso-nextcloud astroverso-nextcloud-redis astroverso-nextcloud-db)
+NETWORK=astroverso_default
 SECRETS="$STATE/data/secrets"
 CONFIG="$STATE/data/html/config/config.php"
 OVERRIDE="$STATE/docker-compose.override.yml"
@@ -49,7 +49,7 @@ choose_disks() {
         labels+=("$(printf '%-28s %s' "$target" "$type")")
     done < <(disk_mounts)
     if ((${#paths[@]} == 0)); then
-        ui_info "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astro → Administração → Discos da máquina"
+        ui_info "nenhum disco da máquina em $DISK_ROOT: cadastre em Gerenciar Astroverso → Administração → Discos da máquina"
     else
         ui_checklist chosen "Quais discos aparecem no Nextcloud?" --selected "$preset" "${labels[@]}"
         for i in "${chosen[@]}"; do picked+=("${paths[i]}"); done
@@ -102,7 +102,7 @@ storage() {
     wid="$(container_uid 33)"
     for path in "${paths[@]}"; do
         if ! mountpoint -q "$path"; then
-            ui_warn "$path não está montado: fica fora do Nextcloud (veja Gerenciar Astro → Administração → Discos da máquina)"
+            ui_warn "$path não está montado: fica fora do Nextcloud (veja Gerenciar Astroverso → Administração → Discos da máquina)"
             continue
         fi
         if ! disk_responds "$path"; then
@@ -110,7 +110,7 @@ storage() {
             continue
         fi
         if ! findmnt -no OPTIONS "$path" | grep -q container_file_t; then
-            ui_warn "$path foi montado sem a liberação para containers: rode Gerenciar Astro → Administração → Discos da máquina"
+            ui_warn "$path foi montado sem a liberação para containers: rode Gerenciar Astroverso → Administração → Discos da máquina"
             continue
         fi
         NC_DISKS+=("$path")
@@ -314,7 +314,7 @@ theme() {
         key="${item%%:*}"
         file="$BRAND_DIR/${item#*:}"
         [[ -f $file ]] || continue
-        target="/tmp/astro-$key.png"
+        target="/tmp/astroverso-$key.png"
         podman cp "$file" "$CONTAINER:$target"
         occ theming:config "$key" "$target" >/dev/null
         podman exec "$CONTAINER" rm -f "$target"
@@ -401,7 +401,7 @@ cmd_backup() {
     local dump="$STATE/backup" files
     mkdir -p "$dump"
     if cmd_status; then
-        if ! podman exec astro-nextcloud-db pg_dump -U nextcloud -d nextcloud -Fc > "$dump/nextcloud.pgdump.new"; then
+        if ! podman exec astroverso-nextcloud-db pg_dump -U nextcloud -d nextcloud -Fc > "$dump/nextcloud.pgdump.new"; then
             rm -f "$dump/nextcloud.pgdump.new"
             ui_error "falha no dump do banco do Nextcloud"
             return 1

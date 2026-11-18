@@ -1,7 +1,7 @@
-ASTRO_HOME="$HOME/.astro"
-STATE="$ASTRO_HOME/${ASTRO_PROJECT:-astro}"
+ASTROVERSO_HOME="$HOME/.astroverso"
+STATE="$ASTROVERSO_HOME/${ASTROVERSO_PROJECT:-astroverso}"
 ENV_FILE="$STATE/.env"
-export ASTRO_STATE="$STATE"
+export ASTROVERSO_STATE="$STATE"
 
 env_get() {
     local value
@@ -15,7 +15,7 @@ compose() {
 
 config_reuse() {
     [[ -f $ENV_FILE ]] || return 1
-    if [[ ${ASTRO_REUSE_CONFIG:-} == 1 ]]; then
+    if [[ ${ASTROVERSO_REUSE_CONFIG:-} == 1 ]]; then
         ui_info "usando a configuração salva em $ENV_FILE"
         return 0
     fi
@@ -24,7 +24,7 @@ config_reuse() {
 
 state_setup() {
     mkdir -p "$STATE"
-    chmod 700 "$ASTRO_HOME" "$STATE"
+    chmod 700 "$ASTROVERSO_HOME" "$STATE"
 }
 
 state_purge() {
@@ -55,8 +55,8 @@ images_remove() {
 state_restore() {
     local from=$1 keep
     shift
-    [[ -d $from && -f $from/.env ]] || ui_fail "backup incompleto: $from não tem a configuração do $ASTRO_PROJECT"
-    mkdir -p "$ASTRO_HOME"
+    [[ -d $from && -f $from/.env ]] || ui_fail "backup incompleto: $from não tem a configuração do $ASTROVERSO_PROJECT"
+    mkdir -p "$ASTROVERSO_HOME"
     if [[ -d $STATE ]]; then
         podman unshare rm -rf "$STATE.restaurando"
         podman unshare mv "$STATE" "$STATE.restaurando"
@@ -70,7 +70,7 @@ state_restore() {
     done
     podman unshare rm -rf "$STATE.restaurando"
     chmod 700 "$STATE"
-    ui_ok "configuração do $ASTRO_PROJECT restaurada em $STATE"
+    ui_ok "configuração do $ASTROVERSO_PROJECT restaurada em $STATE"
 }
 
 is_port() {

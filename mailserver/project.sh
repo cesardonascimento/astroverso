@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=mailserver
+ASTROVERSO_PROJECT=mailserver
 NOTIFY_CHANNEL=sistema
 source ../lib/ui.sh
 source ../lib/host.sh
@@ -10,18 +10,18 @@ source ../lib/env.sh
 source ../lib/proxy.sh
 source ../lib/notify.sh
 
-CONTAINER=astro-mailserver
-NEXTCLOUD=astro-nextcloud
+CONTAINER=astroverso-mailserver
+NEXTCLOUD=astroverso-nextcloud
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
-WORKER=astro-mailserver
-KV_TITLE=astro-mailserver
+WORKER=astroverso-mailserver
+KV_TITLE=astroverso-mailserver
 COMPATIBILITY_DATE=2026-10-01
 MAIL_USER=inbox
 IMAP_PORT=31143
 SMTP_PORT=31587
 QUARANTINE=Quarentena
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-FETCH_UNIT=astro-mailserver-fetch
+FETCH_UNIT=astroverso-mailserver-fetch
 FETCH_CALENDAR=("*-*-* 08..19:00/5:00" "*-*-* 20:00:00")
 DOORBELL=campainha
 LOCK="$STATE/.fetch.lock"
@@ -40,7 +40,7 @@ cmd_status() {
 cmd_actions() {
     printf '%s\n' \
         "domains|Domínios autorizados (ver, adicionar, remover)" \
-        "recipients|Destinatários de e-mail (quem pode receber os envios do astro)" \
+        "recipients|Destinatários de e-mail (quem pode receber os envios do Astroverso)" \
         "fetch|Buscar os e-mails agora" \
         "reprocess|Reprocessar e-mails (entregar de novo na entrada, para as rotinas lerem outra vez)" \
         "access|Mostrar os dados de acesso à caixa (IMAP)"
@@ -128,7 +128,7 @@ token_instructions() {
     ui_info "a instalação usa um token de API da Cloudflare só deste projeto (o do Caddy não serve)"
     ui_info "como criar (2 minutos):"
     ui_info "  1. abra https://dash.cloudflare.com/profile/api-tokens → Create Token → Custom token (Get started)"
-    ui_info "  2. nome: astro mailserver; permissões (Add more para cada linha):"
+    ui_info "  2. nome: astroverso mailserver; permissões (Add more para cada linha):"
     ui_info "       Account → Workers Scripts → Edit"
     ui_info "       Account → Workers KV Storage → Edit"
     ui_info "       Zone → Email Routing Rules → Edit"
@@ -176,14 +176,14 @@ configure() {
         ui_ok "configuração existente mantida"
     else
         domain="$(proxy_domain)"
-        ui_info "endereço que vai receber os e-mails encaminhados, num domínio sem outro e-mail (ex.: o domínio do astro)"
+        ui_info "endereço que vai receber os e-mails encaminhados, num domínio sem outro e-mail (ex.: o domínio do Astroverso)"
         ui_input address "endereço da caixa" "$(env_get MAIL_ADDRESS "${domain:+inbox@$domain}")" is_email
         ui_info "só os e-mails destes domínios (com SPF ou DMARC válidos) vão para a entrada; os outros vão para a pasta $QUARANTINE"
         ui_input domains "domínios autorizados, separados por vírgula (ex.: o domínio do seu e-mail)" \
             "$(env_get ALLOWED_DOMAINS "$(domains_from_senders "$(env_get ALLOWED_SENDERS)")")" is_domains
         if [[ -x ../nextcloud/project.sh ]] && ../nextcloud/project.sh status; then
             ui_input nc_user "usuário do Nextcloud que recebe a caixa no app Mail" \
-                "$(env_get NEXTCLOUD_USER "$(env_get ADMIN_USER "" "$ASTRO_HOME/nextcloud/.env")")" is_name
+                "$(env_get NEXTCLOUD_USER "$(env_get ADMIN_USER "" "$ASTROVERSO_HOME/nextcloud/.env")")" is_name
         fi
         TOKEN=""
     fi
@@ -235,7 +235,7 @@ routing_ensure() {
     fi
     if [[ -n $ROUTING_MX ]]; then
         ui_error "$domain já recebe e-mail por $ROUTING_MX"
-        ui_fail "ativar o Email Routing desviaria esse e-mail: use um endereço num domínio sem e-mail (ex.: o domínio do astro)"
+        ui_fail "ativar o Email Routing desviaria esse e-mail: use um endereço num domínio sem e-mail (ex.: o domínio do Astroverso)"
     fi
     ui_info "ativando o Email Routing em $domain (a Cloudflare cria e trava os registros MX e SPF)..."
     if ! cf_call ignored 'None' POST "zones/$zone/email/routing/dns" \
@@ -290,7 +290,7 @@ PYEOF
 workers_dev() {
     local sub ignored
     if ! cf_call sub 'r.get("subdomain", "")' GET "accounts/$ACCOUNT_ID/workers/subdomain" 2>/dev/null || [[ -z $sub ]]; then
-        sub="astro-$(openssl rand -hex 4)"
+        sub="astroverso-$(openssl rand -hex 4)"
         cf_call ignored 'None' PUT "accounts/$ACCOUNT_ID/workers/subdomain" \
             -H 'Content-Type: application/json' --data-binary "$(cf_json subdomain "$sub")" \
             || ui_fail "não foi possível criar o endereço workers.dev da conta"
@@ -320,7 +320,7 @@ cloudflare_setup() {
     if [[ -z $kv ]]; then
         cf_call kv 'r["id"]' POST "accounts/$ACCOUNT_ID/storage/kv/namespaces" \
             -H 'Content-Type: application/json' --data-binary "$(cf_json title "$KV_TITLE")" || ui_fail "não foi possível criar o KV"
-        ui_ok "KV $KV_TITLE criado (guarda cada e-mail até o astro buscar)"
+        ui_ok "KV $KV_TITLE criado (guarda cada e-mail até o Astroverso buscar)"
     else
         ui_ok "KV $KV_TITLE já existe"
     fi
@@ -335,7 +335,7 @@ cloudflare_setup() {
 import json, sys
 address, worker = sys.argv[1:]
 print(json.dumps({
-    "name": "astro mailserver",
+    "name": "astroverso mailserver",
     "enabled": True,
     "matchers": [{"type": "literal", "field": "to", "value": address}],
     "actions": [{"type": "worker", "value": [worker]}],
@@ -381,10 +381,10 @@ start_container() {
 
 fetch_units() {
     mkdir -p "$UNIT_DIR"
-    printf '[Unit]\nDescription=astro mailserver: busca os e-mails na Cloudflare\nAfter=network-online.target\n\n[Service]\nType=oneshot\nEnvironment=ASTRO_PLAIN=1\nExecStart=%s fetch\n' \
+    printf '[Unit]\nDescription=astroverso mailserver: busca os e-mails na Cloudflare\nAfter=network-online.target\n\n[Service]\nType=oneshot\nEnvironment=ASTROVERSO_PLAIN=1\nExecStart=%s fetch\n' \
         "$PWD/project.sh" > "$UNIT_DIR/$FETCH_UNIT.service"
     {
-        printf '[Unit]\nDescription=astro mailserver: confere a campainha de 5 em 5 minutos, das 08:00 às 20:00\n\n[Timer]\n'
+        printf '[Unit]\nDescription=astroverso mailserver: confere a campainha de 5 em 5 minutos, das 08:00 às 20:00\n\n[Timer]\n'
         printf 'OnCalendar=%s\n' "${FETCH_CALENDAR[@]}"
         printf '\n[Install]\nWantedBy=timers.target\n'
     } > "$UNIT_DIR/$FETCH_UNIT.timer"
@@ -549,10 +549,10 @@ cmd_fetch() {
 
 quarantine_release() {
     local domain=$1 count
-    count="$({ podman exec "$CONTAINER" doveadm search -u "$MAIL_USER" mailbox "$QUARANTINE" header X-Astro-Mailserver "@$domain" 2>/dev/null || true; } | wc -l)"
+    count="$({ podman exec "$CONTAINER" doveadm search -u "$MAIL_USER" mailbox "$QUARANTINE" header X-Astroverso-Mailserver "@$domain" 2>/dev/null || true; } | wc -l)"
     ((count > 0)) || return 0
     ui_confirm "mover da $QUARANTINE para a entrada os $count e-mail(s) de @$domain?" y || return 0
-    podman exec "$CONTAINER" doveadm move -u "$MAIL_USER" INBOX mailbox "$QUARANTINE" header X-Astro-Mailserver "@$domain" >/dev/null 2>&1
+    podman exec "$CONTAINER" doveadm move -u "$MAIL_USER" INBOX mailbox "$QUARANTINE" header X-Astroverso-Mailserver "@$domain" >/dev/null 2>&1
     ui_ok "$count e-mail(s) de @$domain movidos para a entrada"
 }
 
@@ -665,7 +665,7 @@ action_recipients() {
     ACCOUNT_ID="$(env_get ACCOUNT_ID)"
     while true; do
         ui_step "Destinatários de e-mail"
-        ui_info "o astro só envia e-mails para endereços confirmados: a Cloudflare manda um link de confirmação para cada um"
+        ui_info "o Astroverso só envia e-mails para endereços confirmados: a Cloudflare manda um link de confirmação para cada um"
         ids=(); emails=(); states=()
         if recipients_list; then
             while IFS=$'\t' read -r id email line; do

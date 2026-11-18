@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=cockpit
+ASTROVERSO_PROJECT=cockpit
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh

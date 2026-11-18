@@ -5,7 +5,7 @@ só na rede local, pelo Caddy, e sem comunicação com os servidores da empresa 
 
 ```bash
 ./project.sh install           # perguntas, containers e rota no Caddy
-./project.sh remove            # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove            # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ./project.sh remote contas:email [AAAA-MM]   # envia agora o e-mail das contas (padrão: mês atual; o mesmo do Discord)
 ```
 
@@ -24,9 +24,9 @@ só na rede local, pelo Caddy, e sem comunicação com os servidores da empresa 
 | Item | Como |
 |---|---|
 | Versão | `n8nio/n8n` e `n8nio/runners` fixadas em `docker-compose.yml`, sempre na mesma versão |
-| Containers | `astro-n8n` (editor, agendamentos e execuções) e `astro-n8n-runners` (roda o código do nó Code, em JavaScript ou Python, separado do n8n), na rede `astro_default`, sem porta no host |
-| Endereço | `https://<endereço>` pelo Caddy (`http://astro-n8n:5678`); webhooks com o mesmo endereço, só na rede local |
-| Banco | SQLite em `~/.astro/n8n/data/n8n` |
+| Containers | `astroverso-n8n` (editor, agendamentos e execuções) e `astroverso-n8n-runners` (roda o código do nó Code, em JavaScript ou Python, separado do n8n), na rede `astroverso_default`, sem porta no host |
+| Endereço | `https://<endereço>` pelo Caddy (`http://astroverso-n8n:5678`); webhooks com o mesmo endereço, só na rede local |
+| Banco | SQLite em `~/.astroverso/n8n/data/n8n` |
 | Administrador | criado pela instalação por variáveis de ambiente (`N8N_INSTANCE_OWNER_*`), reaplicado a cada início; e-mail, nome e senha ficam travados na interface e mudam pela reinstalação |
 | Chave de criptografia | `N8N_ENCRYPTION_KEY`, gerada uma vez no `.env`: protege as credenciais cadastradas no n8n |
 | Isolamento | telemetria, aviso de versão nova e galeria de modelos desligados, ganchos de diagnóstico vazios (página "Isolate n8n" da documentação); o assistente de IA da n8n fica desligado |
@@ -50,26 +50,26 @@ rotinas apontam para esses `id`, que não mudam entre instalações:
 
 | Credencial (`id`) | Origem |
 |---|---|
-| Astro: caixa inbox (IMAP) (`astroImapInbox01`) | `astro-mailserver:31143`, usuário `inbox`, `IMAP_PASSWORD` do mailserver |
-| Astro: bot do Discord (`astroDiscordBot01`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
-| Astro: Nextcloud (`astroNextcloud001`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astro-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
-| Astro: API da Anthropic (`astroAnthropic001`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
-| Astro: envio de e-mail (`astroEnvioEmail01`) | cabeçalho `X-Astro-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
-| Astro: chamadas do assistente (`astroHookAstro001`) | cabeçalho `X-Astro-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo astro |
+| Astroverso: caixa inbox (IMAP) (`astroImapInbox01`) | `astroverso-mailserver:31143`, usuário `inbox`, `IMAP_PASSWORD` do mailserver |
+| Astroverso: bot do Discord (`astroDiscordBot01`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
+| Astroverso: Nextcloud (`astroNextcloud001`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astroverso-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
+| Astroverso: API da Anthropic (`astroAnthropic001`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
+| Astroverso: envio de e-mail (`astroEnvioEmail01`) | cabeçalho `X-Astro-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
+| Astroverso: chamadas do assistente (`astroHookAstro001`) | cabeçalho `X-Astro-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo Astroverso |
 
 **Pelo Discord:** `contas:email [AAAA-MM]` (`remote-actions` do projeto) chama o webhook `POST
-/webhook/astro-contas-email` de dentro do container `astro-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave
+/webhook/astro-contas-email` de dentro do container `astroverso-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave
 das chamadas pela entrada padrão, corpo `{"mes": "AAAA-MM"}`; sem mês, a rotina usa o atual) e devolve o campo `mensagem` da resposta. A rotina
 que atende esse webhook precisa da credencial "chamadas do assistente" e de resposta pelo último nó; sem ela
 ligada, o comando avisa. O comando `help` do projeto põe `mailserver:fetch` e `contas:email` no grupo Contas.
 
 ## Executor de código
 
-O `astro-n8n-runners` usa uma imagem própria (`Dockerfile`, construída na instalação a partir de `n8nio/runners` na
+O `astroverso-n8n-runners` usa uma imagem própria (`Dockerfile`, construída na instalação a partir de `n8nio/runners` na
 mesma versão do n8n): as bibliotecas `qrcode` e `pngjs` (versões fixadas, usadas pelas rotinas de contas para desenhar o QR
 Code do Pix e o código de barras), `mupdf` e `zxing-wasm` (leitura de QR Codes) e o módulo `astro-qr` (pasta
 `astro-qr`: abre o PDF, com as senhas se precisar, desenha as páginas e devolve os QR Codes encontrados; também lê
-imagens) ficam em `/opt/astro/node_modules` (`NODE_PATH`), e o `/etc/n8n-task-runners.json` libera `qrcode`, `pngjs`
+imagens) ficam em `/opt/astroverso/node_modules` (`NODE_PATH`), e o `/etc/n8n-task-runners.json` libera `qrcode`, `pngjs`
 e `astro-qr` em `NODE_FUNCTION_ALLOW_EXTERNAL` (junto do `moment` de fábrica). A rotina Contas: leitura lê o Pix
 dos QR Codes dos anexos antes de chamar o Claude. A versão
 do `ARG N8N_VERSION` acompanha a do `n8nio/n8n` no `docker-compose.yml`.
@@ -88,11 +88,11 @@ A restauração para o n8n, troca a configuração e carrega a exportação num 
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.astro/n8n/.env` | Endereço, fuso, dados do administrador, chave de criptografia, token do executor de código, `ANTHROPIC_API_KEY`, `NEXTCLOUD_APP_PASSWORD` e `N8N_HOOK_TOKEN` (600) |
-| `~/.astro/n8n/data/owner_password_hash` | Hash bcrypt da senha do administrador |
-| `~/.astro/n8n/data/n8n` | Banco, configuração e exportação do backup do n8n |
+| `~/.astroverso/n8n/.env` | Endereço, fuso, dados do administrador, chave de criptografia, token do executor de código, `ANTHROPIC_API_KEY`, `NEXTCLOUD_APP_PASSWORD` e `N8N_HOOK_TOKEN` (600) |
+| `~/.astroverso/n8n/data/owner_password_hash` | Hash bcrypt da senha do administrador |
+| `~/.astroverso/n8n/data/n8n` | Banco, configuração e exportação do backup do n8n |
 
 ## Remoção
 
-`remove` apaga os containers, as imagens, a rota do Caddy e `~/.astro/n8n` (rotinas, credenciais e histórico). As
+`remove` apaga os containers, as imagens, a rota do Caddy e `~/.astroverso/n8n` (rotinas, credenciais e histórico). As
 rotinas só voltam por um backup das configurações.

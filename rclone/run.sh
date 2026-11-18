@@ -2,14 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=rclone
+ASTROVERSO_PROJECT=rclone
 NOTIFY_CHANNEL=dados
 source ../lib/ui.sh
 source ../lib/env.sh
 source ../lib/notify.sh
 source common.sh
 
-CONFIG_KEY="${ASTRO_BACKUP_KEY:-$CONFIG_KEY}"
+CONFIG_KEY="${ASTROVERSO_BACKUP_KEY:-$CONFIG_KEY}"
 
 MAX_DELETE=5
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
@@ -73,7 +73,7 @@ cloud_title() {
 }
 
 lock() {
-    [[ ${ASTRO_LOCKED:-} == 1 ]] && return 0
+    [[ ${ASTROVERSO_LOCKED:-} == 1 ]] && return 0
     exec 9>"${2:-$LOCK}"
     if [[ $1 == wait ]]; then
         flock 9
@@ -325,7 +325,7 @@ config_prune() {
 
 config_backup() {
     local dest work disk version label=${1:-}
-    dest="${ASTRO_BACKUP_DEST:-$(env_get CONFIG_BACKUP)}"
+    dest="${ASTROVERSO_BACKUP_DEST:-$(env_get CONFIG_BACKUP)}"
     if [[ -z $dest ]]; then
         ui_info "backup das configurações não configurado"
         return 0
@@ -338,16 +338,16 @@ config_backup() {
     if [[ $disk == /srv/* ]]; then
         disk_ready "$disk" || return 1
     fi
-    work="$(mktemp -d -p /var/tmp astro-config.XXXXXX)"
+    work="$(mktemp -d -p /var/tmp astroverso-config.XXXXXX)"
     mkdir -p "$work/gnupg"
     chmod 700 "$work/gnupg"
     version="$(date +%F_%H%M%S)${label:+_$label}"
     ui_step "Backup: configurações ➡️ local: $dest/$version/<serviço>/<serviço>.tar.zst.gpg"
     local dir service saved=() failed=0
-    for dir in "$ASTRO_HOME"/*/; do
+    for dir in "$ASTROVERSO_HOME"/*/; do
         service="$(basename "$dir")"
         if service_parts "$service" \
-                && service_archive "$service" "$work/$service.tar" "${ASTRO_HOME#/}/$service" \
+                && service_archive "$service" "$work/$service.tar" "${ASTROVERSO_HOME#/}/$service" \
                 && service_publish "$service" "$work" "$dest/$version"; then
             saved+=("$service")
         else
@@ -355,10 +355,10 @@ config_backup() {
             failed=1
         fi
     done
-    if [[ -f $ASTRO_HOME/host.env ]]; then
+    if [[ -f $ASTROVERSO_HOME/host.env ]]; then
         PART_EXCLUDES=()
         PART_ADDS=()
-        if service_archive host "$work/host.tar" "${ASTRO_HOME#/}/host.env" && service_publish host "$work" "$dest/$version"; then
+        if service_archive host "$work/host.tar" "${ASTROVERSO_HOME#/}/host.env" && service_publish host "$work" "$dest/$version"; then
             saved+=(host)
         else
             ui_error "host: backup das configurações falhou"

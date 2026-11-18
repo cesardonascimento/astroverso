@@ -19,7 +19,7 @@ def call(token, method, path, body=None):
     request = urllib.request.Request(f"{API}/{path}", data=data, method=method, headers={
         "Authorization": f"Bot {token}",
         "Content-Type": "application/json",
-        "User-Agent": "astro (homelab, 1.0)",
+        "User-Agent": "astroverso (homelab, 1.0)",
     })
     try:
         with urllib.request.urlopen(request, timeout=20) as response:

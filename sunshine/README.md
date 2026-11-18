@@ -6,7 +6,7 @@ mouse e controles.
 
 ```bash
 ./project.sh install           # instala, configura e publica o painel do Sunshine no Caddy
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
 Como o cockpit, não roda em container: o Sunshine precisa da sessão gráfica, da GPU e de criar controles
@@ -28,10 +28,10 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
 - **Codificação pela Intel:** no Fedora, troca o `libva-intel-media-driver` (sem H.264/HEVC) pelo
   `intel-media-driver` do RPM Fusion, para o Sunshine codificar pela placa integrada quando a tela estiver nela.
 - **NVIDIA como placa principal:** com o driver proprietário, uma regra do udev
-  (`61-astro-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
+  (`61-astroverso-mutter-primary-gpu.rules`, tag `mutter-device-preferred-primary`) faz o GNOME desenhar a tela
   e rodar os aplicativos na NVIDIA, sem copiar cada quadro da Intel. O GNOME escolhe a placa principal assim
   que começa, e no boot a NVIDIA aparece alguns segundos depois da Intel: por isso o GDM espera por ela
-  (`gdm.service.d/astro-nvidia.conf`, `udevadm wait` de até 30s no `/dev/dri/by-path/pci-<placa>-card`). Se ela
+  (`gdm.service.d/astroverso-nvidia.conf`, `udevadm wait` de até 30s no `/dev/dri/by-path/pci-<placa>-card`). Se ela
   não aparecer, o GDM sobe mesmo assim.
 - **Apps Flatpak com a NVIDIA:** com a NVIDIA como placa principal, um app Flatpak que desenha pela placa de vídeo
   (ex.: a loja Bazaar) só abre com a extensão `org.freedesktop.Platform.GL.nvidia-<versão>` (ramo `1.4`) igual à do
@@ -39,7 +39,7 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   driver atual pelo Flathub e tira as de versões antigas. Depois de uma atualização do driver, rode a instalação
   de novo.
 - **Login automático com a tela bloqueada:** configura o GDM (`custom.conf`) para entrar com o usuário que
-  instala no boot, e o serviço de usuário `astro-sunshine-lock` (com a `graphical-session.target`) bloqueia a
+  instala no boot, e o serviço de usuário `astroverso-sunshine-lock` (com a `graphical-session.target`) bloqueia a
   sessão logo depois: `loginctl lock-session` na sessão gráfica, repetido a cada 2s até o GNOME confirmar
   (`LockedHint`), por até 1 minuto. O início automático do GNOME (`~/.config/autostart`) não serve: no GNOME 50, o
   comando roda antes de o GNOME conseguir bloquear. O Sunshine sobe com a sessão e transmite a tela de
@@ -55,7 +55,7 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   atualização do pacote as apaga.
 - **Tela no HDMI:** confere se há uma tela ligada na saída da NVIDIA (monitor ou plugue HDMI fantasma). Se não
   houver, avisa: o stream sai pela Intel, sem NVENC, e só com a tampa aberta.
-- **Configuração em `~/.astro/sunshine/config`:** com `~/.config/sunshine` como atalho para lá. Uma pasta real
+- **Configuração em `~/.astroverso/sunshine/config`:** com `~/.config/sunshine` como atalho para lá. Uma pasta real
   em `~/.config/sunshine` é movida (sem perder os pareamentos). Assim ela entra no backup das configurações, sem
   os logs.
 - **Captura pelo KMS:** grava `capture = kms` no `sunshine.conf`. Sem isso, o Sunshine também tenta o portal
@@ -65,17 +65,17 @@ virtuais (`/dev/uinput`, `/dev/uhid`), e usa várias portas UDP.
   Sunshine recusa qualquer alteração feita pelo painel (inclusive criar a senha) com "CSRF Protection Error".
 - **Apps no Moonlight:** o `apps.json` fica com **Desktop** (`scripts/apps.py`). Os apps de fábrica que não
   servem aqui ("Low Res Desktop", com `xrandr`, e "Steam Big Picture") saem; um app criado pelo painel é mantido.
-  A capa do Desktop é `logo/capa-moonlight.png`, copiada para `~/.astro/sunshine/config/covers/desktop.png`.
-- **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astro-sunshine-display` e
+  A capa do Desktop é `logo/capa-moonlight.png`, copiada para `~/.astroverso/sunshine/config/covers/desktop.png`.
+- **Resolução de cada aparelho:** instala `scripts/display.py` em `/usr/local/bin/astroverso-sunshine-display` e
   o registra como comando global de preparo (`global_prep_cmd`) no `sunshine.conf`. No início de cada stream,
   ele troca a tela, pelo DBus do Mutter, para a resolução exata do aparelho (se a tela aceitar) e volta no fim.
   Se o `sunshine.conf` já tiver um `global_prep_cmd` próprio, não mexe e avisa.
 - **Tela sempre acesa:** com a sessão bloqueada, o GNOME apaga a tela em segundos, e o Sunshine não captura uma
   tela apagada: ao iniciar, falha ("Unable to initialize capture method") e não se recupera; numa conexão, testa
-  os codificadores antes do `global_prep_cmd`. O serviço de usuário `astro-sunshine-awake`
-  (`astro-sunshine-display awake`) acende a tela de novo (`PowerSaveMode` do Mutter pelo DBus) sempre que o GNOME a
+  os codificadores antes do `global_prep_cmd`. O serviço de usuário `astroverso-sunshine-awake`
+  (`astroverso-sunshine-display awake`) acende a tela de novo (`PowerSaveMode` do Mutter pelo DBus) sempre que o GNOME a
   apaga. Com a tampa fechada, só a saída HDMI fica acesa, mostrando a tela de bloqueio; o painel do notebook
-  continua desligado. Um drop-in no serviço do Sunshine (`~/.config/systemd/user/<serviço>.d/astro.conf`) o faz
+  continua desligado. Um drop-in no serviço do Sunshine (`~/.config/systemd/user/<serviço>.d/astroverso.conf`) o faz
   subir depois do bloqueio e com a tela acesa.
 - Habilita o serviço de usuário do Sunshine: ele sobe com a sessão gráfica, aberta pelo login automático.
 - Libera no firewall as portas do Moonlight: TCP `47984`, `47989` e `48010`, UDP `47998-48000`, `48002` e
@@ -91,18 +91,18 @@ nele, escolha a máquina e digite no painel (PIN) o código que o Moonlight most
 
 Desliga o login automático, o serviço de bloqueio no login e o que mantém a tela acesa, desabilita o serviço do Sunshine, tira o `setcap`, o ajuste de
 resolução, a regra da placa principal e a espera do GDM, fecha as portas, tira a rota do Caddy e apaga
-`~/.astro/sunshine` com o atalho `~/.config/sunshine`. Ficam o pacote do Sunshine e o driver da NVIDIA.
+`~/.astroverso/sunshine` com o atalho `~/.config/sunshine`. Ficam o pacote do Sunshine e o driver da NVIDIA.
 
 ## Arquivos
 
 | Caminho | O que é |
 |---|---|
-| `~/.astro/sunshine/.env` | `SUNSHINE_HOST` |
-| `~/.astro/sunshine/config/` | configuração do Sunshine (`sunshine.conf`, `apps.json`, pareamentos, credenciais) |
-| `~/.astro/sunshine/.proxy` | rota do painel no Caddy |
-| `~/.config/systemd/user/astro-sunshine-lock.service` | bloqueio da tela logo depois do login automático |
-| `/usr/local/bin/astro-sunshine-display` | troca de resolução durante o stream (`do`/`undo`) e tela acesa (`awake`) |
-| `~/.config/systemd/user/astro-sunshine-awake.service` | mantém a tela acesa durante a sessão |
-| `~/.config/systemd/user/<serviço do Sunshine>.d/astro.conf` | Sunshine depois do bloqueio e da tela acesa |
-| `/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules` | NVIDIA como placa principal do GNOME |
-| `/etc/systemd/system/gdm.service.d/astro-nvidia.conf` | GDM espera a NVIDIA no boot |
+| `~/.astroverso/sunshine/.env` | `SUNSHINE_HOST` |
+| `~/.astroverso/sunshine/config/` | configuração do Sunshine (`sunshine.conf`, `apps.json`, pareamentos, credenciais) |
+| `~/.astroverso/sunshine/.proxy` | rota do painel no Caddy |
+| `~/.config/systemd/user/astroverso-sunshine-lock.service` | bloqueio da tela logo depois do login automático |
+| `/usr/local/bin/astroverso-sunshine-display` | troca de resolução durante o stream (`do`/`undo`) e tela acesa (`awake`) |
+| `~/.config/systemd/user/astroverso-sunshine-awake.service` | mantém a tela acesa durante a sessão |
+| `~/.config/systemd/user/<serviço do Sunshine>.d/astroverso.conf` | Sunshine depois do bloqueio e da tela acesa |
+| `/etc/udev/rules.d/61-astroverso-mutter-primary-gpu.rules` | NVIDIA como placa principal do GNOME |
+| `/etc/systemd/system/gdm.service.d/astroverso-nvidia.conf` | GDM espera a NVIDIA no boot |

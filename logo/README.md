@@ -34,12 +34,12 @@ Todas as variantes são PNG com fundo transparente, recortadas das imagens origi
 
 Derivados, com fundo (sem transparência):
 
-| Arquivo | O que é | Onde o astro usa |
+| Arquivo | O que é | Onde o Astroverso usa |
 |---|---|---|
 | `icone.png` | símbolo num quadrado de 512×512 | ícone do Nextcloud, foto do bot do Discord |
 | `favicon.ico` | o mesmo ícone em 16 a 256 px | ícone de aba de navegador |
-| `quadrado.png` | símbolo centralizado em 256×256, fundo azul espacial (o da `original.png`) | ícones e avatares fora do astro |
-| `quadrado-alt.png` | o mesmo em fundo claro (o da `original-alt.png`), com o símbolo azul-marinho | ícones e avatares fora do astro |
+| `quadrado.png` | símbolo centralizado em 256×256, fundo azul espacial (o da `original.png`) | ícones e avatares fora do Astroverso |
+| `quadrado-alt.png` | o mesmo em fundo claro (o da `original-alt.png`), com o símbolo azul-marinho | ícones e avatares fora do Astroverso |
 | `capa-moonlight.png` | logo vertical numa capa em pé, 600×900 (2:3) | capa do app Desktop no Moonlight (sunshine) |
 
 O Nextcloud usa também o `simbolo.png` como logo (login e barra de cima).

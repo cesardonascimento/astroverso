@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-DNS_IP=${1:?uso: astro-dns-check IP_DO_ADGUARD}
+DNS_IP=${1:?uso: astroverso-dns-check IP_DO_ADGUARD}
 RENEW_ATTEMPTS=3
 WAIT_SECONDS=300
 

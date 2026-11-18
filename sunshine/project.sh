@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-ASTRO_PROJECT=sunshine
+ASTROVERSO_PROJECT=sunshine
 source ../lib/ui.sh
 source ../lib/host.sh
 source ../lib/env.sh
@@ -16,16 +16,16 @@ GDM_CONFS=(/etc/gdm/custom.conf /etc/gdm3/custom.conf /etc/gdm3/daemon.conf)
 UNITS=(/usr/lib/systemd/user/app-dev.lizardbyte.app.Sunshine.service /usr/lib/systemd/user/sunshine.service)
 NVIDIA_VENDOR=0x10de
 FLATPAK_GL_BRANCH=1.4
-MUTTER_RULE=/etc/udev/rules.d/61-astro-mutter-primary-gpu.rules
-GDM_WAIT=/etc/systemd/system/gdm.service.d/astro-nvidia.conf
-DISPLAY_BIN=/usr/local/bin/astro-sunshine-display
+MUTTER_RULE=/etc/udev/rules.d/61-astroverso-mutter-primary-gpu.rules
+GDM_WAIT=/etc/systemd/system/gdm.service.d/astroverso-nvidia.conf
+DISPLAY_BIN=/usr/local/bin/astroverso-sunshine-display
 PREP_CMD="[{\"do\":\"$DISPLAY_BIN do\",\"undo\":\"$DISPLAY_BIN undo\",\"elevated\":false}]"
 CONFIG_DIR="$STATE/config"
 CONFIG_LINK="$HOME/.config/sunshine"
-LOCK_UNIT=astro-sunshine-lock.service
+LOCK_UNIT=astroverso-sunshine-lock.service
 USER_UNITS="$HOME/.config/systemd/user"
 LOCK_FILE="$USER_UNITS/$LOCK_UNIT"
-AWAKE_UNIT=astro-sunshine-awake.service
+AWAKE_UNIT=astroverso-sunshine-awake.service
 AWAKE_FILE="$USER_UNITS/$AWAKE_UNIT"
 IDLE_LOCK=300
 
@@ -425,7 +425,7 @@ user_file() {
 awake_unit() {
     printf '%s\n' \
         "[Unit]" \
-        "Description=astro sunshine: mantém a tela acesa para a captura" \
+        "Description=astroverso sunshine: mantém a tela acesa para a captura" \
         "After=graphical-session.target" \
         "PartOf=graphical-session.target" \
         "" \
@@ -448,7 +448,7 @@ sunshine_dropin() {
 lock_unit() {
     printf '%s\n' \
         "[Unit]" \
-        "Description=astro sunshine: bloqueia a tela depois do login" \
+        "Description=astroverso sunshine: bloqueia a tela depois do login" \
         "After=graphical-session.target" \
         "PartOf=graphical-session.target" \
         "" \
@@ -464,7 +464,7 @@ enable_service() {
     local unit
     unit="$(sunshine_unit)"
     awake_unit | user_file "$AWAKE_FILE"
-    sunshine_dropin | user_file "$USER_UNITS/$unit.d/astro.conf"
+    sunshine_dropin | user_file "$USER_UNITS/$unit.d/astroverso.conf"
     systemctl --user daemon-reload
     systemctl --user enable -q "$AWAKE_UNIT" "$unit"
     ui_ok "tela mantida acesa durante a sessão ($AWAKE_UNIT): com ela apagada, o Sunshine não captura nada"

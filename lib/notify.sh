@@ -1,5 +1,5 @@
-NOTIFY_QUEUE="$HOME/.astro/discord/fila"
-NOTIFY_FLAGS="${XDG_STATE_HOME:-$HOME/.local/state}/astro/notify"
+NOTIFY_QUEUE="$HOME/.astroverso/discord/fila"
+NOTIFY_FLAGS="${XDG_STATE_HOME:-$HOME/.local/state}/astroverso/notify"
 NOTIFY_REPEAT=86400
 
 notify_write() {
@@ -16,7 +16,7 @@ for button in buttons:
     label, action, arg = (button.split("|") + ["", ""])[:3]
     items.append({"rotulo": label, "acao": action, "arg": arg})
 print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items, "silencioso": silent == "1", "canal": channel}, ensure_ascii=False))
-' "$(hostname -s)" "${ASTRO_PROJECT:-astro}" "${NOTIFY_CHANNEL:-astro}" "$silent" "$@" > "$tmp"; then
+' "$(hostname -s)" "${ASTROVERSO_PROJECT:-astroverso}" "${NOTIFY_CHANNEL:-astroverso}" "$silent" "$@" > "$tmp"; then
         rm -f "$tmp"
         ui_warn "não foi possível preparar o aviso para o Discord"
         return 1
@@ -33,7 +33,7 @@ notify_info() {
 }
 
 notify_flag() {
-    printf '%s/%s-%s' "$NOTIFY_FLAGS" "${ASTRO_PROJECT:-astro}" "${1//\//_}"
+    printf '%s/%s-%s' "$NOTIFY_FLAGS" "${ASTROVERSO_PROJECT:-astroverso}" "${1//\//_}"
 }
 
 notify_problem() {

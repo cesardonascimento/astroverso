@@ -1,4 +1,4 @@
-name: astro
+name: astroverso
 
 x-podman:
   in_pod: false
@@ -6,15 +6,15 @@ x-podman:
 services:
   nextcloud-db:
     image: docker.io/library/postgres:18.6-alpine
-    container_name: astro-nextcloud-db
+    container_name: astroverso-nextcloud-db
     restart: always
     environment:
       POSTGRES_DB: nextcloud
       POSTGRES_USER: nextcloud
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
     volumes:
-      - ${ASTRO_STATE}/data/db:/var/lib/postgresql:Z
-      - ${ASTRO_STATE}/data/secrets/db_password:/run/secrets/db_password:ro,z
+      - ${ASTROVERSO_STATE}/data/db:/var/lib/postgresql:Z
+      - ${ASTROVERSO_STATE}/data/secrets/db_password:/run/secrets/db_password:ro,z
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "nextcloud", "-d", "nextcloud"]
       interval: 30s
@@ -24,7 +24,7 @@ services:
 
   nextcloud-redis:
     image: docker.io/valkey/valkey:9.1.3-alpine
-    container_name: astro-nextcloud-redis
+    container_name: astroverso-nextcloud-redis
     restart: always
     command: ["valkey-server", "--save", "", "--appendonly", "no"]
     healthcheck:
@@ -35,7 +35,7 @@ services:
 
   nextcloud:
     image: docker.io/library/nextcloud:35.0.2-apache
-    container_name: astro-nextcloud
+    container_name: astroverso-nextcloud
     restart: always
     depends_on:
       - nextcloud-db
@@ -53,9 +53,9 @@ services:
       PHP_UPLOAD_LIMIT: 16G
       APACHE_DISABLE_REWRITE_IP: 1
     volumes: &nextcloud-volumes
-      - ${ASTRO_STATE}/data/html:/var/www/html:z
+      - ${ASTROVERSO_STATE}/data/html:/var/www/html:z
       - ${FILES_DIR}:/var/www/html/data:z
-      - ${ASTRO_STATE}/data/secrets:/run/secrets:ro,z
+      - ${ASTROVERSO_STATE}/data/secrets:/run/secrets:ro,z
       - ./apache.conf:/etc/apache2/sites-enabled/000-default.conf:ro,z
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/status.php"]
@@ -66,7 +66,7 @@ services:
 
   nextcloud-cron:
     image: docker.io/library/nextcloud:35.0.2-apache
-    container_name: astro-nextcloud-cron
+    container_name: astroverso-nextcloud-cron
     restart: always
     depends_on:
       - nextcloud

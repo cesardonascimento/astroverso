@@ -5,13 +5,13 @@ Proxy reverso com HTTPS válido (Let's Encrypt) para os serviços da rede, por e
 
 ```bash
 ./project.sh install           # pergunta a configuração, prepara o host e sobe o container
-./project.sh action add        # adiciona rotas (também pelo setup.sh: Gerenciar Astro → caddy)
+./project.sh action add        # adiciona rotas (também pelo setup.sh: Gerenciar Astroverso → caddy)
 ./project.sh action remove     # remove rotas
 ./project.sh action list       # lista as rotas
-./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astro)
+./project.sh remove           # desfaz tudo o que o projeto criou (usado pelo Implodir Astroverso)
 ```
 
-## Ações (Gerenciar Astro → caddy)
+## Ações (Gerenciar Astroverso → caddy)
 
 | Ação | O que faz |
 |---|---|
@@ -47,18 +47,18 @@ Os subdomínios diretos (`grafana.<domínio>`) usam um único certificado curing
 evita expor os nomes dos serviços nos registros públicos de certificados. Outros endereços ganham
 certificados próprios.
 
-O token fica em `~/.astro/caddy/.env` (permissão `600`), e os certificados em `~/.astro/caddy/data`.
+O token fica em `~/.astroverso/caddy/.env` (permissão `600`), e os certificados em `~/.astroverso/caddy/data`.
 
 ## Rotas
 
-As rotas manuais ficam em `~/.astro/caddy/.routes`, uma por linha: `endereço destino`. Rotas declaradas por
-outros projetos (arquivos `~/.astro/<projeto>/.proxy`, como o painel do adguard e o cockpit) também são publicadas e
+As rotas manuais ficam em `~/.astroverso/caddy/.routes`, uma por linha: `endereço destino`. Rotas declaradas por
+outros projetos (arquivos `~/.astroverso/<projeto>/.proxy`, como o painel do adguard e o cockpit) também são publicadas e
 têm prioridade sobre uma rota manual com o mesmo endereço; a ação **Recarregar rotas** aplica mudanças nelas.
 Ao adicionar, basta informar o
 subdomínio (`grafana` vira `grafana.<domínio base>`) ou um endereço completo, e o destino
 (`<ip>:3000`, `http://...` ou `https://...`). As mudanças são aplicadas sem reiniciar o Caddy.
 
-Containers do grupo `astro` são acessíveis pelo nome; serviços do próprio sistema e containers na rede
+Containers do grupo `astroverso` são acessíveis pelo nome; serviços do próprio sistema e containers na rede
 do host, por `host.containers.internal`.
 
 Os nomes não existem no DNS público: eles resolvem para esta máquina só dentro da rede, pela reescrita
@@ -66,5 +66,5 @@ Os nomes não existem no DNS público: eles resolvem para esta máquina só dent
 
 ## Remoção
 
-`remove` tira o container, as imagens e as portas HTTP e HTTPS do firewall, e apaga `~/.astro/caddy` (token,
+`remove` tira o container, as imagens e as portas HTTP e HTTPS do firewall, e apaga `~/.astroverso/caddy` (token,
 rotas manuais e certificados).

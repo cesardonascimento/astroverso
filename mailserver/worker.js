@@ -72,7 +72,7 @@ export default {
     const sender = allowed(message.from, env.ALLOWED_DOMAINS || "");
     const trusted = authenticated && sender;
     const reason = trusted ? "ok" : !sender ? `domínio fora da lista: ${message.from}` : "sem spf=pass nem dmarc=pass";
-    const mark = new TextEncoder().encode(`X-Astro-Mailserver: ${trusted ? "inbox" : "quarentena"}; ${reason}\r\n`);
+    const mark = new TextEncoder().encode(`X-Astroverso-Mailserver: ${trusted ? "inbox" : "quarentena"}; ${reason}\r\n`);
     const body = new Uint8Array(mark.length + bytes.length);
     body.set(mark);
     body.set(bytes, mark.length);
