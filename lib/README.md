@@ -90,7 +90,7 @@ Bibliotecas compartilhadas:
   O canal do Discord vem de `NOTIFY_CHANNEL` (definido pelo projeto ao lado do `ASTROVERSO_PROJECT`: `dados`,
   `sistema`, `financeiro`); sem ele, o canal principal.
   Precisa de `lib/ui.sh`.
-- `lib/brand.sh`: a paleta (`BRAND_BACKGROUND`, `BRAND_CREAM`, `BRAND_NAVY`, `BRAND_RED`, `BRAND_ACCENT`), o nome
+- `lib/brand.sh`: a paleta (`BRAND_BACKGROUND`, `BRAND_LIGHT`, `BRAND_PURPLE`, `BRAND_VIOLET`, `BRAND_ACCENT`), o nome
   (`BRAND_NAME`) e a pasta das imagens (`BRAND_DIR`, a `logo/` do repositório). Ver `logo/README.md`.
 - `lib/disk.sh`: discos de dados **da máquina**, montados pelo sistema no boot. Nenhum disco pertence a um
   projeto: o dono é sempre quem instala, e os projetos só escolhem quais usar (pelo caminho em `/srv`).
