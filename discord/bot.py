@@ -216,7 +216,7 @@ class Bot(discord.Client):
 bot = Bot()
 
 
-@bot.tree.command(name="astro", description="Comandos do servidor astro")
+@bot.tree.command(name="astro", description="Comandos do Astroverso")
 @app_commands.describe(command="ex.: backup:cloud (comece a digitar; help mostra tudo)", argument="opcional, ex.: proton")
 async def astro(interacao: discord.Interaction, command: str, argument: str = ""):
     comando, argumento = command, argument

@@ -63,7 +63,7 @@ json_field() {
 }
 
 token_instructions() {
-    ui_info "o bot é uma conta do Discord que só o astro usa. Como criar (2 minutos):"
+    ui_info "o bot é uma conta do Discord que só o Astroverso usa. Como criar (2 minutos):"
     ui_info "  1. abra https://discord.com/developers/applications → New Application (ex.: astro)"
     ui_info "  2. menu Bot → Reset Token → copie o token (ele só aparece uma vez)"
     ui_info "  3. ainda em Bot, deixe \"Public Bot\" desligado (só você pode convidá-lo)"

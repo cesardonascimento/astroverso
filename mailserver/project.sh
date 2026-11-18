@@ -12,6 +12,7 @@ source ../lib/notify.sh
 
 CONTAINER=astroverso-mailserver
 NEXTCLOUD=astroverso-nextcloud
+MAIL_ACCOUNT_NAME="Astroverso Inbox"
 CLOUDFLARE_API=https://api.cloudflare.com/client/v4
 WORKER=astroverso-mailserver
 KV_TITLE=astroverso-mailserver
@@ -420,7 +421,7 @@ print(next((str(a["id"]) for a in accounts if str(a.get("email", "")).lower() ==
 }
 
 nextcloud_mail() {
-    local user address command log
+    local user address command log id
     user="$(env_get NEXTCLOUD_USER)"
     [[ -n $user ]] || return 0
     ui_step "Nextcloud Mail"
@@ -438,22 +439,29 @@ nextcloud_mail() {
         fi
     fi
     podman exec -u www-data "$NEXTCLOUD" php occ app:enable mail >/dev/null
-    if [[ -n $(nc_account_id "$user" "$address") ]]; then
-        ui_ok "conta $address já existe no Mail de $user"
+    id="$(nc_account_id "$user" "$address")"
+    if [[ -n $id ]]; then
+        if ! log="$(podman exec -u www-data "$NEXTCLOUD" php occ mail:account:update "$id" --name "$MAIL_ACCOUNT_NAME" \
+                --imap-host "$CONTAINER" --imap-port "$IMAP_PORT" --smtp-host "$CONTAINER" --smtp-port "$SMTP_PORT" 2>&1)"; then
+            printf '%s\n' "$log" | ui_prefix >&2
+            ui_warn "não foi possível atualizar a conta $address no app Mail de $user"
+            return 0
+        fi
+        ui_ok "conta \"$MAIL_ACCOUNT_NAME\" ($address) conferida no app Mail de $user"
         return 0
     fi
     command=mail:account:create
     if podman exec -u www-data "$NEXTCLOUD" php occ list mail 2>/dev/null | grep -q 'mail:account:create-imap'; then
         command=mail:account:create-imap
     fi
-    if ! log="$(nc_occ_secret "$(env_get IMAP_PASSWORD)" "$command" "$user" "Astro Inbox" "$address" \
+    if ! log="$(nc_occ_secret "$(env_get IMAP_PASSWORD)" "$command" "$user" "$MAIL_ACCOUNT_NAME" "$address" \
             "$CONTAINER" "$IMAP_PORT" none "$MAIL_USER" @secret \
             "$CONTAINER" "$SMTP_PORT" none "$MAIL_USER" @secret 2>&1)"; then
         printf '%s\n' "$log" | ui_prefix >&2
         ui_warn "não foi possível criar a conta no app Mail de $user"
         return 0
     fi
-    ui_ok "conta \"Astro Inbox\" ($address) criada no app Mail de $user (só leitura: não envia e-mails)"
+    ui_ok "conta \"$MAIL_ACCOUNT_NAME\" ($address) criada no app Mail de $user (só leitura: não envia e-mails)"
 }
 
 cmd_install() {
@@ -814,7 +822,7 @@ cmd_remove() {
     if [[ -n $user ]] && podman container exists "$NEXTCLOUD"; then
         id="$(nc_account_id "$user" "$(env_get MAIL_ADDRESS)")"
         if [[ -n $id ]] && podman exec -u www-data "$NEXTCLOUD" php occ mail:account:delete "$id" >/dev/null 2>&1; then
-            ui_ok "conta \"Astro Inbox\" removida do app Mail de $user"
+            ui_ok "conta \"$MAIL_ACCOUNT_NAME\" removida do app Mail de $user"
         fi
     fi
     state_purge

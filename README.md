@@ -215,7 +215,7 @@ notificações dos canais de avisos em "Todas as mensagens".
   vira uma conta a pagar. Depois, a lista muda em Gerenciar Astroverso → mailserver → **Domínios autorizados**, que
   também oferece mover para a entrada o que já estava na Quarentena vindo de um domínio recém-autorizado.
 - **Usuário do Nextcloud:** aparece com o Nextcloud instalado. A caixa entra no app **Mail** desse usuário como
-  "Astro Inbox". Por padrão, o administrador do Nextcloud.
+  "Astroverso Inbox". Por padrão, o administrador do Nextcloud.
 - **Token da Cloudflare:** um token só deste projeto, com as permissões que o assistente lista (Workers, KV,
   regras, endereços de destino e configurações do Email Routing e leitura da zona e do DNS). O assistente mostra como criar e valida o
   token na hora.

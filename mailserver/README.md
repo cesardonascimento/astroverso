@@ -25,7 +25,7 @@ project.sh fetch                 baixa cada e-mail, entrega com doveadm save e s
    ↓
 astroverso-mailserver (Dovecot)  usuário inbox, pastas INBOX e Quarentena
    ├─ automações (IMAP)
-   └─ Nextcloud Mail ("Astro Inbox")
+   └─ Nextcloud Mail ("Astroverso Inbox")
 ```
 
 - **Remetente conferido:** o Worker lê o primeiro `Authentication-Results`, o que a Cloudflare acrescenta
@@ -79,10 +79,10 @@ expiração. É separado do token do Caddy.
   listar, para um e-mail que chegue no meio da rodada tocar de novo, e então busca. Fora do horário, os e-mails
   esperam no KV e chegam na primeira rodada das 08:00. "Buscar os e-mails agora" (Gerenciar Astroverso e Discord
   `mailserver:fetch`) e a instalação ignoram a campainha e listam direto.
-- **Nextcloud Mail:** com um usuário do Nextcloud configurado, instala e ativa o app Mail e cria a conta "Astro
+- **Nextcloud Mail:** com um usuário do Nextcloud configurado, instala e ativa o app Mail e cria a conta "Astroverso
   Inbox" (IMAP `astroverso-mailserver:31143`, sem TLS). A senha não vai como argumento do `occ`: um script PHP pela
   entrada padrão monta os argumentos e lê a senha de uma variável de ambiente. Uma conta com o mesmo endereço não é
-  recriada.
+  recriada: a instalação só confere o nome e o servidor dela (`occ mail:account:update`).
 
 ## Ações
 
@@ -111,7 +111,7 @@ expiração. É separado do token do Caddy.
 ## Remoção
 
 `remove` desliga a busca, apaga o container e a imagem, a regra do Email Routing, o Worker e o KV (com os
-e-mails ainda não buscados), a conta "Astro Inbox" do Nextcloud Mail e `~/.astroverso/mailserver`. Também desliga o
+e-mails ainda não buscados), a conta "Astroverso Inbox" do Nextcloud Mail e `~/.astroverso/mailserver`. Também desliga o
 Email Routing do domínio (`DELETE zones/<zona>/email/routing/dns`, que tira os MX e o SPF); se a Cloudflare
 recusar, avisa para desligar pelo painel. Os destinatários de e-mail ficam cadastrados na conta da Cloudflare (o
 subdomínio `workers.dev` também), prontos para uma nova instalação.
