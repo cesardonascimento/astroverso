@@ -239,19 +239,13 @@ display_switch() {
 }
 
 apps() {
-    local kind text cover=""
-    if [[ -f $BRAND_DIR/capa-moonlight.png ]]; then
-        mkdir -p "$CONFIG_DIR/covers"
-        cp "$BRAND_DIR/capa-moonlight.png" "$CONFIG_DIR/covers/desktop.png"
-        cover="$CONFIG_DIR/covers/desktop.png"
-        ui_ok "capa do $BRAND_NAME no app Desktop do Moonlight"
-    fi
+    local kind text
     while read -r kind text; do
         case $kind in
             ok) ui_ok "$text" ;;
             *)  ui_info "$text" ;;
         esac
-    done < <(python3 -I scripts/apps.py "$CONFIG_DIR/apps.json" "$cover")
+    done < <(python3 -I scripts/apps.py "$CONFIG_DIR/apps.json")
 }
 
 nvidia_pci() {

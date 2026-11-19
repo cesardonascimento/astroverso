@@ -7,7 +7,6 @@ DEFAULTS = {"Low Res Desktop", "Steam Big Picture"}
 
 def main():
     path = sys.argv[1]
-    cover = sys.argv[2] if len(sys.argv) > 2 else ""
     data = {"env": {"PATH": "$(PATH):$(HOME)/.local/bin"}, "apps": []}
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
@@ -16,10 +15,6 @@ def main():
     apps = [app for app in data.get("apps", []) if app.get("name") not in DEFAULTS]
     if not any(app.get("name") == "Desktop" for app in apps):
         apps.insert(0, {"name": "Desktop", "image-path": "desktop.png"})
-    if cover:
-        for app in apps:
-            if app.get("name") == "Desktop":
-                app["image-path"] = cover
     data["apps"] = apps
     names = ", ".join(app.get("name", "?") for app in apps)
     if json.dumps(data, sort_keys=True) == before:

@@ -39,7 +39,6 @@ Derivados, com fundo (sem transparência):
 | `favicon.ico` | o mesmo ícone em 16 a 256 px | ícone de aba de navegador |
 | `quadrado.png` | símbolo centralizado em 256×256, fundo violeta noturno (o da `original.png`) | ícones e avatares fora do Astroverso |
 | `quadrado-alt.png` | o mesmo em fundo claro (o da `original-alt.png`), com o símbolo roxo | ícones e avatares fora do Astroverso |
-| `capa-moonlight.png` | logo vertical numa capa em pé, 600×900 (2:3) | capa do app Desktop no Moonlight (sunshine) |
 
 O Nextcloud usa também o `simbolo.png` como logo (login e barra de cima).
 
