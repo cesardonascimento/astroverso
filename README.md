@@ -339,7 +339,8 @@ padrão, "Todos: Leitura", basta).
   compartilhamento inteiro.
 - **Em qual disco guardar** e **pasta dentro do disco:** o destino. O disco de backup não aparece, e a pasta não pode
   se sobrepor à de um armazenamento em nuvem ou de outra cópia. Se ela já tiver arquivos, o assistente avisa que o
-  que não existir na origem será apagado e pede confirmação.
+  que não existir na origem será apagado e pede confirmação. Os arquivos iguais aos da origem (mesmo caminho e
+  tamanho) são aproveitados na primeira cópia, sem transferir de novo.
 - **Usuário e senha da outra máquina:** o login para ler o compartilhamento. No Windows com conta Microsoft, o
   e-mail e a senha da conta (não o PIN). O assistente confere o acesso se a máquina estiver ligada.
 - **Avisar no Discord depois de quantos dias sem cópia:** se a máquina ficar esse tempo sem responder, chega um aviso

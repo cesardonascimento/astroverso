@@ -283,6 +283,53 @@ share_due() {
     return 1
 }
 
+share_adopt() {
+    local name=$1 remote=$2 dest=$3 list result
+    [[ $(share_get "$name" ADOPTED) == yes ]] && return 0
+    if [[ -z $(find "$dest" -type f -print -quit 2>/dev/null) ]]; then
+        share_set "$name" ADOPTED yes
+        return 0
+    fi
+    ui_step "Backup: rede ➡️ local ($name): aproveitando o que já está em $dest (mesmo caminho e tamanho recebem a data da origem)"
+    list="$(mktemp)"
+    if ! rclone_run lsjson -R --files-only --no-mimetype "$remote" > "$list"; then
+        rm -f "$list"
+        ui_error "$name: não foi possível listar $remote para aproveitar os arquivos"
+        return 1
+    fi
+    if ! result="$(podman unshare python3 -I - "$dest" "$list" <<'PY'
+import datetime, json, os, re, sys
+dest, lista = sys.argv[1], sys.argv[2]
+itens = json.load(open(lista))
+aproveitados = 0
+for item in itens:
+    caminho = os.path.join(dest, item["Path"])
+    try:
+        if not os.path.isfile(caminho) or os.path.getsize(caminho) != item["Size"]:
+            continue
+    except OSError:
+        continue
+    m = re.match(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$", item["ModTime"])
+    if not m:
+        continue
+    zona = "+00:00" if m.group(3) == "Z" else m.group(3)
+    segundos = int(datetime.datetime.fromisoformat(m.group(1) + zona).timestamp())
+    nanos = int((m.group(2) or "0").ljust(9, "0")[:9])
+    instante = segundos * 1_000_000_000 + nanos
+    os.utime(caminho, ns=(instante, instante))
+    aproveitados += 1
+print(f"{aproveitados} de {len(itens)}")
+PY
+    )"; then
+        rm -f "$list"
+        ui_error "$name: falha ao aproveitar os arquivos de $dest"
+        return 1
+    fi
+    rm -f "$list"
+    share_set "$name" ADOPTED yes
+    ui_ok "$name: $result arquivos da origem já estavam em $dest e não serão transferidos"
+}
+
 share_copy() {
     local name=$1 host disk dest remote start log error
     host="$(share_get "$name" HOST)"
@@ -301,6 +348,7 @@ share_copy() {
     fi
     start=$(date +%s)
     mkdir -p "$dest"
+    share_adopt "$name" "$remote" "$dest" || return 1
     ui_step "Backup: rede ➡️ local ($name): $remote → $dest (o destino fica igual à origem)"
     log="$(mktemp)"
     if ! rclone_owner sync "$remote" "$dest" --exclude '/System Volume Information/**' --exclude '/$RECYCLE.BIN/**' \
