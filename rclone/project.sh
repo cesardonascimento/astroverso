@@ -364,7 +364,7 @@ share_login() {
 action_network_add() {
     ui_step "Adicionar cópia da rede"
     command -v rclone >/dev/null || ui_fail "instale o projeto rclone primeiro"
-    local name host share folder disk dest days conflict count
+    local name host share folder disk dest days conflict
     ui_info "copia uma pasta compartilhada de outra máquina da rede (ex.: um disco compartilhado no Windows) para um disco desta"
     ui_info "a outra máquina é a fonte de verdade: o destino fica igual a ela, inclusive no que for apagado lá"
     while true; do
@@ -387,8 +387,7 @@ action_network_add() {
             break
         fi
     done
-    count="$(find "$disk/$dest" -type f 2>/dev/null | head -1000 | wc -l)"
-    if ((count)); then
+    if [[ -n $(find "$disk/$dest" -type f -print -quit 2>/dev/null) ]]; then
         ui_warn "$disk/$dest já tem arquivos: o que não existir em $host/$share${folder:+/$folder} será apagado na primeira cópia"
         [[ -n $(env_get BACKUP_MOUNT) && $disk == "$(env_get SOURCE)" ]] \
             && ui_info "o que for apagado fica $(env_get KEEP_DAYS 30) dias em $(env_get BACKUP_MOUNT)/versoes"
