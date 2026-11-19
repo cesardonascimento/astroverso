@@ -14,11 +14,12 @@ UNIT_PREFIX=astroverso-rclone
 TICK_CALENDAR=("*-*-* 08..20/2:00:00")
 CONFIG_CALENDAR="*-*-* 01:00:00"
 LOCAL_CALENDAR="*-*-* 03:00:00"
+NETWORK_CALENDAR="*-*-* *:00/15:00"
 RECONFIGURE=false
 
 stop_runs() {
     systemctl --user stop "$UNIT_PREFIX-tick.service" "$UNIT_PREFIX-import-*.service" \
-        "$UNIT_PREFIX-local.service" "$UNIT_PREFIX-config.service" 2>/dev/null || true
+        "$UNIT_PREFIX-local.service" "$UNIT_PREFIX-config.service" "$UNIT_PREFIX-network.service" 2>/dev/null || true
     ui_ok "rodadas em andamento paradas (a primeira cópia continua de onde parou)"
 }
 
@@ -36,7 +37,10 @@ cmd_actions() {
         "now|Backup: local 🔄 nuvem (agora)" \
         "add|Adicionar armazenamento em nuvem" \
         "login|Reconectar a um armazenamento em nuvem" \
-        "remove|Remover armazenamento em nuvem"
+        "remove|Remover armazenamento em nuvem" \
+        "network-now|Backup: rede ➡️ local (agora)" \
+        "network-add|Adicionar cópia da rede" \
+        "network-remove|Remover cópia da rede"
 }
 
 cmd_remote_actions() {
@@ -46,6 +50,7 @@ cmd_remote_actions() {
         "backup:cloud-force|Backup: local 🔄 nuvem (liberar exclusões acima do limite na próxima rodada; argumento: armazenamento)|sim"
     [[ -n $(env_get BACKUP_MOUNT) ]] && echo "backup:daily|Backup: local ➡️ backup diário agora (sincroniza com a nuvem antes)|nao"
     [[ -n $(env_get CONFIG_BACKUP) ]] && echo "backup:configs|Backup: configurações ➡️ local agora|nao"
+    [[ -n $(share_names) ]] && echo "backup:network|Backup: rede ➡️ local agora (argumento: cópia; sem ele, todas)|nao"
     return 0
 }
 
@@ -63,6 +68,7 @@ cmd_help() {
             "$group|Backup: configurações ➡️ local|arquivo criptografado de cada serviço|01:00|backup:configs|70" \
             "$group|Backup: configurações ⬅️ local|restaura uma versão das configurações|pelo assistente (Administração)|-|90"
     fi
+    [[ -n $(share_names) ]] && echo "$group|Backup: rede ➡️ local|cópia de uma pasta compartilhada de outra máquina da rede; o disco fica igual a ela|uma vez por dia, na primeira vez em que a máquina responder (testa a cada 15 min)|backup:network|65"
     return 0
 }
 
@@ -106,6 +112,10 @@ cmd_remote() {
             [[ -n $(env_get BACKUP_MOUNT) ]] || ui_fail "disco de backup não configurado"
             systemctl --user start --no-block "$UNIT_PREFIX-local.service"
             echo "Backup: local ➡️ backup diário iniciado em segundo plano (em $(env_get BACKUP_MOUNT)); o início e o fim chegam aqui"
+            ;;
+        backup:network)
+            network_force "${2:-}"
+            echo "Backup: rede ➡️ local iniciado em segundo plano; o resultado chega aqui"
             ;;
         backup:configs)
             [[ -n $(env_get CONFIG_BACKUP) ]] || ui_fail "backup das configurações não configurado"
@@ -253,6 +263,8 @@ write_units() {
     write_unit "$UNIT_PREFIX-local.timer" "$(timer_unit "Backup: local ➡️ backup diário" "$LOCAL_CALENDAR")"
     write_unit "$UNIT_PREFIX-config.service" "$(service_unit "Backup: configurações ➡️ local" config)"
     write_unit "$UNIT_PREFIX-config.timer" "$(timer_unit "Backup: configurações ➡️ local" "$CONFIG_CALENDAR")"
+    write_unit "$UNIT_PREFIX-network.service" "$(service_unit "Backup: rede ➡️ local" network)"
+    write_unit "$UNIT_PREFIX-network.timer" "$(timer_unit "Backup: rede ➡️ local" "$NETWORK_CALENDAR")"
     systemctl --user daemon-reload
 }
 
@@ -272,6 +284,155 @@ schedules() {
     else
         systemctl --user disable -q --now "$UNIT_PREFIX-local.timer" 2>/dev/null || true
     fi
+    network_schedule
+}
+
+network_schedule() {
+    if [[ -n $(share_names) ]]; then
+        systemctl --user enable -q --now "$UNIT_PREFIX-network.timer"
+        ui_ok "cópias da rede: a cada 15 min, cada máquina que responder é copiada uma vez por dia"
+    else
+        systemctl --user disable -q --now "$UNIT_PREFIX-network.timer" 2>/dev/null || true
+    fi
+}
+
+network_force() {
+    local name names=()
+    mapfile -t names < <(share_names)
+    ((${#names[@]})) || ui_fail "nenhuma cópia da rede cadastrada"
+    if [[ -n $1 ]]; then
+        [[ -f $SHARES/$1.env ]] || ui_fail "cópia desconhecida: $1 (cadastradas: ${names[*]})"
+        names=("$1")
+    fi
+    for name in "${names[@]}"; do
+        share_set "$name" FORCE yes
+    done
+    systemctl --user start --no-block "$UNIT_PREFIX-network.service"
+}
+
+paths_overlap() {
+    [[ $1 == "$2" || $1 == "$2"/* || $2 == "$1"/* ]]
+}
+
+dest_conflict() {
+    local path=$1 name other
+    for name in $(target_names); do
+        other="$(target_get "$name" DISK)/$(target_get "$name" FOLDER)"
+        if paths_overlap "$path" "$other"; then
+            printf 'a pasta do armazenamento em nuvem %s (%s)' "$name" "$other"
+            return 0
+        fi
+    done
+    for name in $(share_names); do
+        other="$(share_get "$name" DISK)/$(share_get "$name" DEST)"
+        if paths_overlap "$path" "$other"; then
+            printf 'a cópia da rede %s (%s)' "$name" "$other"
+            return 0
+        fi
+    done
+    return 1
+}
+
+share_login() {
+    local name=$1 host=$2 account user domain password
+    while true; do
+        ui_input account "usuário da outra máquina (DOMÍNIO\\usuário, usuário ou, no Windows com conta Microsoft, o e-mail)" "" is_account
+        ui_secret password "senha desse usuário (no Windows com conta Microsoft, a da conta, não o PIN)"
+        user=$account
+        domain=WORKGROUP
+        if [[ $account == *\\* ]]; then
+            domain=${account%%\\*}
+            user=${account#*\\}
+        elif [[ $account == *@* ]]; then
+            domain=MicrosoftAccount
+        fi
+        rclone_section_write "rede-$name" "type = smb" "host = $host" "user = $user" "domain = $domain" \
+            "pass = $(printf '%s' "$password" | rclone obscure -)"
+        if ! share_responds "$host"; then
+            ui_warn "$host não responde agora: o acesso será conferido na primeira cópia"
+            return 0
+        fi
+        if rclone_run lsf "$(share_remote "$name")" --max-depth 1 >/dev/null 2>&1; then
+            ui_ok "acesso a $(share_remote "$name") conferido"
+            return 0
+        fi
+        ui_warn "não foi possível abrir $(share_get "$name" SHARE) em $host com esse usuário e senha (ou a pasta não existe)"
+        ui_confirm "tentar outro usuário e senha?" y || return 0
+    done
+}
+
+action_network_add() {
+    ui_step "Adicionar cópia da rede"
+    command -v rclone >/dev/null || ui_fail "instale o projeto rclone primeiro"
+    local name host share folder disk dest days conflict count
+    ui_info "copia uma pasta compartilhada de outra máquina da rede (ex.: um disco compartilhado no Windows) para um disco desta"
+    ui_info "a outra máquina é a fonte de verdade: o destino fica igual a ela, inclusive no que for apagado lá"
+    while true; do
+        ui_input name "nome da cópia (ex.: o nome da outra máquina)" "" is_folder
+        [[ -f $SHARES/$name.env ]] || break
+        ui_warn "já existe uma cópia chamada $name"
+    done
+    ui_input host "endereço da outra máquina na rede local (IP ou nome)" "" is_host
+    share_responds "$host" || ui_warn "$host não respondeu na porta 445 agora (desligada ou sem compartilhamento): dá para seguir mesmo assim"
+    ui_input share "nome do compartilhamento" "" is_label
+    ui_input folder "pasta dentro do compartilhamento (/ para ele inteiro)" "/" is_relpath
+    pick_data_disk disk "Em qual disco guardar a cópia de $host?" "$(env_get SOURCE)" "$(env_get BACKUP_MOUNT)"
+    while true; do
+        ui_input dest "pasta dentro de $disk (nunca a raiz do disco)" "$name" is_relpath
+        if [[ -z $dest ]]; then
+            ui_warn "escolha uma pasta, não a raiz do disco"
+        elif conflict="$(dest_conflict "$disk/$dest")"; then
+            ui_warn "$disk/$dest se sobrepõe a $conflict"
+        else
+            break
+        fi
+    done
+    count="$(find "$disk/$dest" -type f 2>/dev/null | head -1000 | wc -l)"
+    if ((count)); then
+        ui_warn "$disk/$dest já tem arquivos: o que não existir em $host/$share${folder:+/$folder} será apagado na primeira cópia"
+        [[ -n $(env_get BACKUP_MOUNT) && $disk == "$(env_get SOURCE)" ]] \
+            && ui_info "o que for apagado fica $(env_get KEEP_DAYS 30) dias em $(env_get BACKUP_MOUNT)/versoes"
+        ui_confirm "continuar?" n || { ui_info "cancelado"; return 0; }
+    fi
+    ui_input days "avisar no Discord depois de quantos dias sem cópia" "7" is_number
+    mkdir -p "$SHARES"
+    chmod 700 "$DATA"
+    share_set "$name" HOST "$host"
+    share_set "$name" SHARE "$share"
+    share_set "$name" FOLDER "$folder"
+    share_set "$name" DISK "$disk"
+    share_set "$name" DEST "$dest"
+    share_set "$name" ALERT_DAYS "$days"
+    share_set "$name" LAST_OK "$(date +%s)"
+    share_set "$name" LAST_DONE ""
+    share_set "$name" FORCE no
+    share_login "$name" "$host"
+    write_units
+    network_schedule
+    systemctl --user start --no-block "$UNIT_PREFIX-network.service"
+    ui_ok "$name: $host/$share${folder:+/$folder} ➡️ $disk/$dest, uma vez por dia"
+    ui_info "a primeira cópia começou em segundo plano (ou começa quando $host responder); acompanhe em \"Ver as últimas execuções\""
+}
+
+action_network_remove() {
+    ui_step "Remover cópia da rede"
+    local names=() chosen=() i
+    mapfile -t names < <(share_names)
+    ((${#names[@]})) || { ui_info "nenhuma cópia da rede cadastrada"; return; }
+    ui_checklist chosen "Quais cópias remover? (os arquivos não são apagados em lugar nenhum)" --all "${names[@]}"
+    for i in "${chosen[@]}"; do
+        rm -f "$SHARES/${names[i]}.env"
+        rclone_section_remove "rede-${names[i]}"
+        ui_ok "${names[i]} removida (a cópia no disco fica como está)"
+    done
+    network_schedule
+}
+
+action_network_now() {
+    ui_step "Backup: rede ➡️ local (agora)"
+    network_force ""
+    ui_ok "rodada iniciada em segundo plano (máquinas que não responderem ficam de fora)"
+    ui_info "acompanhe em \"Ver as últimas execuções\" ou com: journalctl --user -fu $UNIT_PREFIX-network"
 }
 
 pick_provider() {
@@ -404,6 +565,18 @@ action_status() {
         fi
     done
     [[ -n $(target_names) ]] || ui_info "nenhum cadastrado"
+    ui_step "Cópias da rede"
+    local last
+    for name in $(share_names); do
+        last="$(share_get "$name" LAST_OK)"
+        ui_ok "$name: $(share_get "$name" HOST)/$(share_get "$name" SHARE) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
+        if [[ -n $(share_get "$name" LAST_DONE) ]]; then
+            ui_info "$name: última cópia em $(date -d "@$last" '+%d/%m %H:%M')"
+        else
+            ui_info "$name: primeira cópia pendente (espera $(share_get "$name" HOST) responder)"
+        fi
+    done
+    [[ -n $(share_names) ]] || ui_info "nenhuma cadastrada"
     ui_step "Agendamentos"
     systemctl --user list-timers --all "$UNIT_PREFIX-*" --no-pager 2>/dev/null | ui_prefix || true
     ui_step "Últimas mensagens"
@@ -454,6 +627,15 @@ cmd_install() {
         action_add
     else
         ui_info "adicione depois em Gerenciar Astroverso → rclone"
+    fi
+
+    ui_step "Cópias da rede"
+    if [[ -n $(share_names) ]]; then
+        for name in $(share_names); do
+            ui_ok "$name: $(share_get "$name" HOST)/$(share_get "$name" SHARE) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
+        done
+    else
+        ui_info "nenhuma: para copiar uma pasta compartilhada de outra máquina, use \"Adicionar cópia da rede\" em Gerenciar Astroverso → rclone"
     fi
 
     ui_step "Backup das configurações"
@@ -514,6 +696,9 @@ cmd_action() {
         add)    action_add ;;
         login)  action_login ;;
         remove) action_remove ;;
+        network-now)    action_network_now ;;
+        network-add)    action_network_add ;;
+        network-remove) action_network_remove ;;
         backup-now) action_backup_now ;;
         restore)    action_restore ;;
         *)      ui_fail "ação desconhecida: ${1:-}" ;;
@@ -528,7 +713,7 @@ action_backup_now() {
 
 rclone_busy() {
     local unit
-    for unit in tick local config; do
+    for unit in tick local config network; do
         if systemctl --user is-active -q "$UNIT_PREFIX-$unit.service" 2>/dev/null; then
             printf '%s\n' "$UNIT_PREFIX-$unit"
         fi
@@ -668,7 +853,7 @@ cmd_remove() {
     ui_step "Remoção"
     stop_runs
     systemctl --user stop "$UNIT_PREFIX-import-*.timer" 2>/dev/null || true
-    for unit in tick local config; do
+    for unit in tick local config network; do
         systemctl --user disable -q --now "$UNIT_PREFIX-$unit.timer" 2>/dev/null || true
         rm -f "$UNIT_DIR/$UNIT_PREFIX-$unit.timer" "$UNIT_DIR/$UNIT_PREFIX-$unit.service"
     done

@@ -265,6 +265,85 @@ local_run() {
     return "$failed"
 }
 
+share_due() {
+    local name=$1 host last days late
+    host="$(share_get "$name" HOST)"
+    if [[ $(share_get "$name" FORCE) == yes ]]; then
+        return 0
+    fi
+    [[ $(share_get "$name" LAST_DONE) != "$(date +%F)" ]] || return 1
+    share_responds "$host" && return 0
+    last="$(share_get "$name" LAST_OK)"
+    days="$(share_get "$name" ALERT_DAYS)"
+    late=$(( ($(date +%s) - ${last:-$(date +%s)}) / 86400 ))
+    if ((${days:-0} > 0 && late >= days)); then
+        notify_problem "rede-$name-atraso" "$name ($host) está há $late dias sem cópia: ligue a máquina para o backup rodar" \
+            "Copiar agora|backup:network|$name"
+    fi
+    return 1
+}
+
+share_copy() {
+    local name=$1 host disk dest remote start log error
+    host="$(share_get "$name" HOST)"
+    disk="$(share_get "$name" DISK)"
+    dest="$disk/$(share_get "$name" DEST)"
+    remote="$(share_remote "$name")"
+    share_set "$name" FORCE no
+    disk_ready "$disk" || return 1
+    if ! share_responds "$host"; then
+        ui_error "$name: $host não respondeu na porta 445 (máquina desligada ou compartilhamento desativado)"
+        return 1
+    fi
+    if [[ -z $(rclone_run lsf "$remote" --max-depth 1 2>/dev/null | head -1) ]]; then
+        ui_error "$name: $remote está vazio ou não abriu (usuário, senha ou nome do compartilhamento): nada foi apagado"
+        return 1
+    fi
+    start=$(date +%s)
+    mkdir -p "$dest"
+    ui_step "Backup: rede ➡️ local ($name): $remote → $dest (o destino fica igual à origem)"
+    log="$(mktemp)"
+    if ! rclone_owner sync "$remote" "$dest" --exclude '/System Volume Information/**' --exclude '/$RECYCLE.BIN/**' \
+            --exclude '/lost+found/**' "${RCLONE_OPTIONS[@]}" 2>&1 | tee "$log"; then
+        error="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -oE '(Failed to [a-z]+|ERROR) *: .*' | tail -1)" || true
+        rm -f "$log"
+        ui_error "$name: cópia interrompida${error:+ ($error)}, a próxima rodada continua de onde parou"
+        return 1
+    fi
+    rm -f "$log"
+    share_set "$name" LAST_DONE "$(date +%F)"
+    share_set "$name" LAST_OK "$(date +%s)"
+    ui_ok "$name: cópia concluída em $(duration $(($(date +%s) - start)))"
+}
+
+share_run() {
+    local name status log summary names=()
+    for name in $(share_names); do
+        if share_due "$name"; then
+            names+=("$name")
+        fi
+    done
+    ((${#names[@]})) || return 0
+    lock skip
+    for name in "${names[@]}"; do
+        log="$(mktemp)"
+        set +e
+        (set -e; share_copy "$name") 2>&1 | tee "$log"
+        status=${PIPESTATUS[0]}
+        set -e
+        summary="$(sed -n 's/^\[rclone\] *\(ok\|erro\): //p' "$log" | tail -1)"
+        rm -f "$log"
+        if ((status == 0)); then
+            notify_resolved "rede-$name-falha" "Backup: rede ➡️ local ($name) voltou a funcionar"
+            notify_resolved "rede-$name-atraso" "$name voltou a ter cópia"
+            notify_info "✅ Backup: rede ➡️ local: $summary"
+        else
+            notify_problem "rede-$name-falha" "Backup: rede ➡️ local falhou: $summary. A próxima rodada (a cada 15 min) tenta de novo" \
+                "Tentar de novo|backup:network|$name"
+        fi
+    done
+}
+
 regex_escape() {
     sed -e 's/[][\\.*^$]/\\&/g' <<< "$1"
 }
@@ -377,7 +456,8 @@ config_backup() {
 case "${1:-}" in
     tick)    cloud_run ;;
     local)   lock wait; routine "Backup: local ➡️ backup diário" backup:daily local_run ;;
+    network) share_run ;;
     preview) lock wait; preview_target "${2:-}" ;;
     config)  lock wait "$CONFIG_LOCK"; routine "Backup: configurações ➡️ local" backup:configs config_backup "${2:-}" ;;
-    *)       ui_fail "uso: $0 tick | local | config [rótulo] | preview <armazenamento>" ;;
+    *)       ui_fail "uso: $0 tick | local | network | config [rótulo] | preview <armazenamento>" ;;
 esac

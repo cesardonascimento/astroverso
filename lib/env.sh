@@ -107,6 +107,23 @@ is_path() {
     [[ $path =~ ^/[[:alnum:]\ ._/-]+$ && $path != *..* ]] && printf '%s' "$path"
 }
 
+is_host() {
+    is_ipv4 "$1" && return 0
+    is_hostname "$1" && return 0
+    [[ ${1,,} =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] && printf '%s' "${1,,}"
+}
+
+is_relpath() {
+    local path="${1#/}"
+    path="${path%/}"
+    [[ -z $path ]] && return 0
+    [[ $path =~ ^[[:alnum:]\ ._/-]+$ && $path != *..* && $path != *//* ]] && printf '%s' "$path"
+}
+
+is_account() {
+    [[ $1 =~ ^([A-Za-z0-9._-]+\\)?[A-Za-z0-9._@+-]+$ ]] && printf '%s' "$1"
+}
+
 is_label() {
     [[ $1 =~ ^[[:alnum:]][[:alnum:]\ ._-]{0,39}$ ]] && printf '%s' "$1"
 }

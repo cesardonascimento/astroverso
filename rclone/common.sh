@@ -15,6 +15,7 @@ config_versions() {
 }
 RCLONE_CONF="$DATA/rclone.conf"
 TARGETS="$DATA/targets"
+SHARES="$DATA/rede"
 PROVIDERS="$BACKUP_DIR/providers"
 
 rclone_run() {
@@ -64,15 +65,49 @@ target_names() {
     return 0
 }
 
-target_get() {
+file_get() {
     local value
-    value="$(grep -m1 "^$2=" "$TARGETS/$1.env" 2>/dev/null | cut -d= -f2- | tr -d "'")" || true
+    value="$(grep -m1 "^$2=" "$1" 2>/dev/null | cut -d= -f2- | tr -d "'")" || true
     printf '%s' "$value"
 }
 
-target_set() {
-    local file="$TARGETS/$1.env" rest
+file_set() {
+    local file=$1 rest
     rest="$(grep -v "^$2=" "$file" 2>/dev/null || true)"
     (umask 077 && { [[ -n $rest ]] && printf '%s\n' "$rest"; printf "%s='%s'\n" "$2" "$3"; } > "$file.new")
     mv "$file.new" "$file"
+}
+
+target_get() {
+    file_get "$TARGETS/$1.env" "$2"
+}
+
+target_set() {
+    file_set "$TARGETS/$1.env" "$2" "$3"
+}
+
+share_names() {
+    local file
+    for file in "$SHARES"/*.env; do
+        [[ -f $file ]] && basename "$file" .env
+    done
+    return 0
+}
+
+share_get() {
+    file_get "$SHARES/$1.env" "$2"
+}
+
+share_set() {
+    file_set "$SHARES/$1.env" "$2" "$3"
+}
+
+share_remote() {
+    local folder
+    folder="$(share_get "$1" FOLDER)"
+    printf 'rede-%s:%s%s' "$1" "$(share_get "$1" SHARE)" "${folder:+/$folder}"
+}
+
+share_responds() {
+    timeout 3 bash -c "</dev/tcp/$1/445" 2>/dev/null
 }

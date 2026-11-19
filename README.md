@@ -20,7 +20,7 @@ instalação.
 | [**mailserver**](mailserver/) | **Caixa de e-mail para automações.** Algumas tarefas começam por um e-mail (um boleto, uma fatura, um aviso), mas dar a um programa acesso à sua caixa pessoal expõe todo o resto. Aqui, você encaminha só o que interessa para um endereço próprio no seu domínio (ex.: `inbox@<seu-domínio>`). A Cloudflare recebe esses e-mails e os guarda até o servidor buscá-los, sem nenhuma porta aberta em casa, e eles ficam numa caixa local que as automações leem e que você abre no app Mail do Nextcloud. Para avisar alguém por e-mail (ex.: o resumo das contas do mês), as automações enviam pela própria Cloudflare, só para endereços que você cadastrou e que confirmaram o cadastro. |
 | [**n8n**](n8n/) | **Automações sem programar.** Muitas rotinas são "quando X acontecer, faça Y": quando chegar um e-mail de cobrança, anote numa planilha; todo dia às 8h, mande um resumo no celular. O n8n monta essas rotinas pelo navegador, ligando blocos prontos (e-mail, Discord, Telegram, planilhas, APIs de centenas de serviços), sem escrever código, e guarda o histórico de cada execução. Aqui ele roda isolado: só na rede local e sem enviar nada à empresa que o desenvolve. |
 | [**nextcloud**](nextcloud/) | **Nuvem própria.** Faz o papel do Google Drive, do Google Fotos e da agenda e dos contatos do celular, mas com os dados guardados no seu servidor. Os apps do Nextcloud sincronizam pastas do computador, enviam as fotos do celular sozinhos e permitem compartilhar arquivos por link. |
-| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. |
+| [**rclone**](rclone/) | **Cópias de segurança.** Um disco só é um ponto único de falha: se ele quebrar, for roubado ou um arquivo for apagado por engano, os dados somem. O backup mantém outras cópias automaticamente: uma em outro disco da máquina, atualizada toda noite e guardando por um tempo o que foi apagado ou alterado, e outra fora de casa, num armazenamento em nuvem (como o Proton Drive), sincronizada nos dois sentidos de 2 em 2 horas durante o dia. Também traz, uma vez por dia, uma pasta compartilhada de outro computador da rede (como um disco do Windows) para um disco da máquina. |
 | [**samba**](samba/) | **Pasta de rede.** Uma pasta compartilhada aparece nos outros computadores como se fosse um disco deles: no Windows, no Explorador de Arquivos; no Mac, no iPhone e no Linux, no app de arquivos. Serve para passar arquivos entre os aparelhos da casa sem pendrive nem nuvem. Aqui, só a pasta `Public` do seu usuário fica na rede, e só você entra, com usuário e senha. |
 | [**sunshine**](sunshine/) | **Acesso remoto à tela da máquina.** Um servidor de streaming (Sunshine) transmite a tela, o som, o teclado, o mouse e os controles para o celular, o notebook ou a TV pelo app Moonlight, com pouca latência e a imagem codificada pela placa de vídeo. Serve para usar a área de trabalho da máquina de qualquer lugar, como se estivesse na frente dela. A máquina entra sozinha no boot com a tela bloqueada: pelo Moonlight, você destrava com a sua senha. |
 
@@ -65,6 +65,7 @@ mostra esta lista.
 | Backup: local 🔄 nuvem (liberar exclusões) | libera o limite de 5% numa rodada | depois de conferir o teste | `backup:cloud-force` (pede confirmação) |
 | Backup: local ➡️ backup diário | cópia do disco no disco de backup, com as versões do dia (sincroniza com a nuvem antes) | 03:00 | `backup:daily` |
 | Backup: configurações ➡️ local | arquivo criptografado de cada serviço | 01:00 | `backup:configs` |
+| Backup: rede ➡️ local | cópia de uma pasta compartilhada de outra máquina da rede; o disco fica igual a ela | uma vez por dia, na primeira vez em que a máquina responder (testa a cada 15 min) | `backup:network` (argumento opcional: a cópia) |
 | Backup: configurações ⬅️ local | restaura uma versão das configurações | pelo assistente (Administração) | — |
 | Contas: e-mail do mês | manda aos destinatários as contas que vencem no mês, com o QR Code do Pix ou o código de barras | dia 5 de cada mês, às 08:00 (rotina Contas: notificação mensal ligada) | `contas:email` (envia na hora; argumento opcional `AAAA-MM` para outro mês) |
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
@@ -324,6 +325,25 @@ Depois da primeira cópia, **o disco e a nuvem ficam iguais**: o que for criado,
 sincronização seguinte. Se o mesmo arquivo mudar dos dois lados, fica o mais novo, e o outro é guardado ao
 lado com `.conflict1` no nome. Se uma rodada for apagar mais de 5% dos arquivos, ela para sem apagar nada:
 "Backup: local 🔄 nuvem (agora)", no menu do rclone, mostra o aviso e pergunta se libera.
+
+**Adicionar cópia da rede** (Gerenciar Astroverso → rclone): copia todo dia uma pasta compartilhada de outro
+computador da rede para um disco da máquina. O outro computador é a fonte de verdade: o destino fica igual a ele,
+inclusive no que for apagado lá. Ele não precisa ficar ligado num horário certo: a cada 15 minutos o rclone vê se
+ele responde e faz a cópia do dia na primeira vez em que responder. Antes, compartilhe a pasta ou o disco na outra
+máquina (no Windows: Propriedades → Compartilhamento → Compartilhamento Avançado → "Compartilhar esta pasta"; o
+padrão, "Todos: Leitura", basta).
+
+- **Nome da cópia:** identifica a cópia nos menus e avisos (ex.: o nome da outra máquina).
+- **Endereço da outra máquina:** o IP ou o nome dela na rede local.
+- **Nome do compartilhamento** e **pasta dentro do compartilhamento:** o que será copiado. `/` copia o
+  compartilhamento inteiro.
+- **Em qual disco guardar** e **pasta dentro do disco:** o destino. O disco de backup não aparece, e a pasta não pode
+  se sobrepor à de um armazenamento em nuvem ou de outra cópia. Se ela já tiver arquivos, o assistente avisa que o
+  que não existir na origem será apagado e pede confirmação.
+- **Usuário e senha da outra máquina:** o login para ler o compartilhamento. No Windows com conta Microsoft, o
+  e-mail e a senha da conta (não o PIN). O assistente confere o acesso se a máquina estiver ligada.
+- **Avisar no Discord depois de quantos dias sem cópia:** se a máquina ficar esse tempo sem responder, chega um aviso
+  por dia até ela voltar. Por padrão, `7`.
 
 ### samba
 
