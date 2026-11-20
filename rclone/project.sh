@@ -343,7 +343,7 @@ share_keys() {
         ui_ok "chave SSH desta cópia criada em $SHARES/$name.key"
     fi
     rclone_section_write "rede-$name" "type = sftp" "host = $(share_get "$name" HOST)" "user = $(share_get "$name" USER)" \
-        "key_file = ${RCLONE_CONFIG_DIR}/rede/$name.key" "known_hosts_file = ${RCLONE_CONFIG_DIR}/rede/$name.known_hosts" "shell_type = none" \
+        "key_file = \${RCLONE_CONFIG_DIR}/rede/$name.key" "known_hosts_file = \${RCLONE_CONFIG_DIR}/rede/$name.known_hosts" "shell_type = none" \
         "disable_hashcheck = true"
 }
 
