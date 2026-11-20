@@ -77,8 +77,8 @@ Bibliotecas compartilhadas:
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
   que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_label` (nome com espaços, até 40), `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_relpath` (caminho relativo, com espaços; `/` ou vazio
-  vira vazio), `is_host` (IP, nome com domínio ou nome simples da rede local), `is_account` (`DOMÍNIO\usuário`, usuário ou
-  e-mail), `is_email`, `is_time` (`HH:MM`) e `is_number`.
+  vira vazio), `is_host` (IP, nome com domínio ou nome simples da rede local), `is_drive` (letra de disco do Windows, com ou sem
+  `:`, em maiúscula), `is_email`, `is_time` (`HH:MM`) e `is_number`.
   Toda resposta que vai para `.env`, configuração ou Caddyfile deve passar por um deles. `config_reuse` faz a
   pergunta "usar a configuração já salva?" (falso sem `.env`); com `ASTROVERSO_REUSE_CONFIG=1` (troca de domínio),
   responde sim sem perguntar, e o projeto não deve fazer outras perguntas opcionais nesse caminho.

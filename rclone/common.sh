@@ -105,9 +105,24 @@ share_set() {
 share_remote() {
     local folder
     folder="$(share_get "$1" FOLDER)"
-    printf 'rede-%s:%s%s' "$1" "$(share_get "$1" SHARE)" "${folder:+/$folder}"
+    printf 'rede-%s:/C:/ProgramData/Astroverso/snapshot-%s%s' "$1" "$1" "${folder:+/$folder}"
 }
 
 share_responds() {
-    timeout 3 bash -c "</dev/tcp/$1/445" 2>/dev/null
+    timeout 3 bash -c "</dev/tcp/$1/22" 2>/dev/null
+}
+
+share_ssh() {
+    local name=$1
+    shift
+    ssh -i "$SHARES/$name.key" -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=10 \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SHARES/$name.known_hosts" \
+        "$(share_get "$name" USER)@$(share_get "$name" HOST)" "$@"
+}
+
+share_snapshot() {
+    local name=$1 action=$2 script
+    script="$(sed -e "s/__NOME__/$name/g" -e "s/__ACAO__/$action/g" -e "s/__DRIVE__/$(share_get "$name" DRIVE)/g" \
+        "$BACKUP_DIR/snapshot.ps1" | iconv -f UTF-8 -t UTF-16LE | base64 -w0)"
+    share_ssh "$name" powershell -NoProfile -NonInteractive -EncodedCommand "$script" < /dev/null
 }

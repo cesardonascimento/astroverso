@@ -69,7 +69,7 @@ cmd_help() {
             "$group|Backup: configurações ➡️ local|arquivo criptografado de cada serviço|01:00|backup:configs|70" \
             "$group|Backup: configurações ⬅️ local|restaura uma versão das configurações|pelo assistente (Administração)|-|90"
     fi
-    [[ -n $(share_names) ]] && echo "$group|Backup: rede ➡️ local|cópia de uma pasta compartilhada de outra máquina da rede; o disco fica igual a ela|uma vez por dia, na primeira vez em que a máquina responder (testa a cada 15 min)|backup:network|65"
+    [[ -n $(share_names) ]] && echo "$group|Backup: rede ➡️ local|cópia de um disco de um Windows da rede, lida num snapshot (entram até os arquivos abertos); o destino fica igual a ele|uma vez por dia, na primeira vez em que a máquina responder (testa a cada 15 min)|backup:network|65"
     return 0
 }
 
@@ -334,39 +334,70 @@ dest_conflict() {
     return 1
 }
 
+share_keys() {
+    local name=$1
+    mkdir -p "$SHARES"
+    chmod 700 "$DATA" "$SHARES"
+    if [[ ! -s $SHARES/$name.key ]]; then
+        ssh-keygen -q -t ed25519 -N '' -C "astroverso-$name" -f "$SHARES/$name.key"
+        ui_ok "chave SSH desta cópia criada em $SHARES/$name.key"
+    fi
+    rclone_section_write "rede-$name" "type = sftp" "host = $(share_get "$name" HOST)" "user = $(share_get "$name" USER)" \
+        "key_file = ${RCLONE_CONFIG_DIR}/rede/$name.key" "known_hosts_file = ${RCLONE_CONFIG_DIR}/rede/$name.known_hosts" "shell_type = none" \
+        "disable_hashcheck = true"
+}
+
+share_check() {
+    local name=$1 host output
+    host="$(share_get "$name" HOST)"
+    if ! share_responds "$host"; then
+        ui_warn "$host não responde na porta 22 agora: o acesso será conferido na primeira cópia"
+        return 0
+    fi
+    if ! output="$(share_ssh "$name" cmd /c ver < /dev/null 2>&1)"; then
+        ui_warn "o SSH não entrou em $host: $(tr -d '\r' <<< "$output" | sed '/^[[:space:]]*$/d' | tail -2 | paste -sd ' ')"
+        return 1
+    fi
+    ui_ok "SSH em $host conferido"
+    if ! output="$(share_snapshot "$name" criar 2>&1)"; then
+        ui_warn "o SSH entrou, mas o snapshot falhou: $(tr -d '\r' <<< "$output" | sed '/^[[:space:]]*$/d; /^#< CLIXML/d' | head -3 | paste -sd ' ')"
+        share_snapshot "$name" apagar >/dev/null 2>&1 || true
+        return 1
+    fi
+    ui_ok "snapshot criado"
+    if rclone_run lsf "$(share_remote "$name")" --max-depth 1 --retries 1 --low-level-retries 1 \
+            --exclude '/System Volume Information/**' --exclude '/$RECYCLE.BIN/**' 2>/dev/null | ui_prefix; then
+        ui_ok "conteúdo do snapshot lido pelo SFTP (acima)"
+    else
+        ui_warn "o snapshot foi criado, mas o SFTP não conseguiu ler a pasta dele"
+        share_snapshot "$name" apagar >/dev/null 2>&1 || true
+        return 1
+    fi
+    share_snapshot "$name" apagar >/dev/null 2>&1 || ui_warn "o snapshot de teste ficou em $host: a primeira cópia o apaga"
+    ui_ok "snapshot de teste apagado: $name pronta"
+}
+
 share_login() {
-    local name=$1 host=$2 account user domain password
+    local name=$1
+    share_keys "$name"
+    ui_step "Na outra máquina (Windows), uma vez só"
+    ui_info "1. Configurações → Sistema → Recursos opcionais: o Servidor OpenSSH precisa estar instalado e o serviço \"sshd\" automático"
+    ui_info "2. Abra o PowerShell como administrador e rode a linha abaixo (cadastra a chave deste servidor):"
+    ui_info "\$k = '$(cat "$SHARES/$name.key.pub")'; \$f = \"\$env:ProgramData\\ssh\\administrators_authorized_keys\"; if (-not (Select-String -Path \$f -SimpleMatch \$k -Quiet -ErrorAction SilentlyContinue)) { Add-Content -Path \$f -Value \$k }; icacls \$f /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F' | Out-Null"
+    ui_info "o usuário $(share_get "$name" USER) precisa ser administrador do Windows (o snapshot exige)"
     while true; do
-        ui_input account "usuário da outra máquina (DOMÍNIO\\usuário, usuário ou, no Windows com conta Microsoft, o e-mail)" "" is_account
-        ui_secret password "senha desse usuário (no Windows com conta Microsoft, a da conta, não o PIN)"
-        user=$account
-        domain=WORKGROUP
-        if [[ $account == *\\* ]]; then
-            domain=${account%%\\*}
-            user=${account#*\\}
-        elif [[ $account == *@* ]]; then
-            domain=MicrosoftAccount
-        fi
-        rclone_section_write "rede-$name" "type = smb" "host = $host" "user = $user" "domain = $domain" \
-            "pass = $(printf '%s' "$password" | rclone obscure -)"
-        if ! share_responds "$host"; then
-            ui_warn "$host não responde agora: o acesso será conferido na primeira cópia"
-            return 0
-        fi
-        if rclone_run lsf "$(share_remote "$name")" --max-depth 1 --retries 1 --low-level-retries 1 >/dev/null 2>&1; then
-            ui_ok "acesso a $(share_remote "$name") conferido"
-            return 0
-        fi
-        ui_warn "não foi possível abrir $(share_get "$name" SHARE) em $host com esse usuário e senha (ou a pasta não existe)"
-        ui_confirm "tentar outro usuário e senha?" y || return 0
+        ui_confirm "já fez os dois passos? testar agora" y || { ui_info "teste adiado: a primeira cópia confere o acesso"; return 0; }
+        share_check "$name" && return 0
+        ui_info "confira os dois passos acima e o usuário ($(share_get "$name" USER), o nome que o \"whoami\" mostra depois da barra)"
     done
 }
 
 action_network_add() {
     ui_step "Adicionar cópia da rede"
     command -v rclone >/dev/null || ui_fail "instale o projeto rclone primeiro"
-    local name host share folder disk dest days conflict
-    ui_info "copia uma pasta compartilhada de outra máquina da rede (ex.: um disco compartilhado no Windows) para um disco desta"
+    local name host user drive folder disk dest days conflict
+    ui_info "copia um disco (ou uma pasta dele) de um Windows da rede para um disco desta máquina, uma vez por dia"
+    ui_info "a leitura é feita num snapshot do Windows: entram até os arquivos que algum programa mantém abertos"
     ui_info "a outra máquina é a fonte de verdade: o destino fica igual a ela, inclusive no que for apagado lá"
     while true; do
         ui_input name "nome da cópia (ex.: o nome da outra máquina)" "" is_folder
@@ -374,9 +405,10 @@ action_network_add() {
         ui_warn "já existe uma cópia chamada $name"
     done
     ui_input host "endereço da outra máquina na rede local (IP ou nome)" "" is_host
-    share_responds "$host" || ui_warn "$host não respondeu na porta 445 agora (desligada ou sem compartilhamento): dá para seguir mesmo assim"
-    ui_input share "nome do compartilhamento" "" is_label
-    ui_input folder "pasta dentro do compartilhamento (/ para ele inteiro)" "/" is_relpath
+    share_responds "$host" || ui_warn "$host não respondeu na porta 22 agora (desligada ou sem o Servidor OpenSSH): dá para seguir mesmo assim"
+    ui_input user "usuário do Windows (administrador; o nome que o \"whoami\" mostra depois da barra)" "" is_name
+    ui_input drive "letra do disco no Windows" "D" is_drive
+    ui_input folder "pasta dentro do disco (/ para ele inteiro)" "/" is_relpath
     pick_data_disk disk "Em qual disco guardar a cópia de $host?" "$(env_get SOURCE)" "$(env_get BACKUP_MOUNT)"
     while true; do
         ui_input dest "pasta dentro de $disk (nunca a raiz do disco)" "$name" is_relpath
@@ -389,16 +421,18 @@ action_network_add() {
         fi
     done
     if [[ -n $(find "$disk/$dest" -type f -print -quit 2>/dev/null) ]]; then
-        ui_warn "$disk/$dest já tem arquivos: o que não existir em $host/$share${folder:+/$folder} será apagado na primeira cópia"
+        ui_warn "$disk/$dest já tem arquivos: o que não existir em $drive:/${folder} será apagado na primeira cópia"
+        ui_info "os arquivos iguais (mesmo caminho e tamanho) são aproveitados, sem transferir de novo"
         [[ -n $(env_get BACKUP_MOUNT) && $disk == "$(env_get SOURCE)" ]] \
             && ui_info "o que for apagado fica $(env_get KEEP_DAYS 30) dias em $(env_get BACKUP_MOUNT)/versoes"
         ui_confirm "continuar?" n || { ui_info "cancelado"; return 0; }
     fi
     ui_input days "avisar no Discord depois de quantos dias sem cópia" "7" is_number
     mkdir -p "$SHARES"
-    chmod 700 "$DATA"
+    chmod 700 "$DATA" "$SHARES"
     share_set "$name" HOST "$host"
-    share_set "$name" SHARE "$share"
+    share_set "$name" USER "$user"
+    share_set "$name" DRIVE "$drive"
     share_set "$name" FOLDER "$folder"
     share_set "$name" DISK "$disk"
     share_set "$name" DEST "$dest"
@@ -406,26 +440,29 @@ action_network_add() {
     share_set "$name" LAST_OK "$(date +%s)"
     share_set "$name" LAST_DONE ""
     share_set "$name" FORCE no
-    share_login "$name" "$host"
+    share_login "$name"
     write_units
     network_schedule
     systemctl --user start --no-block "$UNIT_PREFIX-network.service"
-    ui_ok "$name: $host/$share${folder:+/$folder} ➡️ $disk/$dest, uma vez por dia"
+    ui_ok "$name: $host $drive:/$folder ➡️ $disk/$dest, uma vez por dia"
     ui_info "a primeira cópia começou em segundo plano (ou começa quando $host responder); acompanhe em \"Ver as últimas execuções\""
 }
 
 action_network_login() {
     ui_step "Reconectar a uma cópia da rede"
-    local names=() choice name
+    local names=() choice name user
     mapfile -t names < <(share_names)
     ((${#names[@]})) || ui_fail "nenhuma cópia da rede cadastrada"
     ui_menu choice "Qual cópia reconectar?" "${names[@]}"
     name=${names[choice]}
-    share_login "$name" "$(share_get "$name" HOST)"
+    ui_input user "usuário do Windows (administrador)" "$(share_get "$name" USER)" is_name
+    share_set "$name" USER "$user"
+    rm -f "$SHARES/$name.known_hosts"
+    share_login "$name"
     write_units
     network_schedule
     systemctl --user start --no-block "$UNIT_PREFIX-network.service"
-    ui_ok "$name: login trocado; a próxima cópia usa o usuário e a senha novos"
+    ui_ok "$name: acesso refeito; a próxima cópia já usa o novo"
 }
 
 action_network_remove() {
@@ -435,9 +472,10 @@ action_network_remove() {
     ((${#names[@]})) || { ui_info "nenhuma cópia da rede cadastrada"; return; }
     ui_checklist chosen "Quais cópias remover? (os arquivos não são apagados em lugar nenhum)" --all "${names[@]}"
     for i in "${chosen[@]}"; do
-        rm -f "$SHARES/${names[i]}.env"
+        rm -f "$SHARES/${names[i]}".{env,key,key.pub,known_hosts}
         rclone_section_remove "rede-${names[i]}"
         ui_ok "${names[i]} removida (a cópia no disco fica como está)"
+        ui_info "na outra máquina, a chave astroverso-${names[i]} pode sair de C:\\ProgramData\\ssh\\administrators_authorized_keys"
     done
     network_schedule
 }
@@ -583,7 +621,7 @@ action_status() {
     local last
     for name in $(share_names); do
         last="$(share_get "$name" LAST_OK)"
-        ui_ok "$name: $(share_get "$name" HOST)/$(share_get "$name" SHARE) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
+        ui_ok "$name: $(share_get "$name" HOST) $(share_get "$name" DRIVE):/$(share_get "$name" FOLDER) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
         if [[ -n $(share_get "$name" LAST_DONE) ]]; then
             ui_info "$name: última cópia em $(date -d "@$last" '+%d/%m %H:%M')"
         else
@@ -646,10 +684,10 @@ cmd_install() {
     ui_step "Cópias da rede"
     if [[ -n $(share_names) ]]; then
         for name in $(share_names); do
-            ui_ok "$name: $(share_get "$name" HOST)/$(share_get "$name" SHARE) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
+            ui_ok "$name: $(share_get "$name" HOST) $(share_get "$name" DRIVE):/$(share_get "$name" FOLDER) ➡️ $(share_get "$name" DISK)/$(share_get "$name" DEST)"
         done
     else
-        ui_info "nenhuma: para copiar uma pasta compartilhada de outra máquina, use \"Adicionar cópia da rede\" em Gerenciar Astroverso → rclone"
+        ui_info "nenhuma: para copiar um disco de um Windows da rede, use \"Adicionar cópia da rede\" em Gerenciar Astroverso → rclone"
     fi
 
     ui_step "Backup das configurações"

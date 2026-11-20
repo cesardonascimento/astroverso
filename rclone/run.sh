@@ -12,6 +12,8 @@ source common.sh
 CONFIG_KEY="${ASTROVERSO_BACKUP_KEY:-$CONFIG_KEY}"
 
 MAX_DELETE=5
+SHARE_EXCLUDES=(--exclude '/System Volume Information/**' --exclude '/$RECYCLE.BIN/**' --exclude '/lost+found/**'
+    --exclude '/pagefile.sys' --exclude '/swapfile.sys' --exclude '/hiberfil.sys')
 RCLONE_OPTIONS=(--retries 3 --low-level-retries 10 --stats 5m --stats-one-line --stats-log-level NOTICE --log-level NOTICE)
 
 rclone_owner() {
@@ -292,7 +294,7 @@ share_adopt() {
     fi
     ui_step "Backup: rede ➡️ local ($name): aproveitando o que já está em $dest (mesmo caminho e tamanho recebem a data da origem)"
     list="$(mktemp)"
-    if ! rclone_run lsjson -R --files-only --no-mimetype "$remote" > "$list"; then
+    if ! rclone_run lsjson -R --files-only --no-mimetype "${SHARE_EXCLUDES[@]}" "$remote" > "$list"; then
         rm -f "$list"
         ui_error "$name: não foi possível listar $remote para aproveitar os arquivos"
         return 1
@@ -331,28 +333,56 @@ PY
 }
 
 share_copy() {
-    local name=$1 host disk dest remote start log error
+    local name=$1 host disk status=0 output
     host="$(share_get "$name" HOST)"
     disk="$(share_get "$name" DISK)"
-    dest="$disk/$(share_get "$name" DEST)"
-    remote="$(share_remote "$name")"
     share_set "$name" FORCE no
     disk_ready "$disk" || return 1
     if ! share_responds "$host"; then
-        ui_error "$name: $host não respondeu na porta 445 (máquina desligada ou compartilhamento desativado)"
+        ui_error "$name: $host não respondeu na porta 22 (máquina desligada ou sem o Servidor OpenSSH)"
         return 1
     fi
+    ui_step "Backup: rede ➡️ local ($name): snapshot do disco $(share_get "$name" DRIVE): em $host"
+    if ! output="$(share_snapshot "$name" criar 2>&1)"; then
+        ui_error "$name: não foi possível criar o snapshot em $host: $(share_error "$output")"
+        share_snapshot "$name" apagar >/dev/null 2>&1 || true
+        return 1
+    fi
+    ui_ok "$name: $(tr -d '\r' <<< "$output" | tail -1)"
+    if ! share_sync "$name"; then
+        status=1
+    fi
+    if output="$(share_snapshot "$name" apagar 2>&1)"; then
+        ui_ok "$name: snapshot apagado em $host"
+    else
+        ui_warn "$name: o snapshot ficou em $host ($(share_error "$output")); a próxima rodada o apaga"
+    fi
+    return "$status"
+}
+
+share_error() {
+    tr -d '\r' <<< "$1" | sed '/^[[:space:]]*$/d; /^#< CLIXML/d; /^At line/d; /^ *+/d' | head -3 | paste -sd ' '
+}
+
+share_sync() {
+    local name=$1 dest remote start log error
+    dest="$(share_get "$name" DISK)/$(share_get "$name" DEST)"
+    remote="$(share_remote "$name")"
     if [[ -z $(rclone_run lsf "$remote" --max-depth 1 --retries 1 --low-level-retries 1 2>/dev/null | head -1) ]]; then
-        ui_error "$name: $remote está vazio ou não abriu (usuário, senha ou nome do compartilhamento): nada foi apagado"
+        ui_error "$name: o snapshot está vazio ou não abriu pelo SFTP: nada foi apagado"
         return 1
     fi
     start=$(date +%s)
-    mkdir -p "$dest"
-    share_adopt "$name" "$remote" "$dest" || return 1
+    if ! mkdir -p "$dest"; then
+        ui_error "$name: não foi possível criar $dest"
+        return 1
+    fi
+    if ! share_adopt "$name" "$remote" "$dest"; then
+        return 1
+    fi
     ui_step "Backup: rede ➡️ local ($name): $remote → $dest (o destino fica igual à origem)"
     log="$(mktemp)"
-    if ! rclone_owner sync "$remote" "$dest" --exclude '/System Volume Information/**' --exclude '/$RECYCLE.BIN/**' \
-            --exclude '/lost+found/**' "${RCLONE_OPTIONS[@]}" 2>&1 | tee "$log"; then
+    if ! rclone_owner sync "$remote" "$dest" "${SHARE_EXCLUDES[@]}" "${RCLONE_OPTIONS[@]}" 2>&1 | tee "$log"; then
         error="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -oE '(Failed to [a-z]+|ERROR) *: .*' | tail -1)" || true
         rm -f "$log"
         ui_error "$name: cópia interrompida${error:+ ($error)}, a próxima rodada continua de onde parou"

@@ -120,8 +120,9 @@ is_relpath() {
     [[ $path =~ ^[[:alnum:]\ ._/-]+$ && $path != *..* && $path != *//* ]] && printf '%s' "$path"
 }
 
-is_account() {
-    [[ $1 =~ ^([A-Za-z0-9._-]+\\)?[A-Za-z0-9._@+-]+$ ]] && printf '%s' "$1"
+is_drive() {
+    local drive="${1%%:*}"
+    [[ ${drive^^} =~ ^[A-Z]$ ]] && printf '%s' "${drive^^}"
 }
 
 is_label() {

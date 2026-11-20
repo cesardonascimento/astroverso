@@ -1,7 +1,7 @@
 # rclone
 
-Espelha os discos de dados em outro disco da máquina e em armazenamentos em nuvem, e traz para um disco as pastas
-compartilhadas de outras máquinas da rede, com o [rclone](https://rclone.org). Não usa container: são agendamentos (timers) do systemd do usuário, que rodam
+Espelha os discos de dados em outro disco da máquina e em armazenamentos em nuvem, e traz para um disco os discos de
+computadores Windows da rede (lidos num snapshot), com o [rclone](https://rclone.org). Não usa container: são agendamentos (timers) do systemd do usuário, que rodam
 mesmo sem ninguém logado.
 
 ```bash
@@ -35,12 +35,18 @@ Ao adicionar uma cópia da rede (pelo menu):
 |---|---|
 | Nome da cópia | — (`is_folder`) |
 | Endereço da outra máquina na rede local | — (IP, nome ou nome com domínio: `is_host`) |
-| Nome do compartilhamento | — (`is_label`) |
-| Pasta dentro do compartilhamento | `/` (o compartilhamento inteiro; `is_relpath`) |
+| Usuário do Windows | — (administrador, o nome do `whoami` depois da barra; `is_name`) |
+| Letra do disco no Windows | `D` (`is_drive`) |
+| Pasta dentro do disco | `/` (o disco inteiro; `is_relpath`) |
 | Em qual disco guardar a cópia | o disco copiado toda noite (o disco de backup não aparece) |
 | Pasta dentro do disco | o nome da cópia; não pode ser a raiz nem se sobrepor à pasta de um armazenamento em nuvem ou de outra cópia; com arquivos, pede confirmação (o que não existir na origem é apagado) |
 | Avisar no Discord depois de quantos dias sem cópia | `7` |
-| Usuário e senha da outra máquina | `DOMÍNIO\usuário`, `usuário` ou o e-mail da conta Microsoft (`is_account`); o acesso é conferido com `rclone lsf` se a máquina responder |
+| Já fez os dois passos? testar agora | `S`: entra por SSH, cria um snapshot, lista o conteúdo pelo SFTP e apaga o snapshot |
+
+O assistente gera uma chave SSH só para a cópia (`ed25519`, sem senha) e mostra os passos na outra máquina:
+instalar o Servidor OpenSSH e rodar, no PowerShell como administrador, a linha que põe a chave em
+`C:\ProgramData\ssh\administrators_authorized_keys` (permissões pelos SIDs de Administradores e SYSTEM, que não
+mudam com o idioma do Windows).
 
 ## Agendamentos
 
@@ -49,7 +55,7 @@ Ao adicionar uma cópia da rede (pelo menu):
 | `astroverso-rclone-tick` | de 2 em 2 horas, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
 | `astroverso-rclone-config` | 01:00 | Backup das configurações: cada `~/.astroverso/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
 | `astroverso-rclone-local` | 03:00 | Uma sincronização com a nuvem e, em seguida (mesmo se ela falhar), o espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
-| `astroverso-rclone-network` | a cada 15 min (só com uma cópia da rede cadastrada) | Para cada cópia da rede ainda não feita no dia: testa a porta 445 da outra máquina (3s) e, se ela responder, faz `rclone sync` do compartilhamento para a pasta do disco (por `podman unshare`, sem `System Volume Information`, `$RECYCLE.BIN` e `lost+found`). Máquina desligada não é erro: a rodada sai em silêncio. As conferências de acesso tentam uma vez só (`--retries 1 --low-level-retries 1`): uma senha errada não bloqueia a conta da outra máquina. Na primeira cópia, se o destino já tiver arquivos, aproveita os que têm o mesmo caminho e tamanho da origem: lista a origem (`rclone lsjson -R`) e dá a eles a data dela, até o nanossegundo, para o `sync` não os transferir de novo (o SMB não tem hash, e o rclone compara tamanho e data) |
+| `astroverso-rclone-network` | a cada 15 min (só com uma cópia da rede cadastrada) | Para cada cópia da rede ainda não feita no dia: testa a porta 22 da outra máquina (3s) e, se ela responder, manda pelo SSH o `snapshot.ps1` (PowerShell em `-EncodedCommand`, nada fica instalado no Windows): apaga os snapshots que o Astroverso deixou (IDs em `C:\ProgramData\Astroverso\snapshot-<nome>.txt`), cria um snapshot do disco (`Win32_ShadowCopy`) e o expõe em `C:\ProgramData\Astroverso\snapshot-<nome>` (`mklink /d`). Em seguida, `rclone sync` por SFTP dessa pasta para a do disco (por `podman unshare`, sem `System Volume Information`, `$RECYCLE.BIN`, `lost+found` e os arquivos de paginação), e o snapshot é apagado, com a cópia certa ou não. Máquina desligada não é erro: a rodada sai em silêncio. Na primeira cópia, se o destino já tiver arquivos, aproveita os que têm o mesmo caminho e tamanho da origem: lista a origem (`rclone lsjson -R`) e dá a eles a data dela, para o `sync` não os transferir de novo (sem hash na origem, o rclone compara tamanho e data) |
 | `astroverso-rclone-import-<nome>` | o horário escolhido | Temporário (`systemd-run`): começa a primeira cópia agendada. Se a máquina reiniciar antes, a primeira cópia começa na sincronização seguinte |
 
 Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo depois de ligar.
@@ -112,8 +118,8 @@ Sunshine e o resto da máquina sempre vêm primeiro.
   `~/.cache/rclone/bisync/*.lck`, e as seguintes falhariam com "prior lock file found". Como a rodada só começa
   com o `flock` na mão, nenhuma outra está rodando: a trava velha é apagada ali.
 - A sincronização para se for apagar mais de 5% dos arquivos (veja acima).
-- Cópia da rede: só copia se o compartilhamento abrir e tiver ao menos um item. Um compartilhamento vazio ou que
-  não abre (senha trocada, disco desligado na outra máquina) nunca esvazia o destino. Ela usa o mesmo `flock`, então
+- Cópia da rede: só copia se o snapshot abrir pelo SFTP e tiver ao menos um item. Um snapshot vazio ou que não abre
+  nunca esvazia o destino. Ela usa o mesmo `flock`, então
   não roda junto com o espelho das 03:00.
 
 ## Avisos no Discord
@@ -130,7 +136,7 @@ se resolve:
 | Espelho no disco de backup falhou | Rodada das 03:00 |
 | Backup das configurações falhou | Algum serviço não foi salvo. Botão "Tentar de novo" |
 | Cópia da rede atrasada | A outra máquina não respondeu por `ALERT_DAYS` dias. Botão "Copiar agora" |
-| Cópia da rede falhou | A máquina respondeu, mas a cópia não terminou (login, compartilhamento vazio, queda). Botão "Tentar de novo" |
+| Cópia da rede falhou | A máquina respondeu, mas a cópia não terminou (SSH, snapshot recusado, snapshot vazio, queda). Botão "Tentar de novo" |
 
 Comandos no Discord (`/astro command:<comando> argument:<armazenamento>`; com um só armazenamento, o argumento
 pode ficar de fora). A lista completa, com as outras operações, está no README da raiz e no `/astro command:help`:
@@ -190,8 +196,8 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
 | Backup: rede ➡️ local (agora) | Copia agora todas as cópias da rede, mesmo as já feitas no dia (máquina desligada fica de fora, com aviso de falha) |
 | Adicionar cópia da rede | As perguntas acima |
-| Reconectar a uma cópia da rede | Troca só o usuário e a senha (ex.: senha errada ou trocada) e religa o agendamento |
-| Remover cópia da rede | Tira o login e a cópia do agendamento; os arquivos ficam no disco |
+| Reconectar a uma cópia da rede | Troca o usuário do Windows se preciso, mostra de novo os passos da chave, testa e religa o agendamento |
+| Remover cópia da rede | Tira a chave, o cadastro e a cópia do agendamento; os arquivos ficam no disco. A chave cadastrada no Windows sai à mão |
 
 Em Gerenciar Astroverso → Administração (ações globais do rclone):
 
@@ -233,8 +239,9 @@ ambiente (ex.: `RCLONE_PROTONDRIVE_2FA`), nunca como argumento de comando.
 | Caminho | Conteúdo |
 |---|---|
 | `~/.astroverso/rclone/.env` | Disco de backup (`BACKUP_MOUNT`), disco copiado, dias de versões e a pasta do backup das configurações |
-| `~/.astroverso/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens, e uma `[rede-<nome>]` (`type = smb`, senha pelo `rclone obscure -`) por cópia da rede (`600`, pasta `700`) |
-| `~/.astroverso/rclone/data/rede/<nome>.env` | Cópia da rede: máquina (`HOST`), `SHARE`, `FOLDER`, disco e pasta de destino (`DISK`, `DEST`), `ALERT_DAYS`, `ADOPTED` (arquivos do destino já aproveitados), a última cópia (`LAST_DONE` dia, `LAST_OK` horário) e `FORCE` (copiar na próxima rodada mesmo já feita no dia) |
+| `~/.astroverso/rclone/data/rclone.conf` | Uma seção por armazenamento, com login e tokens, e uma `[rede-<nome>]` (`type = sftp`, `shell_type = none`, `disable_hashcheck`, chave e `known_hosts` por `${RCLONE_CONFIG_DIR}/rede/`) por cópia da rede (`600`, pasta `700`) |
+| `~/.astroverso/rclone/data/rede/<nome>.env` | Cópia da rede: máquina (`HOST`), usuário (`USER`), letra do disco (`DRIVE`), `FOLDER`, disco e pasta de destino (`DISK`, `DEST`), `ALERT_DAYS`, `ADOPTED` (arquivos do destino já aproveitados), a última cópia (`LAST_DONE` dia, `LAST_OK` horário) e `FORCE` (copiar na próxima rodada mesmo já feita no dia) |
+| `~/.astroverso/rclone/data/rede/<nome>.key`, `.key.pub`, `.known_hosts` | Chave SSH da cópia e a chave da outra máquina, gravada na primeira conexão |
 | `~/.astroverso/rclone/data/targets/<nome>.env` | Serviço, disco, pasta, o estado da primeira cópia e o da sincronização (`BISYNC_READY`, `TOO_MANY_DELETES`, `BISYNC_FORCE`) |
 | `~/.cache/rclone/bisync/` | Listas de arquivos da última sincronização (fora do backup; se sumirem, a próxima rodada junta os dois lados) |
 | `~/.astroverso/rclone/data/config-backup.key` | Senha do backup das configurações (`600`) |
