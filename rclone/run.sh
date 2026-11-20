@@ -361,7 +361,7 @@ share_copy() {
 }
 
 share_error() {
-    tr -d '\r' <<< "$1" | sed '/^[[:space:]]*$/d; /^#< CLIXML/d; /^At line/d; /^ *+/d' | head -3 | paste -sd ' '
+    tr -d '\r' <<< "$1" | sed -n 's/^erro: //p' | head -1
 }
 
 share_sync() {

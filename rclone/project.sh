@@ -360,7 +360,7 @@ share_check() {
     fi
     ui_ok "SSH em $host conferido"
     if ! output="$(share_snapshot "$name" criar 2>&1)"; then
-        ui_warn "o SSH entrou, mas o snapshot falhou: $(tr -d '\r' <<< "$output" | sed '/^[[:space:]]*$/d; /^#< CLIXML/d' | head -3 | paste -sd ' ')"
+        ui_warn "o SSH entrou, mas o snapshot falhou: $(tr -d '\r' <<< "$output" | sed -n 's/^erro: //p' | head -1)"
         share_snapshot "$name" apagar >/dev/null 2>&1 || true
         return 1
     fi
