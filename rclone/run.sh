@@ -342,7 +342,7 @@ share_copy() {
         ui_error "$name: $host não respondeu na porta 445 (máquina desligada ou compartilhamento desativado)"
         return 1
     fi
-    if [[ -z $(rclone_run lsf "$remote" --max-depth 1 2>/dev/null | head -1) ]]; then
+    if [[ -z $(rclone_run lsf "$remote" --max-depth 1 --retries 1 --low-level-retries 1 2>/dev/null | head -1) ]]; then
         ui_error "$name: $remote está vazio ou não abriu (usuário, senha ou nome do compartilhamento): nada foi apagado"
         return 1
     fi

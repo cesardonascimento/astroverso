@@ -40,6 +40,7 @@ cmd_actions() {
         "remove|Remover armazenamento em nuvem" \
         "network-now|Backup: rede ➡️ local (agora)" \
         "network-add|Adicionar cópia da rede" \
+        "network-login|Reconectar a uma cópia da rede" \
         "network-remove|Remover cópia da rede"
 }
 
@@ -352,7 +353,7 @@ share_login() {
             ui_warn "$host não responde agora: o acesso será conferido na primeira cópia"
             return 0
         fi
-        if rclone_run lsf "$(share_remote "$name")" --max-depth 1 >/dev/null 2>&1; then
+        if rclone_run lsf "$(share_remote "$name")" --max-depth 1 --retries 1 --low-level-retries 1 >/dev/null 2>&1; then
             ui_ok "acesso a $(share_remote "$name") conferido"
             return 0
         fi
@@ -411,6 +412,20 @@ action_network_add() {
     systemctl --user start --no-block "$UNIT_PREFIX-network.service"
     ui_ok "$name: $host/$share${folder:+/$folder} ➡️ $disk/$dest, uma vez por dia"
     ui_info "a primeira cópia começou em segundo plano (ou começa quando $host responder); acompanhe em \"Ver as últimas execuções\""
+}
+
+action_network_login() {
+    ui_step "Reconectar a uma cópia da rede"
+    local names=() choice name
+    mapfile -t names < <(share_names)
+    ((${#names[@]})) || ui_fail "nenhuma cópia da rede cadastrada"
+    ui_menu choice "Qual cópia reconectar?" "${names[@]}"
+    name=${names[choice]}
+    share_login "$name" "$(share_get "$name" HOST)"
+    write_units
+    network_schedule
+    systemctl --user start --no-block "$UNIT_PREFIX-network.service"
+    ui_ok "$name: login trocado; a próxima cópia usa o usuário e a senha novos"
 }
 
 action_network_remove() {
@@ -697,6 +712,7 @@ cmd_action() {
         remove) action_remove ;;
         network-now)    action_network_now ;;
         network-add)    action_network_add ;;
+        network-login)  action_network_login ;;
         network-remove) action_network_remove ;;
         backup-now) action_backup_now ;;
         restore)    action_restore ;;

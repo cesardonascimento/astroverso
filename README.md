@@ -342,7 +342,8 @@ padrão, "Todos: Leitura", basta).
   que não existir na origem será apagado e pede confirmação. Os arquivos iguais aos da origem (mesmo caminho e
   tamanho) são aproveitados na primeira cópia, sem transferir de novo.
 - **Usuário e senha da outra máquina:** o login para ler o compartilhamento. No Windows com conta Microsoft, o
-  e-mail e a senha da conta (não o PIN). O assistente confere o acesso se a máquina estiver ligada.
+  e-mail e a senha da conta (não o PIN). O assistente confere o acesso se a máquina estiver ligada. Para trocar só o
+  usuário e a senha depois, use "Reconectar a uma cópia da rede".
 - **Avisar no Discord depois de quantos dias sem cópia:** se a máquina ficar esse tempo sem responder, chega um aviso
   por dia até ela voltar. Por padrão, `7`.
 

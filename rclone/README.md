@@ -49,7 +49,7 @@ Ao adicionar uma cópia da rede (pelo menu):
 | `astroverso-rclone-tick` | de 2 em 2 horas, das 08:00 às 20:00 | Sincroniza cada armazenamento nos dois sentidos (`rclone bisync`). Enquanto a primeira cópia não termina, faz ou retoma essa cópia no lugar da sincronização |
 | `astroverso-rclone-config` | 01:00 | Backup das configurações: cada `~/.astroverso/<serviço>` (com os ajustes de cada projeto, como dumps de banco) em `<serviço>/<serviço>.tar.zst.gpg`, criptografado (AES-256, senha da instalação), na pasta escolhida |
 | `astroverso-rclone-local` | 03:00 | Uma sincronização com a nuvem e, em seguida (mesmo se ela falhar), o espelho do disco inteiro em `<disco de backup>/atual`, guardando dono e permissões (`podman unshare rclone sync --metadata`). O que for apagado ou alterado vai para `<disco de backup>/versoes/<data>/`, apagado depois do prazo |
-| `astroverso-rclone-network` | a cada 15 min (só com uma cópia da rede cadastrada) | Para cada cópia da rede ainda não feita no dia: testa a porta 445 da outra máquina (3s) e, se ela responder, faz `rclone sync` do compartilhamento para a pasta do disco (por `podman unshare`, sem `System Volume Information`, `$RECYCLE.BIN` e `lost+found`). Máquina desligada não é erro: a rodada sai em silêncio. Na primeira cópia, se o destino já tiver arquivos, aproveita os que têm o mesmo caminho e tamanho da origem: lista a origem (`rclone lsjson -R`) e dá a eles a data dela, até o nanossegundo, para o `sync` não os transferir de novo (o SMB não tem hash, e o rclone compara tamanho e data) |
+| `astroverso-rclone-network` | a cada 15 min (só com uma cópia da rede cadastrada) | Para cada cópia da rede ainda não feita no dia: testa a porta 445 da outra máquina (3s) e, se ela responder, faz `rclone sync` do compartilhamento para a pasta do disco (por `podman unshare`, sem `System Volume Information`, `$RECYCLE.BIN` e `lost+found`). Máquina desligada não é erro: a rodada sai em silêncio. As conferências de acesso tentam uma vez só (`--retries 1 --low-level-retries 1`): uma senha errada não bloqueia a conta da outra máquina. Na primeira cópia, se o destino já tiver arquivos, aproveita os que têm o mesmo caminho e tamanho da origem: lista a origem (`rclone lsjson -R`) e dá a eles a data dela, até o nanossegundo, para o `sync` não os transferir de novo (o SMB não tem hash, e o rclone compara tamanho e data) |
 | `astroverso-rclone-import-<nome>` | o horário escolhido | Temporário (`systemd-run`): começa a primeira cópia agendada. Se a máquina reiniciar antes, a primeira cópia começa na sincronização seguinte |
 
 Todos têm `Persistent=true`: se a máquina estava desligada na hora, rodam logo depois de ligar.
@@ -190,6 +190,7 @@ arquivos dos containers, extrair com `podman unshare tar --zstd -x --numeric-own
 | Remover armazenamento em nuvem | Tira o login e o agendamento; os arquivos ficam no disco e na nuvem |
 | Backup: rede ➡️ local (agora) | Copia agora todas as cópias da rede, mesmo as já feitas no dia (máquina desligada fica de fora, com aviso de falha) |
 | Adicionar cópia da rede | As perguntas acima |
+| Reconectar a uma cópia da rede | Troca só o usuário e a senha (ex.: senha errada ou trocada) e religa o agendamento |
 | Remover cópia da rede | Tira o login e a cópia do agendamento; os arquivos ficam no disco |
 
 Em Gerenciar Astroverso → Administração (ações globais do rclone):
