@@ -115,7 +115,7 @@ share_responds() {
 share_ssh() {
     local name=$1
     shift
-    ssh -i "$SHARES/$name.key" -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=10 \
+    ssh -i "$SHARES/$name.key" -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o UpdateHostKeys=yes -o ConnectTimeout=10 \
         -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SHARES/$name.known_hosts" \
         "$(share_get "$name" USER)@$(share_get "$name" HOST)" "$@"
 }
