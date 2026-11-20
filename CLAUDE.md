@@ -299,6 +299,22 @@ logo/                identidade visual: variantes em PNG transparente (símbolo,
   `NODE_FUNCTION_ALLOW_EXTERNAL`, e esse valor vem do `env-overrides` de `/etc/n8n-task-runners.json` (variável de
   ambiente não basta): a imagem própria edita o arquivo. A imagem não tem `npm`, só `pnpm`
   (`--config.node-linker=hoisted`); o `NODE_PATH` é repassado ao executor.
+- O container guarda o caminho absoluto dos arquivos do repositório montados pelo compose (`./arquivo`): mover
+  ou renomear a pasta do repositório exige recriar os containers (`compose up -d --force-recreate` ou reinstalar),
+  senão o `podman start` falha com `getxattr <caminho antigo>: no such file or directory`.
+- Se o `podman-restart` falha em um container no boot, o systemd encerra tudo o que ele iniciou: o `rootlessport`
+  (as portas publicadas, como 80 e 443 do Caddy) e os `conmon`. Os containers seguem "Up", mas os endereços param
+  de responder e `podman stop`/`restart` dá "conmon exited prematurely". Depois de corrigir o container que falhou,
+  subir de novo pelo `systemctl --user restart podman-restart.service` (com os containers parados): um `podman start`
+  num terminal deixa o `rootlessport` no grupo do terminal.
+- O OpenSSH do Windows pode ter o PowerShell como shell padrão (não o `cmd`): comandos com `&` ou `%VAR%` quebram.
+  Scripts vão por `powershell -NoProfile -NonInteractive -EncodedCommand <UTF-16LE em base64>`, que funciona com
+  qualquer shell. Erros do PowerShell saem em CLIXML pela saída de erro: o `snapshot.ps1` devolve `erro: <motivo>`
+  na saída normal.
+- Snapshot do Windows (`Win32_ShadowCopy`) só em NTFS ou ReFS: em exFAT, o `Create` devolve 4 ("volume não
+  suportado"). Não há conversão de exFAT para NTFS sem formatar.
+- O `rclone` (SFTP) recusa a conexão com "knownhosts: key mismatch" se o `known_hosts` tiver só um tipo de chave da
+  máquina e ele negociar outro: o `ssh` da cópia da rede usa `UpdateHostKeys=yes` para gravar todas.
 - O `occ` só aceita senhas como argumento (ex.: `mail:account:create-imap`). Para não expô-las no `ps`, rodar o
   `console.php` por um script PHP na entrada padrão (`podman exec -i -e VAR ... php`), com `$_SERVER["argv"]`
   montado lá dentro e a senha lida por `getenv`.
