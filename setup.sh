@@ -411,15 +411,17 @@ administration() {
     while true; do
         global_actions
         globals=${#GLOBAL_IDS[@]}
-        ui_menu index "Administração" "Discos da máquina" "Trocar o domínio" "${GLOBAL_LABELS[@]}" "Implodir Astroverso" "Voltar"
+        ui_menu index "Administração" "Discos da máquina" "Máquinas da rede" "Trocar o domínio" "${GLOBAL_LABELS[@]}" "Implodir Astroverso" "Voltar"
         if ((index == 0)); then
             disk_manage || true
         elif ((index == 1)); then
+            host_machines_manage || true
+        elif ((index == 2)); then
             change_domain || true
-        elif ((index <= globals + 1)); then
-            read -r name id <<< "${GLOBAL_IDS[index - 2]}"
+        elif ((index <= globals + 2)); then
+            read -r name id <<< "${GLOBAL_IDS[index - 3]}"
             project "$name" action "$id" || true
-        elif ((index == globals + 2)); then
+        elif ((index == globals + 3)); then
             implode || true
             $IMPLODED && return 0
         else

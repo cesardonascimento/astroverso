@@ -5,6 +5,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 ASTROVERSO_PROJECT=discord
 source ../lib/ui.sh
 source ../lib/env.sh
+source ../lib/host.sh
 
 FILA="$STATE/fila"
 TIMEOUT=600
@@ -17,6 +18,7 @@ project_containers() {
 
 catalog_lines() {
     echo "machine:status|Máquina: estado (containers, discos e próximos agendamentos)|nao|host|status|host"
+    [[ -z $(host_machines) ]] || echo "machine:wake|Máquina: ligar outra máquina da rede (argumento: o nome cadastrado)|nao|host|wake|host"
     local file name id description confirm
     for file in ../*/project.sh; do
         name="$(basename "$(dirname "$file")")"
@@ -47,8 +49,9 @@ help_lines() {
         "$file" status >/dev/null 2>&1 </dev/null || continue
         "$file" help 2>/dev/null </dev/null || true
     done
+    echo "Máquina e serviços|Máquina: estado|containers, discos e próximos agendamentos|quando quiser|machine:status"
+    [[ -z $(host_machines) ]] || echo "Máquina e serviços|Máquina: ligar|liga pelo Wake-on-LAN uma máquina cadastrada em Administração → Máquinas da rede|quando quiser|machine:wake <nome>"
     printf '%s\n' \
-        "Máquina e serviços|Máquina: estado|containers, discos e próximos agendamentos|quando quiser|machine:status" \
         "Máquina e serviços|Serviço: iniciar|sobe os containers de um projeto|quando quiser|<projeto>:start" \
         "Máquina e serviços|Serviço: parar|para os containers (ficam parados até o start); pede confirmação|quando quiser|<projeto>:stop" \
         "Máquina e serviços|Serviço: reiniciar|reinicia os containers; pede confirmação|quando quiser|<projeto>:restart" \
@@ -175,7 +178,9 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
     fi
     ui_info "pedido de $name ($user): $action${arg:+ $arg}"
     IFS=$'\x1f' read -r project op kind <<< "$entry"
-    if [[ $kind == host ]]; then
+    if [[ $kind == host && $op == wake ]]; then
+        output="$(ASTROVERSO_PROJECT=astroverso host_wake "$arg" 2>&1)" || status=$?
+    elif [[ $kind == host ]]; then
         output="$(host_status 2>&1)" || status=$?
     elif [[ $kind == container && $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
         output="$(container_op "$project" "$op" 2>&1)" || status=$?

@@ -342,6 +342,18 @@ host_lan_subnet() {
 
 HOST_STATE="$HOME/.astroverso/host.env"
 
+host_state_set() {
+    local key=$1 value=${2:-}
+    mkdir -p "$(dirname "$HOST_STATE")"
+    (
+        umask 077
+        grep -v "^$key=" "$HOST_STATE" 2>/dev/null > "$HOST_STATE.new" || true
+        [[ -z $value ]] || echo "$key=$value" >> "$HOST_STATE.new"
+    )
+    mv "$HOST_STATE.new" "$HOST_STATE"
+    chmod 600 "$HOST_STATE"
+}
+
 host_tailscale_port() {
     local port
     port="$(systemctl show tailscaled -p Environment --value 2>/dev/null | grep -oP '(^|\s)PORT=\K[0-9]+')" || true
@@ -361,14 +373,7 @@ host_tailscale_port_forward() {
     until ui_confirm "já fez esse redirecionamento no roteador?" n; do
         ui_warn "a instalação continua depois do redirecionamento (Ctrl+C para sair)"
     done
-    mkdir -p "$(dirname "$HOST_STATE")"
-    (
-        umask 077
-        grep -v '^TAILSCALE_PORT_FORWARD=' "$HOST_STATE" 2>/dev/null > "$HOST_STATE.new" || true
-        echo "TAILSCALE_PORT_FORWARD=$forward" >> "$HOST_STATE.new"
-    )
-    mv "$HOST_STATE.new" "$HOST_STATE"
-    chmod 600 "$HOST_STATE"
+    host_state_set TAILSCALE_PORT_FORWARD "$forward"
     ui_ok "redirecionamento da porta UDP ${forward#*:} confirmado"
 }
 
@@ -415,6 +420,116 @@ host_lan_ip() {
 
 host_tailscale_ip() {
     tailscale ip -4 2>/dev/null || true
+}
+
+host_machines() {
+    grep -oP '^WAKE_\K[a-z0-9-]+=[0-9.]+,[0-9a-f:]{17}$' "$HOST_STATE" 2>/dev/null | tr '=,' '  ' || true
+}
+
+host_machine() {
+    host_machines | awk -v name="$1" '$1 == name { print $2, $3; found = 1 } END { exit !found }'
+}
+
+host_online() {
+    ping -c 1 -W 1 "$1" >/dev/null 2>&1 && return 0
+    ip neigh show "$1" 2>/dev/null | grep -q ' REACHABLE$'
+}
+
+host_neighbor_mac() {
+    host_online "$1" || return 1
+    ip neigh show "$1" | grep -oP 'lladdr \K[0-9a-f:]{17}'
+}
+
+host_wake_send() {
+    python3 -I -c '
+import ipaddress, socket, sys
+packet = b"\xff" * 6 + bytes.fromhex(sys.argv[1].replace(":", "")) * 16
+targets = ["255.255.255.255"]
+if sys.argv[2]:
+    targets.append(str(ipaddress.ip_network(sys.argv[2], strict=False).broadcast_address))
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    for target in targets:
+        s.sendto(packet, (target, 9))
+' "$1" "$(host_lan_subnet 2>/dev/null || true)"
+}
+
+host_wake() {
+    local name=${1,,} ip mac start
+    if [[ -z $name ]] || ! read -r ip mac < <(host_machine "$name"); then
+        [[ -z $name ]] || ui_error "máquina não cadastrada: $name"
+        if [[ -n $(host_machines) ]]; then
+            ui_info "cadastradas: $(host_machines | awk '{ print $1 }' | paste -sd, - | sed 's/,/, /g')"
+        else
+            ui_info "nenhuma máquina cadastrada (Gerenciar Astroverso → Administração → Máquinas da rede)"
+        fi
+        return 1
+    fi
+    if host_online "$ip"; then
+        ui_ok "$name ($ip) já está ligada"
+        return 0
+    fi
+    ui_info "enviando o pacote mágico para $name ($mac) e esperando a resposta em $ip"
+    start=$SECONDS
+    while ((SECONDS - start < 120)); do
+        host_wake_send "$mac"
+        sleep 4
+        if host_online "$ip"; then
+            ui_ok "$name ligou em $((SECONDS - start))s"
+            return 0
+        fi
+    done
+    ui_error "$name não respondeu em 2 minutos: confira o Wake-on-LAN na BIOS e no Windows e se ela está no cabo"
+    return 1
+}
+
+host_machines_manage() {
+    local index name ip mac names=()
+    while true; do
+        ui_step "Máquinas da rede (Wake-on-LAN)"
+        mapfile -t names < <(host_machines | awk '{ print $1 }')
+        if ((${#names[@]})); then
+            while read -r name ip mac; do
+                ui_info "$name: $ip ($mac)"
+            done < <(host_machines)
+        else
+            ui_info "nenhuma máquina cadastrada"
+        fi
+        ui_menu index "O que fazer?" "Ligar uma máquina" "Adicionar uma máquina" "Remover uma máquina" "Voltar"
+        case $index in
+            0|2)
+                if ((${#names[@]} == 0)); then
+                    ui_warn "nenhuma máquina cadastrada"
+                    continue
+                fi
+                if ((index == 0)); then
+                    ui_menu index "Qual máquina ligar?" "${names[@]}" "Voltar"
+                    ((index < ${#names[@]})) || continue
+                    host_wake "${names[index]}" || true
+                else
+                    ui_menu index "Qual máquina remover?" "${names[@]}" "Voltar"
+                    ((index < ${#names[@]})) || continue
+                    host_state_set "WAKE_${names[index]}"
+                    ui_ok "${names[index]} removida"
+                fi
+                ;;
+            1)
+                ui_info "o nome é o usado no Discord: /astro command:machine:wake argument:<nome>"
+                ui_input name "nome da máquina" "" is_machine
+                ui_input ip "IP fixo da máquina na rede local (reserva no DHCP do roteador)" "" is_ipv4
+                if mac="$(host_neighbor_mac "$ip")"; then
+                    ui_ok "MAC detectado: $mac"
+                else
+                    ui_info "a máquina não respondeu: digite o MAC da placa de rede (no Windows: ipconfig /all, \"Endereço Físico\")"
+                    ui_input mac "MAC" "" is_mac
+                fi
+                host_state_set "WAKE_$name" "$ip,$mac"
+                ui_ok "$name cadastrada: $ip ($mac)"
+                ui_info "na máquina, ligue o Wake-on-LAN na BIOS (ErP desligado, ligar pela PCI-E) e na placa de rede"
+                ;;
+            *) return 0 ;;
+        esac
+    done
 }
 
 HOST_REBOOT=false

@@ -78,6 +78,7 @@ Discord ⇄ astroverso-discord (bot) ⇄ ~/.astroverso/discord/fila ⇄ astrover
 |---|---|---|
 | `help` | | Lista as operações do Astroverso por grupo (nome, o que é, quando roda e o comando), em uma ou mais mensagens só para quem pediu |
 | `machine:status` | | Máquina: estado. Containers do Astroverso, espaço nos discos, kernel novo pendente e próximos agendamentos |
+| `machine:wake <nome>` | | Máquina: ligar. Manda o pacote mágico (Wake-on-LAN) para um computador cadastrado em Administração → Máquinas da rede e espera até 2 minutos ele responder. Aparece no catálogo e na ajuda só com alguma máquina cadastrada |
 | `<projeto>:start` | | `podman start` nos containers `astroverso-<projeto>*` |
 | `<projeto>:stop` | sim | `podman stop`. Com `restart: always`, o container fica parado até o `start`, mesmo depois de reiniciar a máquina |
 | `<projeto>:restart` | sim | `podman restart` |

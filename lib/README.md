@@ -70,12 +70,16 @@ Bibliotecas compartilhadas:
   redirecionamento da porta UDP do Tailscale no roteador),
   `host_nvidia_driver` (instala o driver proprietário se houver placa NVIDIA, atualizando o kernel no Fedora e
   cadastrando a chave no Secure Boot; marca `HOST_REBOOT=true` quando falta reiniciar), `host_nvidia_version`, `host_rpmfusion`, `host_intel_media` (driver VAAPI completo da Intel no Fedora),
-  `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`.
+  `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`, `host_state_set CHAVE [valor]` (grava ou apaga, sem valor, uma
+  linha do `~/.astroverso/host.env`). Máquinas da rede (Wake-on-LAN): `host_machines_manage` (menu da Administração),
+  `host_machines` (`nome ip mac` de cada `WAKE_<nome>=<ip>,<mac>` do `host.env`), `host_wake <nome>` (pacote mágico
+  por broadcast, de 4 em 4 segundos, até a máquina responder ou passar de 2 minutos; usado pelo `machine:wake` do
+  Discord) e `host_online <ip>` (ping ou, com ICMP bloqueado como no Windows, o ARP em `REACHABLE`).
 - `lib/env.sh`: `ASTROVERSO_HOME`, `STATE`, `ENV_FILE`, `compose`, `state_setup` e `state_purge` (acima), `images_remove`
   (apaga as imagens do `docker-compose.yml` e os `FROM` do `Dockerfile` do projeto) e `state_restore <pasta> [itens a manter]`,
   que troca `$STATE` pela pasta do backup, mantendo os itens pedidos da configuração atual. `env_get CHAVE [padrão]
   [arquivo]` lê valores do `.env` do projeto (ou de outro arquivo). Validadores para as perguntas,
-  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_hostname`, `is_name`, `is_label` (nome com espaços, até 40), `is_username`, `is_timezone`, `is_path` (caminho absoluto),
+  que imprimem o valor normalizado ou falham: `is_port`, `is_ipv4`, `is_mac` (aceita `-`, devolve minúsculo com `:`), `is_machine` (nome de máquina, minúsculo), `is_hostname`, `is_name`, `is_label` (nome com espaços, até 40), `is_username`, `is_timezone`, `is_path` (caminho absoluto),
   `is_folder` (nome de uma pasta, sem `/` e sem começar por `.`), `is_relpath` (caminho relativo, com espaços; `/` ou vazio
   vira vazio), `is_host` (IP, nome com domínio ou nome simples da rede local), `is_drive` (letra de disco do Windows, com ou sem
   `:`, em maiúscula), `is_email`, `is_time` (`HH:MM`) e `is_number`.

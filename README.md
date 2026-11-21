@@ -46,6 +46,7 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 | Gerenciar Astroverso | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astroverso. Ao sair do Claude, `astroverso` abre o assistente de novo |
 | Gerenciar Astroverso → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
+| Gerenciar Astroverso → Administração → Máquinas da rede | Cadastra os computadores da rede que podem ser ligados de longe (Wake-on-LAN) e liga um deles na hora; pelo Discord, `machine:wake <nome>` |
 | Gerenciar Astroverso → Administração → Trocar o domínio | Passa todos os serviços para outro domínio (ex.: `app.<domínio-antigo>` → `app.<domínio-novo>`): mostra o que fazer antes na Cloudflare, troca os endereços salvos (guardando uma cópia da configuração), reaplica cada serviço sem refazer as perguntas e, no fim, lista o que mudar fora da máquina (Tailscale, apps do Nextcloud, favoritos) |
 | Gerenciar Astroverso → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
 | Gerenciar Astroverso → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
@@ -71,6 +72,7 @@ mostra esta lista.
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Mailserver: reprocessar e-mails | entrega de novo na entrada os e-mails dos últimos 30 dias, para as rotinas do n8n lerem outra vez (uma conta já gravada no arquivo do mês é pulada: apague o bloco dela antes) | quando quiser refazer a leitura (no assistente, escolhendo os e-mails) | `mailserver:reprocess` (pede confirmação) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
+| Máquina: ligar | liga pelo Wake-on-LAN um computador cadastrado em Máquinas da rede e espera até 2 minutos ele responder | quando quiser | `machine:wake <nome>` (aparece com alguma máquina cadastrada) |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
 | Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |
 | Serviço: reiniciar | reinicia os containers | quando quiser | `<projeto>:restart` (pede confirmação) |
@@ -139,6 +141,29 @@ acesso administrativo ligado).
 Depois desta etapa, a máquina confere os discos a cada 15 minutos. Se um deles some (desligado, cabo solto) ou
 para de responder (a conexão caiu e voltou com ele em uso), chega um aviso no Discord. No segundo caso, o disco
 só volta a funcionar depois de reiniciar a máquina.
+
+### Máquinas da rede
+
+Fica em Gerenciar Astroverso → Administração. Cadastra outros computadores da casa para ligá-los de longe pelo
+Wake-on-LAN: no assistente ("Ligar uma máquina") ou no Discord, com `/astro command:machine:wake argument:<nome>`.
+O cadastro vai para `~/.astroverso/host.env`, que entra no backup das configurações.
+
+- **Nome da máquina:** o nome usado no Discord (letras minúsculas, números e hífen).
+- **IP fixo da máquina na rede local:** serve para saber se ela já está ligada e se ligou. Reserve esse IP no
+  DHCP do roteador, pelo MAC.
+- **MAC:** só é perguntado se a máquina estiver desligada no cadastro. Ligada, ele é detectado sozinho. No
+  Windows, aparece em `ipconfig /all`, como "Endereço Físico" da placa de rede com cabo.
+
+Na máquina que vai ser ligada:
+
+- **BIOS:** desligue o ErP (ou "Deep Sleep"), que corta a energia da placa de rede com o computador desligado, e
+  ligue o "Power On By PCI-E" (ou "Wake on LAN"). Na ASUS, ficam em Advanced → APM Configuration.
+- **Windows:** no Gerenciador de Dispositivos, na placa de rede com cabo, ligue "Wake on Magic Packet" na aba
+  Avançado e, em Gerenciamento de Energia, "Permitir que este dispositivo ative o computador" e "Permitir que apenas
+  um pacote mágico ative o computador". Desligue a Inicialização Rápida (Opções de Energia → "Escolher a função
+  dos botões de energia").
+- Só funciona pelo cabo. Depois de faltar luz, o Windows precisa iniciar e desligar uma vez para a placa voltar a
+  esperar o pacote.
 
 ### adguard
 
