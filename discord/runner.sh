@@ -18,7 +18,7 @@ project_containers() {
 
 catalog_lines() {
     echo "machine:status|Máquina: estado (containers, discos e próximos agendamentos)|nao|host|status|host"
-    [[ -z $(host_machines) ]] || echo "machine:wake|Máquina: ligar outra máquina da rede (argumento: o nome cadastrado)|nao|host|wake|host"
+    [[ -z $(host_machines) ]] || echo "machine:wake|Máquina: ligar outra máquina da rede (argumento: o nome cadastrado; sem ele, botões)|nao|host|wake|host"
     local file name id description confirm
     for file in ../*/project.sh; do
         name="$(basename "$(dirname "$file")")"
@@ -50,7 +50,7 @@ help_lines() {
         "$file" help 2>/dev/null </dev/null || true
     done
     echo "Máquina e serviços|Máquina: estado|containers, discos e próximos agendamentos|quando quiser|machine:status"
-    [[ -z $(host_machines) ]] || echo "Máquina e serviços|Máquina: ligar|liga pelo Wake-on-LAN uma máquina cadastrada em Administração → Máquinas da rede|quando quiser|machine:wake <nome>"
+    [[ -z $(host_machines) ]] || echo "Máquina e serviços|Máquina: ligar|liga pelo Wake-on-LAN uma máquina cadastrada em Administração → Máquinas da rede (sem o nome, mostra um botão por máquina)|quando quiser|machine:wake [nome]"
     printf '%s\n' \
         "Máquina e serviços|Serviço: iniciar|sobe os containers de um projeto|quando quiser|<projeto>:start" \
         "Máquina e serviços|Serviço: parar|para os containers (ficam parados até o start); pede confirmação|quando quiser|<projeto>:stop" \
@@ -145,16 +145,20 @@ container_op() {
 }
 
 respond() {
-    local id=$1 status=$2 output=$3
+    local id=$1 status=$2 output=$3 buttons=${4:-}
     python3 -I -c '
 import json, sys
-print(json.dumps({"id": sys.argv[1], "ok": sys.argv[2] == "0", "saida": sys.argv[3]}, ensure_ascii=False))
-' "$id" "$status" "$output" > "$FILA/tmp/$id.json"
+dados = {"id": sys.argv[1], "ok": sys.argv[2] == "0", "saida": sys.argv[3]}
+botoes = [dict(zip(("rotulo", "acao", "arg"), linha.split("|"))) for linha in sys.argv[4].splitlines() if linha]
+if botoes:
+    dados["botoes"] = botoes
+print(json.dumps(dados, ensure_ascii=False))
+' "$id" "$status" "$output" "$buttons" > "$FILA/tmp/$id.json"
     mv "$FILA/tmp/$id.json" "$FILA/respostas/$id.json"
 }
 
 process() {
-    local file=$1 work id="" action="" arg="" user="" name="" output="" status=0 project op
+    local file=$1 work id="" action="" arg="" user="" name="" output="" buttons="" status=0 project op
     work="$FILA/andamento/${file##*/}"
     mv "$file" "$work" 2>/dev/null || return 0
     IFS=$'\x1f' read -r id action arg user name < <(python3 -I -c '
@@ -178,7 +182,10 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
     fi
     ui_info "pedido de $name ($user): $action${arg:+ $arg}"
     IFS=$'\x1f' read -r project op kind <<< "$entry"
-    if [[ $kind == host && $op == wake ]]; then
+    if [[ $kind == host && $op == wake && -z $arg ]]; then
+        output="🖥️ Qual máquina ligar?"
+        buttons="$(host_machines | awk '{ print $1 "|machine:wake|" $1 }')"
+    elif [[ $kind == host && $op == wake ]]; then
         output="$(ASTROVERSO_PROJECT=astroverso host_wake "$arg" 2>&1)" || status=$?
     elif [[ $kind == host ]]; then
         output="$(host_status 2>&1)" || status=$?
@@ -190,7 +197,7 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
     fi
     output="$(sed 's/\x1b\[[0-9;]*m//g' <<< "$output")"
     ((${#output} <= 4000)) || output="${output: -4000}"
-    respond "$id" "$status" "$output"
+    respond "$id" "$status" "$output" "$buttons"
     if ((status)); then
         ui_warn "$action${arg:+ $arg}: falhou ($status)"
     else

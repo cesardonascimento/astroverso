@@ -46,7 +46,7 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 | Gerenciar Astroverso | Os ajustes do dia a dia de cada projeto instalado (ex.: adicionar rotas no Caddy) e a Administração |
 | Modo desenvolvimento | Aparece se o Claude Code estiver instalado: abre o Claude na pasta do repositório, continuando a última conversa (ou começando uma), para desenvolver o Astroverso. Ao sair do Claude, `astroverso` abre o assistente de novo |
 | Gerenciar Astroverso → Administração → Discos da máquina | Escolhe os discos que a máquina monta no boot e quais são compartilhados com todos os usuários |
-| Gerenciar Astroverso → Administração → Máquinas da rede | Cadastra os computadores da rede que podem ser ligados de longe (Wake-on-LAN) e liga um deles na hora; pelo Discord, `machine:wake <nome>` |
+| Gerenciar Astroverso → Administração → Máquinas da rede | Cadastra os computadores da rede que podem ser ligados de longe (Wake-on-LAN) e liga um deles na hora; pelo Discord, `machine:wake` (com botões) ou `machine:wake <nome>` |
 | Gerenciar Astroverso → Administração → Trocar o domínio | Passa todos os serviços para outro domínio (ex.: `app.<domínio-antigo>` → `app.<domínio-novo>`): mostra o que fazer antes na Cloudflare, troca os endereços salvos (guardando uma cópia da configuração), reaplica cada serviço sem refazer as perguntas e, no fim, lista o que mudar fora da máquina (Tailscale, apps do Nextcloud, favoritos) |
 | Gerenciar Astroverso → Administração → Backup: configurações ➡️ local (agora) | Aparece com o rclone instalado: cria na hora uma versão nova do backup das configurações |
 | Gerenciar Astroverso → Administração → Backup: configurações ⬅️ local (restaurar uma versão) | Aparece com o rclone instalado: escolhe uma versão e os serviços (ou "Todos") e volta a configuração deles para aquele momento |
@@ -72,7 +72,7 @@ mostra esta lista.
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Mailserver: reprocessar e-mails | entrega de novo na entrada os e-mails dos últimos 30 dias, para as rotinas do n8n lerem outra vez (uma conta já gravada no arquivo do mês é pulada: apague o bloco dela antes) | quando quiser refazer a leitura (no assistente, escolhendo os e-mails) | `mailserver:reprocess` (pede confirmação) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
-| Máquina: ligar | liga pelo Wake-on-LAN um computador cadastrado em Máquinas da rede e espera até 3 minutos ele responder | quando quiser | `machine:wake <nome>` (aparece com alguma máquina cadastrada) |
+| Máquina: ligar | liga pelo Wake-on-LAN um computador cadastrado em Máquinas da rede e espera até 3 minutos ele responder | quando quiser | `machine:wake [nome]` (sem o nome, um botão por máquina; aparece com alguma máquina cadastrada) |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
 | Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |
 | Serviço: reiniciar | reinicia os containers | quando quiser | `<projeto>:restart` (pede confirmação) |
@@ -145,7 +145,7 @@ só volta a funcionar depois de reiniciar a máquina.
 ### Máquinas da rede
 
 Fica em Gerenciar Astroverso → Administração. Cadastra outros computadores da casa para ligá-los de longe pelo
-Wake-on-LAN: no assistente ("Ligar uma máquina") ou no Discord, com `/astro command:machine:wake argument:<nome>`.
+Wake-on-LAN: no assistente ("Ligar uma máquina") ou no Discord, com `/astro command:machine:wake` (responde com um botão por máquina) ou `/astro command:machine:wake argument:<nome>`.
 O cadastro vai para `~/.astroverso/host.env`, que entra no backup das configurações.
 
 - **Nome da máquina:** o nome usado no Discord (letras minúsculas, números e hífen).

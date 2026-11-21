@@ -106,6 +106,13 @@ async def executar(acao, arg, usuario):
     return {"ok": False, "saida": "sem resposta do servidor em 14 minutos (o executor astroverso-discord-runner está ativo?)"}
 
 
+async def responder(interacao, acao, arg, dados):
+    if dados.get("botoes"):
+        await interacao.followup.send((dados.get("saida") or rotulo(acao, arg))[:1900], view=botoes(dados["botoes"]))
+    else:
+        await interacao.followup.send(resultado(acao, arg, dados))
+
+
 def botao(rotulo_botao, tipo, acao="", arg="", estilo=discord.ButtonStyle.secondary):
     return discord.ui.Button(label=rotulo_botao[:80], style=estilo, custom_id=f"astro|{tipo}|{acao}|{arg}"[:100])
 
@@ -121,7 +128,7 @@ def botoes(lista):
     if not lista:
         return discord.utils.MISSING
     view = discord.ui.View(timeout=None)
-    for item in lista[:5]:
+    for item in lista[:25]:
         view.add_item(botao(item.get("rotulo", "?"), "run", item.get("acao", ""), item.get("arg", "")))
     return view
 
@@ -210,7 +217,7 @@ class Bot(discord.Client):
         else:
             await interacao.response.defer(thinking=True)
         dados = await executar(acao, arg, interacao.user)
-        await interacao.followup.send(resultado(acao, arg, dados))
+        await responder(interacao, acao, arg, dados)
 
 
 bot = Bot()
@@ -241,7 +248,7 @@ async def astro(interacao: discord.Interaction, command: str, argument: str = ""
         return
     await interacao.response.defer(thinking=True)
     dados = await executar(comando, argumento, interacao.user)
-    await interacao.followup.send(resultado(comando, argumento, dados))
+    await responder(interacao, comando, argumento, dados)
 
 
 @astro.autocomplete("command")
