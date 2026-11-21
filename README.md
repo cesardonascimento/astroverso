@@ -57,10 +57,8 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 Os nomes abaixo aparecem iguais nos menus, nos avisos do Discord e nos logs. No Discord, `/astro command:help`
 mostra esta lista.
 
-No canal principal do bot fica o **Painel do Astroverso**: um botão para cada comando e um menu para iniciar,
-parar ou reiniciar os serviços. Um painel novo aparece quando o bot inicia (inclusive ao reinstalar o discord),
-depois de cada ação e depois de cada aviso no canal principal, para estar sempre no fim da conversa. Os botões dos
-painéis antigos continuam funcionando.
+O `/astro command:panel` mostra o **Painel do Astroverso**: um botão para cada comando e um menu para iniciar,
+parar ou reiniciar os serviços. Os botões continuam funcionando na mensagem, mesmo depois de o bot reiniciar.
 
 | Nome | O que é | Quando | Comando no Discord |
 |---|---|---|---|
@@ -81,6 +79,7 @@ painéis antigos continuam funcionando.
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
 | Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |
 | Serviço: reiniciar | reinicia os containers | quando quiser | `<projeto>:restart` (pede confirmação) |
+| Painel | um botão para cada comando e um menu para os serviços | quando quiser | `panel` |
 | Ajuda | esta lista | quando quiser | `help` |
 
 ## Respondendo a instalação

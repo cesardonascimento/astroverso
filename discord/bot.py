@@ -164,7 +164,6 @@ class Bot(discord.Client):
         super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none())
         self.tree = app_commands.CommandTree(self)
         self.sincronizado = False
-        self.trava_painel = asyncio.Lock()
 
     async def setup_hook(self):
         for pasta in (PEDIDOS, RESPOSTAS, SAIDA, TMP):
@@ -179,15 +178,6 @@ class Bot(discord.Client):
         await self.tree.sync(guild=canal.guild)
         self.sincronizado = True
         log.info("conectado como %s; comando /astro no servidor %s, avisos em #%s", self.user, canal.guild.name, canal.name)
-        await self.enviar_painel()
-
-    async def enviar_painel(self):
-        async with self.trava_painel:
-            try:
-                canal = self.get_channel(CANAL) or await self.fetch_channel(CANAL)
-                await canal.send("🛰️ **Painel do Astroverso**", view=painel(), silent=True)
-            except discord.HTTPException as erro:
-                log.warning("falha ao enviar o painel: %s", erro)
 
     async def enviar_saida(self):
         await self.wait_until_ready()
@@ -201,7 +191,6 @@ class Bot(discord.Client):
         if canais:
             log.info("avisos por canal: %s", ", ".join(f"{n} → #{c.name}" for n, c in canais.items()))
         while not self.is_closed():
-            no_principal = False
             for arquivo in sorted(SAIDA.glob("*.json")):
                 try:
                     dados = json.loads(arquivo.read_text())
@@ -217,9 +206,6 @@ class Bot(discord.Client):
                     log.warning("falha ao enviar aviso (tento de novo): %s", erro)
                     break
                 arquivo.unlink(missing_ok=True)
-                no_principal = no_principal or canal is principal
-            if no_principal:
-                await self.enviar_painel()
             await asyncio.sleep(2)
 
     async def autorizado(self, interacao):
@@ -262,7 +248,6 @@ class Bot(discord.Client):
             await interacao.response.defer(thinking=True)
         dados = await executar(acao, arg, interacao.user)
         await responder(interacao, acao, arg, dados)
-        await self.enviar_painel()
 
 
 bot = Bot()
@@ -276,6 +261,9 @@ async def astro(interacao: discord.Interaction, command: str, argument: str = ""
         return
     if comando == "help":
         await enviar_ajuda(interacao)
+        return
+    if comando == "panel":
+        await interacao.response.send_message("🛰️ **Painel do Astroverso**", view=painel())
         return
     item = catalogo().get(comando)
     if not item:
@@ -291,12 +279,12 @@ async def astro(interacao: discord.Interaction, command: str, argument: str = ""
     await interacao.response.defer(thinking=True)
     dados = await executar(comando, argumento, interacao.user)
     await responder(interacao, comando, argumento, dados)
-    await bot.enviar_painel()
 
 
 @astro.autocomplete("command")
 async def completar(interacao: discord.Interaction, atual: str):
-    opcoes = [{"id": "help", "descricao": "Ajuda: todas as operações, quando rodam e os comandos"}] + list(catalogo().values())
+    opcoes = [{"id": "help", "descricao": "Ajuda: todas as operações, quando rodam e os comandos"},
+              {"id": "panel", "descricao": "Painel: um botão para cada comando"}] + list(catalogo().values())
     return [
         app_commands.Choice(name=f"{a['id']} — {a['descricao']}"[:100], value=a["id"])
         for a in opcoes if atual.lower() in a["id"].lower()

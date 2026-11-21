@@ -55,6 +55,7 @@ help_lines() {
         "Máquina e serviços|Serviço: iniciar|sobe os containers de um projeto|quando quiser|<projeto>:start" \
         "Máquina e serviços|Serviço: parar|para os containers (ficam parados até o start); pede confirmação|quando quiser|<projeto>:stop" \
         "Máquina e serviços|Serviço: reiniciar|reinicia os containers; pede confirmação|quando quiser|<projeto>:restart" \
+        "Máquina e serviços|Painel|um botão para cada comando e um menu para os serviços|quando quiser|panel" \
         "Máquina e serviços|Ajuda|esta lista|quando quiser|help"
 }
 

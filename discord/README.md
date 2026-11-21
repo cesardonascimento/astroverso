@@ -63,7 +63,7 @@ Discord ⇄ astroverso-discord (bot) ⇄ ~/.astroverso/discord/fila ⇄ astrover
 | `fila/saida/<n>.json` | `notify_send` / `notify_info` (qualquer projeto) | Aviso, canal e botões, enviados pelo bot ao canal do assunto; com `silencioso`, sai como mensagem silenciosa do Discord (sem notificar o celular) |
 | `fila/tmp/` | todos | Arquivos em escrita: só entram nas outras pastas prontos (`mv`) |
 
-1. `/astro command:<projeto>:<ação> argument:<opcional>`, um botão de um aviso ou o painel. Os nomes dos comandos são
+1. `/astro command:<projeto>:<ação> argument:<opcional>`, um botão de um aviso ou do painel (`panel`). Os nomes dos comandos são
    sempre em inglês.
 2. O bot confere se quem pediu está em `DISCORD_USERS`. Ações marcadas pedem confirmação (botões Confirmar e
    Cancelar).
@@ -74,19 +74,18 @@ Discord ⇄ astroverso-discord (bot) ⇄ ~/.astroverso/discord/fila ⇄ astrover
 
 ## Painel
 
-Mensagem "🛰️ Painel do Astroverso" no canal principal, montada do catálogo a cada envio (uma máquina ou um
+Resposta do comando `panel` (tratado pelo próprio bot, como o `help`): mensagem "🛰️ Painel do Astroverso", montada do catálogo a cada pedido (uma máquina ou um
 projeto novo aparece sozinho): um botão por comando que não é de container (`custom_id` `astro|run|<comando>|`, com
 o nome do comando como rótulo; `help` responde só para quem clicou), até 20, e um menu de seleção
 (`astro|menu||`) com os `<projeto>:start|stop|restart` e o que não coube nos botões, até 25 opções. As ações com
-confirmação continuam pedindo. Um painel novo é enviado, sem apagar os antigos (que seguem funcionando), quando o
-bot inicia, depois de cada ação terminada (pelo `/astro`, por botão ou pelo menu) e depois de uma rodada de avisos
-que caíram no canal principal.
+confirmação continuam pedindo. Os botões de um painel antigo seguem funcionando.
 
 ## Comandos
 
 | Comando | Confirmação | O que faz |
 |---|---|---|
 | `help` | | Lista as operações do Astroverso por grupo (nome, o que é, quando roda e o comando), em uma ou mais mensagens só para quem pediu |
+| `panel` | | Painel do Astroverso: um botão por comando e um menu para iniciar, parar ou reiniciar os serviços (ver "Painel") |
 | `machine:status` | | Máquina: estado. Containers do Astroverso, espaço nos discos, kernel novo pendente e próximos agendamentos |
 | `machine:wake [nome]` | | Máquina: ligar. Manda o pacote mágico (Wake-on-LAN) para um computador cadastrado em Administração → Máquinas da rede e espera até 3 minutos ele responder. Sem o nome, responde com um botão por máquina (`astro\|run\|machine:wake\|<nome>`). Aparece no catálogo e na ajuda só com alguma máquina cadastrada |
 | `<projeto>:start` | | `podman start` nos containers `astroverso-<projeto>*` |
