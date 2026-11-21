@@ -4,3 +4,4 @@ data/
 .proxy
 CLAUDE.local.md
 docker-compose.override.yml
+__pycache__/
