@@ -57,6 +57,11 @@ Nos menus, as setas escolhem e Enter confirma. **Esc** volta ao menu anterior; n
 Os nomes abaixo aparecem iguais nos menus, nos avisos do Discord e nos logs. No Discord, `/astro command:help`
 mostra esta lista.
 
+No canal principal do bot fica o **Painel do Astroverso**: um botão para cada comando e um menu para iniciar,
+parar ou reiniciar os serviços. Um painel novo aparece quando o bot inicia (inclusive ao reinstalar o discord),
+depois de cada ação e depois de cada aviso no canal principal, para estar sempre no fim da conversa. Os botões dos
+painéis antigos continuam funcionando.
+
 | Nome | O que é | Quando | Comando no Discord |
 |---|---|---|---|
 | Backup: local ⬅️ nuvem | download inicial: traz tudo da nuvem para o disco, sem apagar nada | uma vez, ao cadastrar a nuvem | `backup:cloud` (roda a fase atual) |
