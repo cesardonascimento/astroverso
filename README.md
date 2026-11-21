@@ -72,7 +72,7 @@ mostra esta lista.
 | Mailserver: buscar e-mails | traz para a caixa local os e-mails recebidos na Cloudflare | de 5 em 5 minutos, das 08:00 às 20:00, quando chegou e-mail | `mailserver:fetch` (busca na hora) |
 | Mailserver: reprocessar e-mails | entrega de novo na entrada os e-mails dos últimos 30 dias, para as rotinas do n8n lerem outra vez (uma conta já gravada no arquivo do mês é pulada: apague o bloco dela antes) | quando quiser refazer a leitura (no assistente, escolhendo os e-mails) | `mailserver:reprocess` (pede confirmação) |
 | Máquina: estado | containers, discos e próximos agendamentos | quando quiser | `machine:status` |
-| Máquina: ligar | liga pelo Wake-on-LAN um computador cadastrado em Máquinas da rede e espera até 2 minutos ele responder | quando quiser | `machine:wake <nome>` (aparece com alguma máquina cadastrada) |
+| Máquina: ligar | liga pelo Wake-on-LAN um computador cadastrado em Máquinas da rede e espera até 3 minutos ele responder | quando quiser | `machine:wake <nome>` (aparece com alguma máquina cadastrada) |
 | Serviço: iniciar | sobe os containers de um projeto | quando quiser | `<projeto>:start` |
 | Serviço: parar | para os containers (ficam parados até o start) | quando quiser | `<projeto>:stop` (pede confirmação) |
 | Serviço: reiniciar | reinicia os containers | quando quiser | `<projeto>:restart` (pede confirmação) |

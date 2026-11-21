@@ -471,7 +471,7 @@ host_wake() {
     fi
     ui_info "enviando o pacote mágico para $name ($mac) e esperando a resposta em $ip"
     start=$SECONDS
-    while ((SECONDS - start < 120)); do
+    while ((SECONDS - start < 180)); do
         host_wake_send "$mac"
         sleep 4
         if host_online "$ip"; then
@@ -479,7 +479,7 @@ host_wake() {
             return 0
         fi
     done
-    ui_error "$name não respondeu em 2 minutos: confira o Wake-on-LAN na BIOS e no Windows e se ela está no cabo"
+    ui_error "$name não respondeu em 3 minutos: confira o Wake-on-LAN na BIOS e no Windows e se ela está no cabo"
     return 1
 }
 

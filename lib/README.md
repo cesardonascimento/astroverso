@@ -73,7 +73,7 @@ Bibliotecas compartilhadas:
   `host_lan_ip`, `host_lan_subnet`, `host_tailscale_ip`, `host_state_set CHAVE [valor]` (grava ou apaga, sem valor, uma
   linha do `~/.astroverso/host.env`). Máquinas da rede (Wake-on-LAN): `host_machines_manage` (menu da Administração),
   `host_machines` (`nome ip mac` de cada `WAKE_<nome>=<ip>,<mac>` do `host.env`), `host_wake <nome>` (pacote mágico
-  por broadcast, de 4 em 4 segundos, até a máquina responder ou passar de 2 minutos; usado pelo `machine:wake` do
+  por broadcast, de 4 em 4 segundos, até a máquina responder ou passar de 3 minutos; usado pelo `machine:wake` do
   Discord) e `host_online <ip>` (ping ou, com ICMP bloqueado como no Windows, o ARP em `REACHABLE`).
 - `lib/env.sh`: `ASTROVERSO_HOME`, `STATE`, `ENV_FILE`, `compose`, `state_setup` e `state_purge` (acima), `images_remove`
   (apaga as imagens do `docker-compose.yml` e os `FROM` do `Dockerfile` do projeto) e `state_restore <pasta> [itens a manter]`,
