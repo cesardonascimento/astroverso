@@ -255,7 +255,7 @@ para ele.
 
 ### n8n
 
-- **Endereço do n8n no Caddy:** o nome pelo qual o n8n é aberto no navegador. Por padrão, `n8n.<domínio>`.
+- **Endereço do n8n no Caddy:** o nome pelo qual o n8n é aberto no navegador. Por padrão, `n8n.<nome-da-máquina>.<domínio>`, para separar o n8n de cada máquina.
 - **E-mail, nome e sobrenome do administrador:** a conta com que você entra no n8n. O e-mail é só o login: o n8n
   não manda e-mails, e o endereço não precisa existir. Por padrão, `n8n@<domínio>`. A conta é criada pela própria instalação, para ninguém na rede tomá-la antes de você no
   primeiro acesso. Para trocar esses dados depois, reinstale o n8n (eles ficam travados na tela do n8n).

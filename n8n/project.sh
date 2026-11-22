@@ -97,7 +97,7 @@ configure() {
         fi
     else
         domain="$(proxy_domain)"
-        ui_input host  "endereço do n8n no Caddy" "$(env_get N8N_HOST "n8n${domain:+.$domain}")" is_hostname
+        ui_input host  "endereço do n8n no Caddy" "$(env_get N8N_HOST "n8n.$(hostname -s)${domain:+.$domain}")" is_hostname
         ui_info "o administrador é criado pela instalação: ninguém na rede consegue tomar a conta antes de você"
         ui_input email "e-mail para entrar no n8n (só o login: não precisa existir, o n8n não manda e-mails)" \
             "$(env_get OWNER_EMAIL "${domain:+n8n@$domain}")" is_email
