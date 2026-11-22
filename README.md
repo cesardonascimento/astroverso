@@ -172,8 +172,8 @@ Na máquina que vai ser ligada:
 ### adguard
 
 - **Usuário e senha do painel:** as credenciais de administração do AdGuard, usadas para entrar no painel
-  web onde se veem as consultas, as listas de bloqueio e as configurações. A senha é guardada só como
-  hash.
+  web onde se veem as consultas, as listas de bloqueio e as configurações. O usuário padrão é `astroverso`.
+  A senha é guardada só como hash.
 - **Porta do painel no host:** a porta em que o painel escuta na máquina. Se o painel for publicado no
   Caddy (pergunta abaixo), essa porta é bloqueada para a rede e o acesso passa a ser só pelo endereço
   HTTPS, para a senha nunca trafegar sem criptografia. Sem o Caddy, o painel abre em `http://<ip>:<porta>`.
@@ -292,7 +292,7 @@ comandos na máquina e só é acessível pela rede local.
 - **Endereço do Nextcloud no Caddy:** o nome pelo qual o Nextcloud é aberto no navegador e configurado nos
   apps. Por padrão, `nextcloud.<domínio>`.
 - **Usuário administrador:** a conta que administra o Nextcloud e cria as contas das outras pessoas. Por
-  padrão, `astro`. Só vale na primeira instalação.
+  padrão, `astroverso`. Só vale na primeira instalação.
 - **Pasta dos arquivos:** onde ficam os arquivos enviados ao Nextcloud. Por padrão, a pasta oculta `.nextcloud`
   no home do seu usuário, fora do projeto. Se ela mudar depois de instalado, o assistente pergunta se pode **mover os arquivos** para a
   pasta nova.

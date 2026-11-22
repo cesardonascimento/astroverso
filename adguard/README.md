@@ -24,7 +24,7 @@ AdGuard Home customizado. Instalado pelo `setup.sh` da raiz ou diretamente:
 
 | Pergunta | Padrão |
 |---|---|
-| Usuário do painel | `admin` |
+| Usuário do painel | `astroverso` |
 | Senha do painel | — |
 | Porta do painel no host | `8080` |
 | IP do host onde o DNS escuta | `0.0.0.0` (todos) |

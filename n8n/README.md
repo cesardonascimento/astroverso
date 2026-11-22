@@ -50,12 +50,12 @@ rotinas apontam para esses `id`, que não mudam entre instalações:
 
 | Credencial (`id`) | Origem |
 |---|---|
-| Astroverso: caixa inbox (IMAP) (`astroImapInbox01`) | `astroverso-mailserver:31143`, usuário `inbox`, `IMAP_PASSWORD` do mailserver |
-| Astroverso: bot do Discord (`astroDiscordBot01`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
-| Astroverso: Nextcloud (`astroNextcloud001`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astroverso-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
-| Astroverso: API da Anthropic (`astroAnthropic001`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
-| Astroverso: envio de e-mail (`astroEnvioEmail01`) | cabeçalho `X-Astroverso-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
-| Astroverso: chamadas do assistente (`astroHookAstro001`) | cabeçalho `X-Astroverso-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo Astroverso |
+| Astroverso: caixa inbox (IMAP) (`astroversoImapInbox`) | `astroverso-mailserver:31143`, usuário `inbox`, `IMAP_PASSWORD` do mailserver |
+| Astroverso: bot do Discord (`astroversoDiscordBot`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
+| Astroverso: Nextcloud (`astroversoNextcloud`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astroverso-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
+| Astroverso: API da Anthropic (`astroversoAnthropic`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
+| Astroverso: envio de e-mail (`astroversoEnvioEmail`) | cabeçalho `X-Astroverso-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |
+| Astroverso: chamadas do assistente (`astroversoHook`) | cabeçalho `X-Astroverso-Chave` com `N8N_HOOK_TOKEN` (gerado uma vez), para webhooks chamados pelo Astroverso |
 
 **Pelo Discord:** `contas:email [AAAA-MM]` (`remote-actions` do projeto) chama o webhook `POST
 /webhook/astroverso-contas-email` de dentro do container `astroverso-n8n` (`node` com `fetch` em `127.0.0.1:5678`, a chave

@@ -27,7 +27,7 @@ Nenhuma porta é aberta na máquina: o Caddy alcança o `astroverso-nextcloud` p
 | Pergunta | Padrão |
 |---|---|
 | Endereço do Nextcloud no Caddy | `nextcloud.<domínio do caddy>` |
-| Usuário administrador | `astro` |
+| Usuário administrador | `astroverso` |
 | Pasta dos arquivos | `~/.nextcloud` (no home de quem instala) |
 | Quais discos aparecem no Nextcloud? | (nenhum marcado; a lista vem de "Discos da máquina") |
 | Senha do administrador | (sem padrão; só na primeira instalação) |

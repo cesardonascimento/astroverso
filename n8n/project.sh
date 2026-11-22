@@ -227,24 +227,24 @@ def env(projeto):
 n8n, mail, discord, nextcloud = env("n8n"), env("mailserver"), env("discord"), env("nextcloud")
 creds = []
 if mail.get("IMAP_PASSWORD"):
-    creds.append({"id": "astroImapInbox01", "name": "Astroverso: caixa inbox (IMAP)", "type": "imap", "data": {
+    creds.append({"id": "astroversoImapInbox", "name": "Astroverso: caixa inbox (IMAP)", "type": "imap", "data": {
         "user": "inbox", "password": mail["IMAP_PASSWORD"], "host": "astroverso-mailserver", "port": 31143,
         "secure": False, "allowUnauthorizedCerts": False}})
 if discord.get("DISCORD_TOKEN"):
-    creds.append({"id": "astroDiscordBot01", "name": "Astroverso: bot do Discord", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroversoDiscordBot", "name": "Astroverso: bot do Discord", "type": "httpHeaderAuth", "data": {
         "name": "Authorization", "value": "Bot " + discord["DISCORD_TOKEN"]}})
 if n8n.get("NEXTCLOUD_APP_PASSWORD") and nextcloud.get("NEXTCLOUD_HOST") and nextcloud.get("ADMIN_USER"):
-    creds.append({"id": "astroNextcloud001", "name": "Astroverso: Nextcloud", "type": "nextCloudApi", "data": {
+    creds.append({"id": "astroversoNextcloud", "name": "Astroverso: Nextcloud", "type": "nextCloudApi", "data": {
         "webDavUrl": f"https://{nextcloud['NEXTCLOUD_HOST']}/remote.php/dav/files/{nextcloud['ADMIN_USER']}",
         "user": nextcloud["ADMIN_USER"], "password": n8n["NEXTCLOUD_APP_PASSWORD"]}})
 if n8n.get("ANTHROPIC_API_KEY"):
-    creds.append({"id": "astroAnthropic001", "name": "Astroverso: API da Anthropic", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroversoAnthropic", "name": "Astroverso: API da Anthropic", "type": "httpHeaderAuth", "data": {
         "name": "x-api-key", "value": n8n["ANTHROPIC_API_KEY"]}})
 if mail.get("SEND_KEY"):
-    creds.append({"id": "astroEnvioEmail01", "name": "Astroverso: envio de e-mail", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroversoEnvioEmail", "name": "Astroverso: envio de e-mail", "type": "httpHeaderAuth", "data": {
         "name": "X-Astroverso-Chave", "value": mail["SEND_KEY"]}})
 if n8n.get("N8N_HOOK_TOKEN"):
-    creds.append({"id": "astroHookAstro001", "name": "Astroverso: chamadas do assistente", "type": "httpHeaderAuth", "data": {
+    creds.append({"id": "astroversoHook", "name": "Astroverso: chamadas do assistente", "type": "httpHeaderAuth", "data": {
         "name": "X-Astroverso-Chave", "value": n8n["N8N_HOOK_TOKEN"]}})
 json.dump(creds, open(out, "w"))
 print(", ".join(c["name"].replace("Astroverso: ", "") for c in creds))

@@ -49,7 +49,7 @@ configure() {
     fi
 
     local username language timezone web_port dns_ip
-    ui_input  username "usuário do painel" "$(env_get ADGUARD_USERNAME admin)" is_name
+    ui_input  username "usuário do painel" "$(env_get ADGUARD_USERNAME astroverso)" is_name
     ui_secret NEW_PASSWORD "senha do painel"
     ui_input  web_port "porta do painel no host" "$(env_get WEB_PORT 8080)" is_port
     ui_input  dns_ip   "IP do host onde o DNS escuta (0.0.0.0 = todos)" "$(env_get DNS_BIND_IP 0.0.0.0)" is_ipv4
