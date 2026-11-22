@@ -82,7 +82,7 @@ rodada estão em "Avisos no Discord".
 
 ## Avisos no Discord
 
-Com o projeto discord instalado, as rotinas agendadas avisam no canal. Início e sucesso vão como mensagem
+Com o astroverso-discord instalado, as rotinas agendadas avisam no canal. Início e sucesso vão como mensagem
 silenciosa (ficam no canal, sem notificar o celular); falhas notificam.
 
 | Rotina | Início | Sucesso | Falha |
@@ -124,7 +124,7 @@ Sunshine e o resto da máquina sempre vêm primeiro.
 
 ## Avisos no Discord
 
-Com o projeto `discord` instalado, o rclone avisa, no máximo uma vez por dia por problema, e de novo quando ele
+Com o astroverso-discord instalado, o rclone avisa, no máximo uma vez por dia por problema, e de novo quando ele
 se resolve:
 
 | Aviso | Quando |

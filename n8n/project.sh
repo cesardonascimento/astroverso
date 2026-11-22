@@ -253,7 +253,7 @@ PYEOF
     chmod 600 "$tmp"
     if [[ -z $names ]]; then
         rm -f "$tmp"
-        ui_info "nenhuma credencial para as rotinas ainda (instale mailserver, nextcloud e discord)"
+        ui_info "nenhuma credencial para as rotinas ainda (instale mailserver, nextcloud e o astroverso-discord)"
         return 0
     fi
     if n8n_import credentials "$tmp"; then

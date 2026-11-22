@@ -1,13 +1,14 @@
-NOTIFY_QUEUE="$HOME/.astroverso/discord/fila"
+source "$(dirname "${BASH_SOURCE[0]}")/discord.sh"
+
 NOTIFY_FLAGS="${XDG_STATE_HOME:-$HOME/.local/state}/astroverso/notify"
 NOTIFY_REPEAT=86400
 
 notify_write() {
-    [[ -d $NOTIFY_QUEUE/saida && -d $NOTIFY_QUEUE/tmp ]] || return 2
-    local silent=$1 name tmp
+    discord_ready || return 2
+    local silent=$1 file
     shift
-    name="$(date +%s%N)-$$"
-    tmp="$NOTIFY_QUEUE/tmp/$name.json"
+    mkdir -p "$DISCORD_SPOOL"
+    file="$DISCORD_SPOOL/$(date +%s%N)-$$.json"
     if ! python3 -I -c '
 import json, sys
 host, project, channel, silent, text, *buttons = sys.argv[1:]
@@ -16,12 +17,13 @@ for button in buttons:
     label, action, arg = (button.split("|") + ["", ""])[:3]
     items.append({"rotulo": label, "acao": action, "arg": arg})
 print(json.dumps({"texto": f"**{host}** · {project}\n{text}", "botoes": items, "silencioso": silent == "1", "canal": channel}, ensure_ascii=False))
-' "$(hostname -s)" "${ASTROVERSO_PROJECT:-astroverso}" "${NOTIFY_CHANNEL:-astroverso}" "$silent" "$@" > "$tmp"; then
-        rm -f "$tmp"
+' "$(hostname -s)" "${ASTROVERSO_PROJECT:-astroverso}" "${NOTIFY_CHANNEL:-astroverso}" "$silent" "$@" > "$file.tmp"; then
+        rm -f "$file.tmp"
         ui_warn "não foi possível preparar o aviso para o Discord"
         return 1
     fi
-    mv "$tmp" "$NOTIFY_QUEUE/saida/$name.json"
+    mv "$file.tmp" "$file"
+    discord_flush || true
 }
 
 notify_send() {
@@ -49,7 +51,7 @@ notify_problem() {
     if ((status == 0)); then
         touch "$flag"
     elif ((status == 2)); then
-        ui_info "aviso não enviado (projeto discord não instalado): $text"
+        ui_info "aviso não enviado (astroverso-discord não configurado): $text"
     fi
     return 0
 }

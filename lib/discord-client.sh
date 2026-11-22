@@ -3,14 +3,17 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 ASTROVERSO_PROJECT=discord
-source ../lib/ui.sh
-source ../lib/env.sh
-source ../lib/host.sh
+source ui.sh
+source env.sh
+source host.sh
+source discord.sh
 
-FILA="$STATE/fila"
+ROOT="$(dirname "$PWD")"
+WORK="${XDG_STATE_HOME:-$HOME/.local/state}/astroverso/discord"
 TIMEOUT=600
-SELF=discord
 CONTAINER_OPS="start stop restart"
+CHANNELS=(financeiro dados sistema)
+PUBLISH_EVERY=300
 
 project_containers() {
     podman ps -a --format '{{.Names}}' | grep -E "^astroverso-$1(-[a-z0-9-]+)?$" | sort -r || true
@@ -20,11 +23,11 @@ catalog_lines() {
     echo "machine:status|Máquina: estado (containers, discos e próximos agendamentos)|nao|host|status|host"
     [[ -z $(host_machines) ]] || echo "machine:wake|Máquina: ligar outra máquina da rede (argumento: o nome cadastrado; sem ele, botões)|nao|host|wake|host"
     local file name id description confirm
-    for file in ../*/project.sh; do
+    for file in "$ROOT"/*/project.sh; do
         name="$(basename "$(dirname "$file")")"
         [[ -x $file ]] || continue
         "$file" status >/dev/null 2>&1 </dev/null || continue
-        if [[ $name != "$SELF" && -n $(project_containers "$name") ]]; then
+        if [[ -n $(project_containers "$name") ]]; then
             printf '%s\n' \
                 "$name:start|Serviço: iniciar $name|nao|$name|start|container" \
                 "$name:stop|Serviço: parar $name (fica parado até o start, mesmo depois de reiniciar a máquina)|sim|$name|stop|container" \
@@ -43,8 +46,8 @@ catalog_lines() {
 }
 
 help_lines() {
-    local file name
-    for file in ../*/project.sh; do
+    local file
+    for file in "$ROOT"/*/project.sh; do
         [[ -x $file ]] && grep -q '^    help)' "$file" || continue
         "$file" status >/dev/null 2>&1 </dev/null || continue
         "$file" help 2>/dev/null </dev/null || true
@@ -59,46 +62,48 @@ help_lines() {
         "Máquina e serviços|Ajuda|esta lista|quando quiser|help"
 }
 
-write_catalog() {
-    mkdir -p "$FILA"/{pedidos,respostas,saida,tmp,andamento}
-    catalog_lines | python3 -I -c '
+write_manifest() {
+    mkdir -p "$WORK"
+    python3 -I - "$WORK/catalogo.lines" "$WORK/ajuda.lines" "${CHANNELS[@]}" > "$WORK/manifesto.tmp" <<'PY'
 import json, sys
-items = []
-for line in sys.stdin:
+catalogo = []
+for line in open(sys.argv[1]):
     parts = line.rstrip("\n").split("|")
     if len(parts) >= 6 and parts[0]:
-        items.append({"id": parts[0], "descricao": parts[1], "confirmar": parts[2] == "sim",
-                      "projeto": parts[3], "op": parts[4], "tipo": parts[5]})
-print(json.dumps(items, ensure_ascii=False))
-' > "$FILA/tmp/catalogo.json"
-    mv "$FILA/tmp/catalogo.json" "$FILA/catalogo.json"
-    help_lines | python3 -I -c '
-import json, sys
-items, groups = [], []
-for line in sys.stdin:
+        catalogo.append({"id": parts[0], "descricao": parts[1], "confirmar": parts[2] == "sim",
+                         "projeto": parts[3], "op": parts[4], "tipo": parts[5]})
+ajuda, grupos = [], []
+for line in open(sys.argv[2]):
     parts = line.rstrip("\n").split("|")
     if len(parts) >= 5 and parts[1]:
         item = dict(zip(("grupo", "nome", "descricao", "quando", "comando"), parts[:5]))
         item["ordem"] = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else 50
-        if item["grupo"] not in groups:
-            groups.append(item["grupo"])
-        items.append(item)
-items.sort(key=lambda item: (groups.index(item["grupo"]), item["ordem"]))
-print(json.dumps(items, ensure_ascii=False))
-' > "$FILA/tmp/ajuda.json"
-    mv "$FILA/tmp/ajuda.json" "$FILA/ajuda.json"
+        if item["grupo"] not in grupos:
+            grupos.append(item["grupo"])
+        ajuda.append(item)
+ajuda.sort(key=lambda item: (grupos.index(item["grupo"]), item["ordem"]))
+canais = [{"nome": nome, "escrita": False, "escuta": False} for nome in sys.argv[3:]]
+print(json.dumps({"catalogo": catalogo, "ajuda": ajuda, "canais": canais, "botoes": []}, ensure_ascii=False))
+PY
+    mv "$WORK/manifesto.tmp" "$WORK/manifesto.json"
+}
+
+publish() {
+    mkdir -p "$WORK"
+    catalog_lines > "$WORK/catalogo.lines"
+    help_lines > "$WORK/ajuda.lines"
+    write_manifest
+    local answer
+    if answer="$(discord_api PUT /v1/cliente "$WORK/manifesto.json")"; then
+        ui_ok "catálogo publicado: $(python3 -I -c 'import json,sys; d=json.load(sys.stdin); print(d.get("comandos", 0), "comandos")' <<< "$answer" 2>/dev/null)"
+        return 0
+    fi
+    ui_warn "astroverso-discord não aceitou o catálogo ($(discord_url))"
+    return 1
 }
 
 catalog_entry() {
-    python3 -I -c '
-import json, sys
-for a in json.load(open(sys.argv[1])):
-    if a["id"] == sys.argv[2]:
-        print("\x1f".join((a.get("projeto", ""), a.get("op", ""), a.get("tipo", ""))))
-        break
-else:
-    sys.exit(1)
-' "$FILA/catalogo.json" "$1"
+    awk -F'|' -v id="$1" '$1 == id { printf "%s\x1f%s\x1f%s\n", $4, $5, $6; found = 1; exit } END { exit !found }' "$WORK/catalogo.lines"
 }
 
 next_run() {
@@ -146,33 +151,22 @@ container_op() {
 }
 
 respond() {
-    local id=$1 status=$2 output=$3 buttons=${4:-}
+    local id=$1 status=$2 output=$3 buttons=${4:-} file
+    file="$WORK/resposta-$id.json"
     python3 -I -c '
 import json, sys
-dados = {"id": sys.argv[1], "ok": sys.argv[2] == "0", "saida": sys.argv[3]}
-botoes = [dict(zip(("rotulo", "acao", "arg"), linha.split("|"))) for linha in sys.argv[4].splitlines() if linha]
+dados = {"ok": sys.argv[1] == "0", "saida": sys.argv[2]}
+botoes = [dict(zip(("rotulo", "acao", "arg"), linha.split("|"))) for linha in sys.argv[3].splitlines() if linha]
 if botoes:
     dados["botoes"] = botoes
 print(json.dumps(dados, ensure_ascii=False))
-' "$id" "$status" "$output" "$buttons" > "$FILA/tmp/$id.json"
-    mv "$FILA/tmp/$id.json" "$FILA/respostas/$id.json"
+' "$status" "$output" "$buttons" > "$file"
+    discord_api POST "/v1/eventos/$id/resposta" "$file" >/dev/null || ui_warn "resposta do pedido $id não entregue"
+    rm -f "$file"
 }
 
 process() {
-    local file=$1 work id="" action="" arg="" user="" name="" output="" buttons="" status=0 project op
-    work="$FILA/andamento/${file##*/}"
-    mv "$file" "$work" 2>/dev/null || return 0
-    IFS=$'\x1f' read -r id action arg user name < <(python3 -I -c '
-import json, sys
-d = json.load(open(sys.argv[1]))
-print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for k in ("id", "acao", "arg", "usuario", "nome")))
-' "$work" 2>/dev/null) || true
-    rm -f "$work"
-    if [[ ! $id =~ ^[a-f0-9]{32}$ ]]; then
-        ui_warn "pedido ilegível descartado"
-        return 0
-    fi
-    local kind="" entry=""
+    local id=$1 action=$2 arg=$3 user=$4 name=$5 output="" buttons="" status=0 project op kind entry=""
     if [[ $arg =~ ^[A-Za-z0-9._-]{0,64}$ ]]; then
         entry="$(catalog_entry "$action")" || entry=""
     fi
@@ -190,10 +184,10 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
         output="$(ASTROVERSO_PROJECT=astroverso host_wake "$arg" 2>&1)" || status=$?
     elif [[ $kind == host ]]; then
         output="$(host_status 2>&1)" || status=$?
-    elif [[ $kind == container && $project != "$SELF" && " $CONTAINER_OPS " == *" $op "* ]]; then
+    elif [[ $kind == container && " $CONTAINER_OPS " == *" $op "* ]]; then
         output="$(container_op "$project" "$op" 2>&1)" || status=$?
     else
-        output="$(timeout "$TIMEOUT" "../$project/project.sh" remote "$op" ${arg:+"$arg"} 2>&1 </dev/null)" || status=$?
+        output="$(timeout "$TIMEOUT" "$ROOT/$project/project.sh" remote "$op" ${arg:+"$arg"} 2>&1 </dev/null)" || status=$?
         ((status == 124)) && output+=$'\n'"interrompido: passou de $((TIMEOUT / 60)) minutos"
     fi
     output="$(sed 's/\x1b\[[0-9;]*m//g' <<< "$output")"
@@ -206,24 +200,56 @@ print("\x1f".join(str(d.get(k, "")).replace("\x1f", " ").replace("\n", " ") for 
     fi
 }
 
+events() {
+    local answer
+    answer="$(DISCORD_TIMEOUT=40 discord_api GET '/v1/eventos?espera=25')" || return 1
+    python3 -I -c '
+import json, sys
+for e in json.loads(sys.stdin.read() or "{}").get("eventos", []):
+    if e.get("tipo") != "comando":
+        continue
+    u = e.get("usuario") or {}
+    campos = (e.get("id", ""), e.get("acao", ""), e.get("arg", ""), u.get("id", ""), u.get("nome", ""))
+    print("\x1f".join(str(c).replace("\x1f", " ").replace("\n", " ") for c in campos))
+' <<< "$answer"
+}
+
 run() {
-    write_catalog
-    local file
+    local last=0 waited=false id action arg user name
+    mkdir -p "$WORK"
+    ui_info "cliente $DISCORD_CLIENT do astroverso-discord"
     while true; do
-        for file in "$FILA"/pedidos/*.json; do
-            [[ -f $file ]] || continue
-            process "$file" &
-        done
-        if [[ -z $(jobs -rp) ]] && ! compgen -G "$FILA/pedidos/*.json" >/dev/null; then
-            break
+        if ! discord_ready; then
+            $waited || ui_info "astroverso-discord não configurado nesta máquina: tento de novo a cada minuto"
+            waited=true
+            sleep 60
+            continue
         fi
-        sleep 1
+        if (($(date +%s) - last >= PUBLISH_EVERY)); then
+            if publish; then
+                last=$(date +%s)
+                ui_info "conectado a $(discord_url)"
+            else
+                sleep 30
+                continue
+            fi
+        fi
+        find "$DISCORD_SPOOL" -name '*.json' -mmin +4320 -delete 2>/dev/null || true
+        discord_flush || true
+        local list
+        if ! list="$(events)"; then
+            sleep 10
+            continue
+        fi
+        while IFS=$'\x1f' read -r id action arg user name; do
+            [[ $id =~ ^[a-f0-9]{32}$ ]] || continue
+            process "$id" "$action" "$arg" "$user" "$name" &
+        done <<< "$list"
     done
-    find "$FILA/respostas" -type f -mmin +1440 -delete 2>/dev/null || true
 }
 
 case "${1:-}" in
     run)     run ;;
-    catalog) write_catalog ;;
-    *)       ui_fail "uso: $0 run | catalog" ;;
+    publish) publish ;;
+    *)       ui_fail "uso: $0 run | publish" ;;
 esac

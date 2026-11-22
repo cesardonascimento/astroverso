@@ -45,13 +45,13 @@ versão** → n8n as traz do backup.
 
 **Credenciais** (`import:credentials` com `id` fixo, a partir de um arquivo temporário dentro do container, apagado
 logo depois; atualizadas a cada instalação e pela ação **Trocar a chave da API da Anthropic**; o n8n instala depois do
-mailserver, do nextcloud e do discord, e uma senha trocada num deles pede reinstalar o n8n). As
+mailserver, do nextcloud e do astroverso-discord, e uma senha trocada num deles pede reinstalar o n8n). As
 rotinas apontam para esses `id`, que não mudam entre instalações:
 
 | Credencial (`id`) | Origem |
 |---|---|
 | Astroverso: caixa inbox (IMAP) (`astroversoImapInbox`) | `astroverso-mailserver:31143`, usuário `inbox`, `IMAP_PASSWORD` do mailserver |
-| Astroverso: bot do Discord (`astroversoDiscordBot`) | cabeçalho `Authorization: Bot <token>` do projeto discord |
+| Astroverso: bot do Discord (`astroversoDiscordBot`) | cabeçalho `Authorization: Bot <token>` do astroverso-discord (`~/.astroverso/discord/.env`) |
 | Astroverso: Nextcloud (`astroversoNextcloud`) | `https://<NEXTCLOUD_HOST>/remote.php/dav/files/<administrador>` e uma senha de app `astroverso-n8n` criada uma vez pelo `occ user:auth-tokens:add` |
 | Astroverso: API da Anthropic (`astroversoAnthropic`) | cabeçalho `x-api-key` com `ANTHROPIC_API_KEY` |
 | Astroverso: envio de e-mail (`astroversoEnvioEmail`) | cabeçalho `X-Astroverso-Chave` com `SEND_KEY` do mailserver (envio pelo Worker, em `SEND_URL`) |

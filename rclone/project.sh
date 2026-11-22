@@ -696,7 +696,7 @@ cmd_install() {
     ui_step "Agendamentos"
     schedules
     if ! podman container exists astroverso-discord 2>/dev/null; then
-        ui_info "para receber avisos com botões quando algo der errado, instale também o projeto discord"
+        ui_info "para receber avisos com botões quando algo der errado, instale também o astroverso-discord"
     fi
 }
 

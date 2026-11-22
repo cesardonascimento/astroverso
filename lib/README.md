@@ -87,8 +87,16 @@ Bibliotecas compartilhadas:
   pergunta "usar a configuração já salva?" (falso sem `.env`); com `ASTROVERSO_REUSE_CONFIG=1` (troca de domínio),
   responde sim sem perguntar, e o projeto não deve fazer outras perguntas opcionais nesse caminho.
 - `lib/proxy.sh`: `proxy_domain` (domínio do Caddy, se configurado), `proxy_publish`, `proxy_unpublish` e `proxy_reload`.
-- `lib/notify.sh`: avisos pelo bot do projeto `discord` (deixa um arquivo na fila `~/.astroverso/discord/fila/saida`;
-  sem o projeto instalado, nada é enviado). `notify_problem <chave> <texto> [botões]` avisa um problema no máximo
+- `lib/discord.sh`: o cliente `homelab` do astroverso-discord. `discord_url` e `discord_key` acham o servidor (na
+  mesma máquina, `~/.astroverso/discord/.env` e `clientes/homelab.key`; noutra, `DISCORD_URL` e `DISCORD_KEY` no
+  `host.env`), `discord_api <método> <caminho> [arquivo JSON]` chama a API (chave pela entrada padrão do `curl`) e
+  `discord_flush` entrega a fila local de avisos (`~/.local/state/astroverso/avisos`).
+- `lib/discord-client.sh`: o serviço do usuário `astroverso-discord-cliente` (instalado pelo `host_base`): a cada 5
+  min publica o catálogo (máquina, `start|stop|restart` dos containers e os `remote-actions`), a ajuda (linhas do
+  `help`) e os canais de avisos; busca os pedidos (`GET /v1/eventos`), roda cada um (`machine:*` na máquina, `start|stop|restart`
+  no Podman, o resto por `project.sh remote`, 10 min de limite) e responde.
+- `lib/notify.sh`: avisos pelo astroverso-discord (`POST /v1/mensagens`; com o bot fora do ar, o aviso fica na fila
+  local e sai na próxima entrega; sem o astroverso-discord configurado, nada é enviado). `notify_problem <chave> <texto> [botões]` avisa um problema no máximo
   uma vez por dia (marca em `~/.local/state/astroverso/notify/<projeto>-<chave>`); `notify_resolved <chave> <texto>`
   avisa que ele acabou, só se houve aviso, em mensagem silenciosa. `notify_send <texto> [botões]` manda direto;
   `notify_info <texto> [botões]` também, mas silenciosa (fica no canal, sem notificar o celular). Cada botão é

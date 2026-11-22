@@ -252,6 +252,7 @@ host_upgrade() {
 }
 
 host_undo() {
+    host_discord_remove
     local target masked=()
     for target in "${HOST_SLEEP_TARGETS[@]}"; do
         [[ $(systemctl is-enabled "$target" 2>/dev/null) == masked ]] && masked+=("$target")
@@ -332,6 +333,30 @@ host_base() {
     host_autostart
     host_ssh
     host_tailscale
+    host_discord
+}
+
+HOST_DISCORD_UNIT=astroverso-discord-cliente
+
+host_discord() {
+    local dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user" bin
+    bin="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/discord-client.sh"
+    mkdir -p "$dir"
+    printf '[Unit]\nDescription=astroverso: cliente homelab do astroverso-discord (comandos e avisos)\nAfter=network-online.target\n\n[Service]\nEnvironment=ASTROVERSO_PLAIN=1\nExecStart=%s run\nRestart=always\nRestartSec=15\n\n[Install]\nWantedBy=default.target\n' \
+        "$bin" > "$dir/$HOST_DISCORD_UNIT.service"
+    systemctl --user daemon-reload
+    systemctl --user enable -q "$HOST_DISCORD_UNIT.service"
+    systemctl --user restart "$HOST_DISCORD_UNIT.service"
+    ui_ok "cliente do astroverso-discord ativo: comandos /astro e avisos desta máquina pelo bot"
+}
+
+host_discord_remove() {
+    local dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    [[ -e $dir/$HOST_DISCORD_UNIT.service ]] || return 0
+    systemctl --user disable -q --now "$HOST_DISCORD_UNIT.service" 2>/dev/null || true
+    rm -f "$dir/$HOST_DISCORD_UNIT.service"
+    systemctl --user daemon-reload
+    ui_ok "cliente do astroverso-discord removido"
 }
 
 host_lan_subnet() {
