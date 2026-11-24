@@ -83,7 +83,7 @@ ligado e desligado, num app especial de configurações do sistema. O desenho de
 
 ### Pacotes previstos
 
-- `kit`: interface (logs, prompts, menus), configuração (`.env`, validadores), camada `distro`, domínio padrão.
+- `kit`: interface (`kit.ui`: logs, prompts, menus, logo), configuração (`.env`, validadores), camada `distro`, domínio padrão.
 - `backup`: rotina de backup das configurações; instalado uma vez, descobre os apps instalados.
 - Cliente do Discord (avisos), quando chegar a vez. O servidor do bot fica no repositório `astroverso-discord`.
 
