@@ -38,7 +38,7 @@ o app ou pacote delas for migrado.
 - **Python 3.11 ou mais novo, só a biblioteca padrão.** Nada de `pip`, venv ou build: clonar e rodar.
 - **sh só onde não há alternativa:** o script de entrada `astroverso` (confere o `python3` e chama o programa) e
   os entrypoints dos containers.
-- Comandos do sistema por `subprocess`, com a lista de argumentos (nunca `shell=True`).
+- Comandos do sistema só pelo `kit.run` (`cmd`, `capture`, `succeeds`), com a lista de argumentos.
 - Anotações de tipo em tudo.
 - Testes com `unittest`, na pasta `tests/` de cada pacote ou app (`python3 -m unittest discover -s packages/kit`).
   Menus e prompts são testados por `pty` dentro dos próprios testes.
@@ -111,5 +111,5 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - `sudo` não funciona na sessão do Claude (sem TTY). Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
 - Não pedir nem aceitar segredos (tokens, senhas) no chat: eles entram pela instalação.
-- Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`subprocess.run(..., input=)`)
+- Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.

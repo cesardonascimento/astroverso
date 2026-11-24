@@ -40,6 +40,22 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 - O terminal é restaurado (eco, cursor, quebra de linha) mesmo com Ctrl+C, que chega ao chamador como
   `KeyboardInterrupt`.
 
+## run
+
+A única porta para comandos do sistema: os apps não chamam o `subprocess` direto. Só listas de argumentos.
+
+| Função | Na tela | Se falhar |
+|---|---|---|
+| `cmd(args, sudo=, input=, quiet=, timeout=)` | Saída e erros, linha a linha, ao vivo, com o prefixo e em cinza | `ui.fail` com o comando e o código. Com `quiet=True`, a saída só aparece se der erro |
+| `capture(args, sudo=, input=, timeout=)` | Nada: devolve a saída padrão (sem o `\n` do fim) | `ui.fail`, mostrando a saída de erro |
+| `succeeds(args, sudo=, timeout=)` | Nada | Devolve `False` (também para comando inexistente ou tempo esgotado) |
+| `sudo_prepare(motivo)` | Explica o motivo e pede a senha uma vez (`sudo -v`), se ainda não houver permissão | Sem terminal: "rode num terminal" |
+
+- **Segredos** só por `input=` (entrada padrão), nunca nos argumentos.
+- `sudo=True` põe `sudo` na frente; sem terminal (systemd), `sudo -n`, que falha na hora em vez de esperar senha.
+- Sem `input=`, o comando herda o terminal: o que pede uma ação do usuário (ex.: o endereço de login do
+  `tailscale up`) aparece ao vivo e espera.
+
 ## logo
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao
