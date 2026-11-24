@@ -84,8 +84,7 @@ backup/           código antigo, só referência
 
 ### App `network`
 
-Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`, um arquivo por parte). Hoje só o
-Tailscale existe. Decisões:
+Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`, um arquivo por parte). Decisões:
 
 - O servidor anuncia no Tailscale **só o próprio IP** (`<ip>/32`), sem encaminhamento nem masquerade: o Split DNS
   aponta o domínio para o IP local, e o Caddy repassa pela rede local para os outros aparelhos (painéis web de
@@ -95,8 +94,13 @@ Tailscale existe. Decisões:
 - Pacote dos repositórios da distribuição; o `remove` desinstala o pacote e tira a máquina da conta.
 - Perguntas explicadas para quem não conhece o projeto (`ui.note` antes de cada etapa) e a ação "Resumo da rede"
   em tabelas, que ganha as partes do AdGuard e do Caddy quando elas chegarem.
-- Os outros apps publicam endereços pelo `kit.routes` (pasta `~/.astroverso/routes/`, de nenhum app), consumida
-  pelo Caddy do `network`.
+- AdGuard: imagem oficial na rede do host, escutando no IP da rede e no `127.0.0.1`; o servidor pergunta a ele só
+  pelo `~<domínio>`; o roteador entrega aos aparelhos o AdGuard **e um DNS secundário** (nunca sem DNS).
+- Caddy: imagem local com o módulo da Cloudflare, cadeado curinga `*.<domínio>` por DNS-01; painéis web de
+  aparelhos da rede entram como endereços (nome, IP, porta), nunca como rotas do Tailscale.
+- Os outros apps publicam endereços em `~/.astroverso/routes/<app>.json` (`[{"host", "target"}]`, pasta de nenhum
+  app); o Caddy do `network` os lê ao recarregar. O `kit.routes` e a recarga automática (unidade `.path`) entram com
+  o primeiro app que publicar um endereço.
 
 ### Configurações do sistema
 

@@ -134,6 +134,12 @@ container.remove(spec.name, spec.image)
 | `active(nome)` | A unidade está rodando |
 | `remove(nome, imagem=)` | Para a unidade, apaga o arquivo e, se pedida, a imagem; apaga a rede quando nenhum outro container a usa |
 | `once(imagem, args, input=)` | Roda um comando num container descartável e devolve a saída (segredos pela entrada padrão) |
+| `build(imagem, Containerfile, args=)` | Monta uma imagem local (se ainda não existir), sem guardar camadas intermediárias |
+| `exec(nome, args)` | Roda um comando num container em execução e devolve a saída (ex.: recarregar a configuração) |
+| `remove_image(imagem)` | Apaga uma imagem, se existir |
+
+O `Container` aceita `env_file`: um arquivo de variáveis (ex.: com um token, `600`), para segredos não ficarem no
+arquivo da unidade.
 
 - Unidade `<nome>.service`, com `Restart=always` e `WantedBy=default.target`. Logs: `journalctl --user -u <nome>`.
 - Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. Quebra de linha é

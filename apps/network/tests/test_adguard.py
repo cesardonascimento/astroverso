@@ -127,7 +127,7 @@ class AdGuardTest(unittest.TestCase):
         self.assertEqual(calls[2][:3], ("once", adguard.HASHER, ["caddy", "hash-password"]))
         self.assertEqual(calls[2][3], "senha1\n")
         self.assertIn(("sysctl_set", "network", {"net.ipv4.ip_unprivileged_port_start": "53"}), calls)
-        self.assertIn(("open", "dns", "8080/tcp"), calls)
+        self.assertIn(("open", "dns"), calls)
         self.assertIn(("start", adguard.NAME), calls)
         self.assertIn(("resolver", "network", "casa.com", "127.0.0.1"), calls)
         self.assertEqual(config.saved_domain(), "casa.com")
@@ -171,7 +171,7 @@ class AdGuardTest(unittest.TestCase):
             adguard.remove()
         self.assertEqual(host.calls, [
             ("sudo",), ("remove", adguard.NAME, adguard.IMAGE), ("remove_image", adguard.HASHER),
-            ("resolver_remove", "network"), ("close", "dns", "8080/tcp"), ("sysctl_remove", "network"),
+            ("resolver_remove", "network"), ("close", "dns"), ("sysctl_remove", "network"),
         ])
 
     def test_summary(self) -> None:
@@ -187,7 +187,7 @@ class AdGuardTest(unittest.TestCase):
         self.assertIn("*.casa.com → 192.168.0.10", text)
         self.assertIn("✔ casa.com → 192.168.0.10", text)
         self.assertIn("! pendente", text)
-        self.assertIn("http://192.168.0.10:8080 (usuário dono)", text)
+        self.assertIn("https://adguard.casa.com (usuário dono)", text)
 
 
 if __name__ == "__main__":

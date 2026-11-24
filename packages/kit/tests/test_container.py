@@ -136,6 +136,18 @@ class ContainerTest(unittest.TestCase):
         distro.install.assert_called_once_with(["podman"])
         self.assertIn(("loginctl", "enable-linger", "dono"), fake.calls)
 
+    def test_env_file_build_exec(self) -> None:
+        spec = container.Container("a", "img", "c", env_file=Path("/x/caddy.env"))
+        self.assertIn("EnvironmentFile=/x/caddy.env\n", container.render(spec))
+        fake = self.use(FakeRun())
+        container.build("localhost/existe:1", Path("/app/caddy.Containerfile"))
+        container.build("localhost/nova:1", Path("/app/caddy.Containerfile"), {"VERSAO": "2"})
+        self.assertIn(("podman", "build", "-q", "--layers=false", "-t", "localhost/nova:1", "-f", "/app/caddy.Containerfile",
+                       "--build-arg=VERSAO=2", "/app"), fake.calls)
+        self.assertFalse(any(call[:2] == ("podman", "build") and "localhost/existe:1" in call for call in fake.calls))
+        container.exec("a", ["caddy", "reload"])
+        self.assertIn(("podman", "exec", "a", "caddy", "reload"), fake.calls)
+
     def test_once(self) -> None:
         fake = self.use(FakeRun())
         self.assertEqual(container.once("img:1", ["hash"], input="segredo"), "resultado")

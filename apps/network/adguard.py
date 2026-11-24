@@ -95,7 +95,7 @@ def install(reuse: bool) -> None:
         values = config.load(APP)
         regenerate = True
     distro.sysctl_set(APP, {"net.ipv4.ip_unprivileged_port_start": "53"})
-    distro.firewall_open(["dns", f"{WEB_PORT}/tcp"])
+    distro.firewall_open(["dns"])
     if regenerate:
         _write_conf(values["ADGUARD_USER"], values["ADGUARD_PASSWORD_HASH"], domain, address)
     container.start(spec())
@@ -186,7 +186,7 @@ def remove() -> None:
     container.remove(NAME, IMAGE)
     container.remove_image(HASHER)
     distro.resolver_route_remove(APP)
-    distro.firewall_close(["dns", f"{WEB_PORT}/tcp"])
+    distro.firewall_close(["dns"])
     distro.sysctl_remove(APP)
 
 
@@ -207,7 +207,7 @@ def summary() -> None:
         rows.append(["Split DNS", ui.good(f"{domain} → {server}") if server == address else (
             ui.bad(f"{domain} → {server}") if server else ui.pending("falta configurar no painel do Tailscale"))])
     rows.append(["Roteador (DNS)", ui.good("feito") if values.get("ROUTER_DNS") == "yes" else ui.pending("pendente")])
-    rows.append(["Painel", f"http://{address}:{WEB_PORT} (usuário {values.get('ADGUARD_USER', '-')})"])
+    rows.append(["Painel", f"https://adguard.{domain} (usuário {values.get('ADGUARD_USER', '-')})"])
     ui.table(rows)
 
 
@@ -217,5 +217,4 @@ def port_rows() -> list[list[str | ui.Cell]]:
 
     return [
         ["53 (tcp/udp)", "DNS (AdGuard)", state("dns"), "-"],
-        [f"{WEB_PORT}/tcp", "Painel do AdGuard", state(f"{WEB_PORT}/tcp"), "-"],
     ]

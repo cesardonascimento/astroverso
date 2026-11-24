@@ -29,6 +29,7 @@ class Container:
     environment: Mapping[str, str] = field(default_factory=dict)
     command: Sequence[str] = ()
     health: str = ""
+    env_file: Path | None = None
 
 
 def quadlets() -> Path:
@@ -62,6 +63,8 @@ def render(spec: Container) -> str:
     lines += [f"Volume={_quote(f'{volume.source}:{volume.target}:{volume.options}')}" for volume in spec.volumes]
     lines += [f"PublishPort={_quote(port)}" for port in spec.ports]
     lines += [f"Environment={_quote(f'{key}={value}')}" for key, value in spec.environment.items()]
+    if spec.env_file:
+        lines.append(f"EnvironmentFile={_quote(str(spec.env_file))}")
     if spec.command:
         lines.append(f"Exec={' '.join(_quote(part) for part in spec.command)}")
     if spec.health:
@@ -101,6 +104,19 @@ def pull(image: str) -> None:
     ui.info(f"baixando {image}...")
     run.cmd(["podman", "pull", "-q", image], quiet=True, timeout=1800)
     ui.ok(f"imagem {image} baixada")
+
+
+def build(image: str, file: Path, args: Mapping[str, str] | None = None) -> None:
+    if run.succeeds(["podman", "image", "exists", image]):
+        return
+    ui.info(f"montando a imagem {image} (alguns minutos na primeira vez)...")
+    extra = [f"--build-arg={key}={value}" for key, value in (args or {}).items()]
+    run.cmd(["podman", "build", "-q", "--layers=false", "-t", image, "-f", str(file), *extra, str(file.parent)], quiet=True, timeout=3600)
+    ui.ok(f"imagem {image} montada")
+
+
+def exec(name: str, args: Sequence[str]) -> str:
+    return run.capture(["podman", "exec", name, *args])
 
 
 def start(spec: Container, timeout: float = 180) -> None:

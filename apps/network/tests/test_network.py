@@ -126,6 +126,11 @@ class NetworkTest(unittest.TestCase):
             mock.patch.object(network.adguard, "summary"),
             mock.patch.object(network.adguard, "port_rows", return_value=[]),
             mock.patch.object(network.adguard, "installed", return_value=True),
+            mock.patch.object(network.caddy, "install"),
+            mock.patch.object(network.caddy, "remove"),
+            mock.patch.object(network.caddy, "summary"),
+            mock.patch.object(network.caddy, "port_rows", return_value=[]),
+            mock.patch.object(network.caddy, "installed", return_value=True),
         ):
             patch.start()
             self.addCleanup(patch.stop)
@@ -193,11 +198,13 @@ class NetworkTest(unittest.TestCase):
         config.save("network", {"ROUTER_FORWARD": "yes"})
         folder = self.home / "backup"
         folder.mkdir()
-        with mock.patch.object(network.adguard, "conf_file", return_value=self.home / "nada"):
+        with mock.patch.object(network.adguard, "conf_file", return_value=self.home / "nada"), \
+                mock.patch.object(network.caddy, "folder", return_value=self.home / "caddy"):
             network.backup(folder)
         self.assertEqual((folder / ".env").read_text(), "ROUTER_FORWARD=yes\n")
         config.env_file("network").unlink()
-        with mock.patch.object(network, "install") as install, mock.patch.object(network.adguard, "conf_file", return_value=self.home / "nada"):
+        with mock.patch.object(network, "install") as install, mock.patch.object(network.adguard, "conf_file", return_value=self.home / "nada"), \
+                mock.patch.object(network.caddy, "folder", return_value=self.home / "caddy"):
             network.restore(folder)
         install.assert_called_once_with(reuse=True)
         self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "yes"})
@@ -205,7 +212,7 @@ class NetworkTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.use(FakeSystem(installed=True, running=True))
-        self.assertEqual([action.id for action in network.actions()], ["summary", "reconnect", "router", "router-dns"])
+        self.assertEqual([action.id for action in network.actions()], ["summary", "reconnect", "router", "devices", "reload", "router-dns"])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             tailscale.mark_router()
         self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "yes"})
