@@ -24,20 +24,33 @@ o app ou pacote delas for migrado.
 - **Micro commits.** Desenvolver um pedaço pequeno por vez: primeiro descrever a arquitetura daquele pedaço e
   esperar a aprovação do usuário, depois implementar. Depois de aprovado, fazer commit e push sem perguntar.
   Mensagens em português, terminando com a linha `Co-Authored-By` da sessão.
-- **Sem comentários no código.** Mensagens de log, sim, bem formatadas.
+- **Sem comentários nem docstrings no código.** Mensagens de log, sim, bem formatadas.
 - Toda mensagem na tela usa o prefixo do projeto ou do app (`[astroverso]`, `[adguard]`...), inclusive prompts,
-  o prompt do `sudo` e os logs de dentro dos containers. Usar as funções do pacote `kit`, nunca `echo` solto.
+  o prompt do `sudo` e os logs de dentro dos containers. Usar o `kit.ui`, nunca `print` (nem `echo`) solto.
+- **Bonito e amigável.** O instalador e o gerenciador cuidam do visual: cores da marca conforme o contexto e o
+  logo na abertura, sempre com uma saída sem cor legível (journal, `NO_COLOR`).
 - Preferir o caminho simples e remover etapas desnecessárias.
 - **Tudo funciona pela rede local**, mesmo com o Tailscale conectado. Não sugerir o IP do Tailscale como
   caminho de acesso.
+
+## Linguagem
+
+- **Python 3.11 ou mais novo, só a biblioteca padrão.** Nada de `pip`, venv ou build: clonar e rodar.
+- **sh só onde não há alternativa:** o script de entrada `astroverso` (confere o `python3` e chama o programa) e
+  os entrypoints dos containers.
+- Comandos do sistema por `subprocess`, com a lista de argumentos (nunca `shell=True`).
+- Anotações de tipo em tudo.
+- Testes com `unittest`, na pasta `tests/` de cada pacote ou app (`python3 -m unittest discover -s packages/kit`).
+  Menus e prompts são testados por `pty` dentro dos próprios testes.
+- O script de entrada põe `packages/` no `PYTHONPATH`; os apps importam assim: `from kit import ui`.
 
 ## Alvo
 
 - **Fedora Server**, sem interface gráfica. Acesso remoto só pelo Cockpit e pelo SSH.
 - Outras distribuições virão depois: nenhum app chama o gerenciador de pacotes, o firewall ou o systemd do
-  sistema diretamente. Tudo passa pela camada `os` do pacote `kit` (`os_install`, `os_firewall_open`,
-  `os_service_enable`...), com um arquivo por distribuição (`packages/kit/os/fedora.sh`). Distribuição sem
-  arquivo: a instalação para no início com "distribuição não suportada".
+  sistema diretamente. Tudo passa pela camada `kit.distro` (`install`, `firewall_open`,
+  `service_enable`...), com um módulo por distribuição (`packages/kit/distro/fedora.py`). Distribuição sem
+  módulo: a instalação para no início com "distribuição não suportada".
 - O Astroverso não depende de uma máquina específica: qualquer máquina instala só os apps que quiser.
 
 ## Arquitetura
@@ -52,7 +65,7 @@ backup/           código antigo, só referência
 
 - **Autônomos.** Um app não conhece nenhum outro app: não cita `apps/<outro>`, não lê `~/.astroverso/<outro>`
   e não depende de ordem de instalação nem de uma etapa prévia da máquina. Depende só de `packages/`.
-- Cada app instala as próprias dependências, pela camada `os` do `kit`.
+- Cada app instala as próprias dependências, pela camada `kit.distro`.
 - **Endereço.** Todo app com interface na rede tem uma etapa de endereço: `<serviço>.<domínio>`. O domínio é
   perguntado pelo `kit` na primeira instalação e gravado em `~/.astroverso/astroverso.env`; os apps seguintes já
   trazem esse domínio como padrão.
@@ -70,7 +83,7 @@ ligado e desligado, num app especial de configurações do sistema. O desenho de
 
 ### Pacotes previstos
 
-- `kit`: interface (logs, prompts, menus), configuração (`.env`, validadores), camada `os`, domínio padrão.
+- `kit`: interface (logs, prompts, menus), configuração (`.env`, validadores), camada `distro`, domínio padrão.
 - `backup`: rotina de backup das configurações; instalado uma vez, descobre os apps instalados.
 - Cliente do Discord (avisos), quando chegar a vez. O servidor do bot fica no repositório `astroverso-discord`.
 
@@ -95,4 +108,5 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - `sudo` não funciona na sessão do Claude (sem TTY). Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
 - Não pedir nem aceitar segredos (tokens, senhas) no chat: eles entram pela instalação.
-- Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão ou por arquivo temporário.
+- Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`subprocess.run(..., input=)`)
+  ou por arquivo temporário.
