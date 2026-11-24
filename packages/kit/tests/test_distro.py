@@ -135,6 +135,16 @@ class DistroTest(unittest.TestCase):
         self.assertIn("liberado no firewall: 41641/udp, samba", self.out.getvalue())
         self.assertIn("fechado no firewall: 80/tcp", self.out.getvalue())
 
+    def test_firewall_allowed(self) -> None:
+        active = {("systemctl", "is-active", "-q", "firewalld"): True}
+        lists = {("firewall-cmd", "--list-ports"): "1025-65535/udp 80/tcp", ("firewall-cmd", "--list-services"): "ssh"}
+        self.use(Recorder(active, lists))
+        self.assertTrue(fedora.firewall_allowed("41641/udp"))
+        self.assertTrue(fedora.firewall_allowed("80/tcp"))
+        self.assertFalse(fedora.firewall_allowed("41641/tcp"))
+        self.assertTrue(fedora.firewall_allowed("ssh"))
+        self.assertFalse(fedora.firewall_allowed("samba"))
+
     def test_firewall_inactive(self) -> None:
         recorder = self.use(Recorder())
         fedora.firewall_open(["41641/udp"])

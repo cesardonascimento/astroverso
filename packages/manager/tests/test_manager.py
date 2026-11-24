@@ -87,6 +87,19 @@ class ManagerTest(unittest.TestCase):
         self.assertEqual(apps["quebrado"].problem, "falta install, remove, backup, restore")
         self.assertIn("falhou", apps["erro"].problem)
 
+    def test_app_with_modules(self) -> None:
+        state = self.root / "pacote.state"
+        source = APP.format(state=str(state), name="pacote", install="pass").replace(
+            "from kit.app import Action", "from kit.app import Action\nfrom . import helper"
+        ).replace('    ui.ok("instalando")', "    ui.ok(helper.TEXT)")
+        folder = self.apps / "pacote"
+        folder.mkdir()
+        (folder / "app.py").write_text(source)
+        (folder / "helper.py").write_text('TEXT = "veio do helper"\n')
+        code, out, _ = self.run_cli("pacote", "install")
+        self.assertEqual(code, 0, out)
+        self.assertIn("veio do helper", out)
+
     def test_direct_commands(self) -> None:
         state = self.app("bom")
         self.assertEqual(self.run_cli("bom", "status")[0], 1)

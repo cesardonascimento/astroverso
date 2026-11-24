@@ -77,10 +77,27 @@ backup/           código antigo, só referência
 - **Backup das configurações.** Cada app implementa `backup(pasta)` e `restore(pasta)`. Se o pacote `backup`
   estiver instalado, o app entra na rotina sozinho; se não, a instalação avisa e segue.
 
+### App `network`
+
+Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`, um arquivo por parte). Hoje só o
+Tailscale existe. Decisões:
+
+- O servidor anuncia no Tailscale **só o próprio IP** (`<ip>/32`), sem encaminhamento nem masquerade: o Split DNS
+  aponta o domínio para o IP local, e o Caddy repassa pela rede local para os outros aparelhos (painéis web de
+  roteadores e PCs entram como endereços do Caddy, nunca como rotas do Tailscale).
+- O servidor não aceita rotas de outros aparelhos (`--accept-routes=false`): uma rota anunciada por outro aparelho
+  desviaria pelo Tailscale o tráfego da própria rede local.
+- Pacote dos repositórios da distribuição; o `remove` desinstala o pacote e tira a máquina da conta.
+- Perguntas explicadas para quem não conhece o projeto (`ui.note` antes de cada etapa) e a ação "Resumo da rede"
+  em tabelas, que ganha as partes do AdGuard e do Caddy quando elas chegarem.
+- Os outros apps publicam endereços pelo `kit.routes` (pasta `~/.astroverso/routes/`, de nenhum app), consumida
+  pelo Caddy do `network`.
+
 ### Configurações do sistema
 
-Toda mudança que o Astroverso faz no sistema (energia, portas, serviços, DNS...) é um módulo que pode ser
-ligado e desligado, num app especial de configurações do sistema. O desenho dele terá a própria etapa.
+Toda mudança que o Astroverso faz no sistema (energia, SSH, suspensão...) é um módulo que pode ser ligado e
+desligado, num app especial de configurações do sistema. O que só existe por causa de um app (ex.: a porta do
+Tailscale no firewall) fica nesse app e sai no `remove` dele. O desenho dele terá a própria etapa.
 
 ### Pacotes previstos
 

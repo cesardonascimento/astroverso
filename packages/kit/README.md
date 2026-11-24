@@ -22,6 +22,9 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 | `step`, `info`, `ok`, `warn` | Etapa e mensagens (saída padrão) |
 | `error(texto)` / `fail(texto)` | Erro na saída de erro; `fail` também encerra com código 1 |
 | `prefixed(texto)` | Saída de um comando, linha a linha, com o prefixo e em cinza |
+| `note(texto)` | Explicação em itálico, recuada e quebrada na largura do terminal (antes de uma pergunta ou etapa) |
+| `section(título)` | Título de um bloco, como as tabelas de um resumo |
+| `table(linhas, columns=)` | Tabela com bordas arredondadas (sem `columns`, vira uma tabela de rótulo e valor). Células com situação: `good` (✔ verde), `pending` (! âmbar), `off` (○ cinza), `bad` (✘ vermelho). As colunas encolhem com `…` se o terminal for estreito; sem cor, sai em colunas alinhadas, sem bordas |
 | `ask(rótulo, default=, validate=)` | Pergunta e devolve o texto, repetindo enquanto o validador recusar |
 | `secret(rótulo, confirm=True)` | Pergunta sem eco, com confirmação (ou sem, com `confirm=False`) |
 | `ask_list(rótulo, validate=)` | Lista de valores, um por pergunta, até um Enter vazio |
@@ -66,7 +69,7 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 |---|---|
 | Pacotes | `installed(pacote)`, `install(pacotes)`, `uninstall(pacotes)`, `add_repo(nome, url)`, `remove_repo(nome)` |
 | Serviços do sistema | `service_active(nome)`, `service_enable(nome)` (agora e no boot), `service_disable(nome)` |
-| Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_masquerade(ligado)` |
+| Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_allowed(item)` (liberado, inclusive dentro de uma faixa; verdadeiro sem firewall), `firewall_masquerade(ligado)` |
 | sysctl | `sysctl_set(nome, valores)` (`/etc/sysctl.d/99-astroverso-<nome>.conf`, aplicado na hora), `sysctl_remove(nome)` |
 
 - Tudo é idempotente: só age, e só mostra um ✔, quando algo muda.

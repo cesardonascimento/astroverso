@@ -110,7 +110,7 @@ class ValidateTest(unittest.TestCase):
         self.check(validate.port, {"80": "80", "065535": "65535"}, ["0", "65536", "-1", "x", ""])
 
     def test_name(self) -> None:
-        self.check(validate.name, {"Rigel-2": "rigel-2"}, ["2abc", "a_b", "", "a" * 64])
+        self.check(validate.name, {"Servidor-2": "servidor-2"}, ["2abc", "a_b", "", "a" * 64])
 
     def test_email(self) -> None:
         self.check(validate.email, {" nome@casa.com ": "nome@casa.com"}, ["nome", "nome@casa", "@casa.com"])

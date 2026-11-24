@@ -32,7 +32,9 @@ class LoadedApp:
 
 def load(folder: Path) -> LoadedApp:
     app = LoadedApp(folder.name)
-    spec = importlib.util.spec_from_file_location(f"astroverso_app_{folder.name}", folder / "app.py")
+    spec = importlib.util.spec_from_file_location(
+        f"astroverso_app_{folder.name.replace('-', '_')}", folder / "app.py", submodule_search_locations=[str(folder)]
+    )
     if spec is None or spec.loader is None:
         app.problem = "app.py não pode ser lido"
         return app

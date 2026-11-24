@@ -116,6 +116,24 @@ def firewall_close(items: Sequence[str]) -> None:
         ui.ok(f"fechado no firewall: {', '.join(changed)}")
 
 
+def _covers(rule: str, item: str) -> bool:
+    if rule == item:
+        return True
+    span, _, protocol = rule.partition("/")
+    number, _, item_protocol = item.partition("/")
+    if protocol != item_protocol or "-" not in span or not number.isdigit():
+        return False
+    start, _, end = span.partition("-")
+    return int(start) <= int(number) <= int(end)
+
+
+def firewall_allowed(item: str) -> bool:
+    if not _firewalld():
+        return True
+    kind = _kind(item)
+    return any(_covers(rule, item) for rule in _listed(kind)) if kind == "port" else item in _listed(kind)
+
+
 def firewall_masquerade(enabled: bool) -> None:
     if not _firewalld() or run.succeeds(["firewall-cmd", "-q", "--query-masquerade"]) == enabled:
         return

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import os
 import select
+import shutil
 import sys
 import termios
+import textwrap
 import tty
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import NoReturn, TextIO
 
 from kit import logo
@@ -132,6 +135,103 @@ def prefixed(text: str, stream: TextIO | None = None) -> None:
     for line in text.splitlines():
         out.write(f"{_tag(depth)}       {_paint(line, depth, GRAY)}\n")
     out.flush()
+
+
+def _width(stream: TextIO) -> int:
+    try:
+        return os.get_terminal_size(stream.fileno()).columns or 100
+    except (AttributeError, OSError, ValueError):
+        return shutil.get_terminal_size((100, 24)).columns
+
+
+def note(text: str) -> None:
+    depth = _stream_depth(sys.stdout)
+    width = max(30, min(_width(sys.stdout), 110) - len(_app) - 9)
+    for paragraph in text.split("\n"):
+        for line in textwrap.wrap(paragraph, width) or [""]:
+            styled = f"\033[3m{line}\033[0m" if depth else line
+            sys.stdout.write(f"{_tag(depth)}       {styled}\n")
+    sys.stdout.flush()
+
+
+def section(title: str) -> None:
+    depth = _stream_depth(sys.stdout)
+    sys.stdout.write(f"{chr(10) if depth else ''}{_tag(depth)}     {_paint(title, depth, SOFT, bold=True)}\n")
+    sys.stdout.flush()
+
+
+@dataclass(frozen=True)
+class Cell:
+    text: str
+    rgb: Rgb | None = None
+    icon: str = ""
+
+    @property
+    def plain(self) -> str:
+        return f"{self.icon} {self.text}" if self.icon else self.text
+
+
+def good(text: str) -> Cell:
+    return Cell(text, GREEN, "✔")
+
+
+def pending(text: str) -> Cell:
+    return Cell(text, AMBER, "!")
+
+
+def off(text: str) -> Cell:
+    return Cell(text, GRAY, "○")
+
+
+def bad(text: str) -> Cell:
+    return Cell(text, RED, "✘")
+
+
+def _fit(text: str, width: int) -> str:
+    return text if len(text) <= width else text[: max(width - 1, 0)] + "…"
+
+
+def table(rows: Sequence[Sequence[str | Cell]], columns: Sequence[str] | None = None) -> None:
+    depth = _stream_depth(sys.stdout)
+    header = [Cell(column) for column in columns or []]
+    body = [[cell if isinstance(cell, Cell) else Cell(str(cell)) for cell in row] for row in rows]
+    count = max([len(header)] + [len(row) for row in body])
+    if not count:
+        return
+    lines = ([header] if header else []) + body
+    lines = [line + [Cell("")] * (count - len(line)) for line in lines]
+    widths = [max(len(line[i].plain) for line in lines) for i in range(count)]
+    room = _width(sys.stdout) - len(_app) - 7 - (3 * count + 1 if depth else 2 * (count - 1))
+    while sum(widths) > room and max(widths) > 4:
+        widths[widths.index(max(widths))] -= 1
+    tag = _tag(depth)
+    out: list[str] = []
+    if not depth:
+        for line in lines:
+            out.append("  ".join(_fit(cell.plain, widths[i]).ljust(widths[i]) for i, cell in enumerate(line)).rstrip())
+        sys.stdout.write("".join(f"{tag}     {text}\n" for text in out))
+        sys.stdout.flush()
+        return
+
+    def border(left: str, middle: str, right: str) -> str:
+        return _paint(left + middle.join("─" * (width + 2) for width in widths) + right, depth, GRAY)
+
+    def row(line: list[Cell], bold: bool = False) -> str:
+        bar = _paint("│", depth, GRAY)
+        cells = []
+        for i, cell in enumerate(line):
+            text = _fit(cell.plain, widths[i])
+            cells.append(_paint(text, depth, cell.rgb, bold=bold) + " " * (widths[i] - len(text)))
+        return f"{bar} " + f" {bar} ".join(cells) + f" {bar}"
+
+    out.append(border("╭", "┬", "╮"))
+    if header:
+        out.append(row(lines[0], bold=True))
+        out.append(border("├", "┼", "┤"))
+    out.extend(row(line) for line in lines[1 if header else 0:])
+    out.append(border("╰", "┴", "╯"))
+    sys.stdout.write("".join(f"{tag}     {text}\n" for text in out))
+    sys.stdout.flush()
 
 
 def _fg(rgb: Rgb, depth: int) -> str:

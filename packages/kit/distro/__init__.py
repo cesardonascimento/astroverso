@@ -81,6 +81,10 @@ def firewall_close(items: Sequence[str]) -> None:
     backend().firewall_close(items)
 
 
+def firewall_allowed(item: str) -> bool:
+    return bool(backend().firewall_allowed(item))
+
+
 def firewall_masquerade(enabled: bool) -> None:
     backend().firewall_masquerade(enabled)
 
