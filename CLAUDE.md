@@ -74,6 +74,9 @@ backup/           código antigo, só referência
   `astroverso` e com o nome `astroverso-<app>` (`astroverso-<app>-<parte>` quando houver mais de um).
 - **Estado fora do repositório:** tudo o que a instalação gera fica em `~/.astroverso/<app>`; o repositório só
   tem código.
+- **README com a tabela de mudanças.** Todo `apps/<app>/README.md` tem uma tabela **Mudança | Por quê** com
+  cada mudança que o instalador faz (pacotes, serviços, portas, arquivos do sistema, contas, estado) e outra com
+  os passos fora da máquina. Ela é atualizada no mesmo commit de qualquer mudança no instalador.
 - **Backup das configurações.** Cada app implementa `backup(pasta)` e `restore(pasta)`. Se o pacote `backup`
   estiver instalado, o app entra na rotina sozinho; se não, a instalação avisa e segue.
 

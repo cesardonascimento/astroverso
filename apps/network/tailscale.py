@@ -12,6 +12,10 @@ SERVICE = "tailscaled"
 PORT = "41641/udp"
 STATE_DIR = "/var/lib/tailscale"
 ADMIN = "https://login.tailscale.com/admin/machines"
+WINDOWS_RULE = (
+    'New-NetFirewallRule -DisplayName "Tailscale" -Direction Inbound -Protocol UDP -LocalPort 41641 -Action Allow'
+)
+LINUX_RULE = "sudo firewall-cmd --permanent --add-port=41641/udp && sudo firewall-cmd --reload"
 
 
 def status() -> dict:
@@ -65,6 +69,7 @@ def install(reuse: bool) -> None:
     _login()
     _advertise()
     _router(reuse)
+    _other_machines()
 
 
 def _login() -> None:
@@ -127,6 +132,17 @@ def _router(reuse: bool) -> None:
     config.save(APP, {"ROUTER_FORWARD": "yes" if done else "no"})
     if not done:
         ui.warn("redirecionamento pendente: depois de fazer, use a ação Marcar o redirecionamento no roteador como feito")
+
+
+def _other_machines() -> None:
+    ui.note(
+        "Importante: o mesmo vale para os outros computadores da casa que têm o Tailscale. Se o firewall deles "
+        "bloquear a porta UDP 41641, a conexão com esta máquina passa pelo servidor intermediário até dentro de "
+        "casa. Libere a entrada dessa porta em cada um deles:"
+    )
+    ui.info(f"  Windows (PowerShell como administrador): {WINDOWS_RULE}")
+    ui.info(f"  Linux com firewalld: {LINUX_RULE}")
+    ui.note("O Resumo da rede mostra, aparelho por aparelho, se a conexão está direta ou por relay.")
 
 
 def reconnect() -> None:
@@ -210,6 +226,12 @@ def summary() -> None:
             ],
             ["Nome", "IP", "Sistema", "Situação", "Conexão"],
         )
+        for peer in peers:
+            if peer.get("Online") and not peer.get("CurAddr") and peer.get("Relay"):
+                ui.warn(
+                    f"{_peer_name(peer)} está por relay: se ele estiver em casa, libere a porta UDP 41641 no "
+                    "firewall dele (veja os comandos na instalação ou no README do network)"
+                )
     router = config.load(APP).get("ROUTER_FORWARD")
     ui.section("Portas")
     ui.table(

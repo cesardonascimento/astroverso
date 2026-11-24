@@ -8,6 +8,9 @@ Cada pasta é um serviço autônomo do Astroverso, reconhecido pelo gerenciador 
 - Guarda o que gera em `~/.astroverso/<app>`.
 - Containers no projeto compose `astroverso`, na rede `astroverso`, com o nome `astroverso-<app>`.
 
+Cada app tem um `README.md` com a tabela **Mudança | Por quê** de tudo que o instalador muda na máquina e dos
+passos fora dela, sempre atualizada junto com o instalador.
+
 ## Contrato do `app.py`
 
 Funções simples no módulo (o `Protocol` `kit.app.App` documenta os tipos):

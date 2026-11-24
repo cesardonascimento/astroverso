@@ -140,6 +140,9 @@ class NetworkTest(unittest.TestCase):
         self.assertIn("redirecionamento pendente", screen)
         self.assertIn("conectado à rede minha-rede", screen)
         self.assertIn("relay sao", screen)
+        self.assertIn("New-NetFirewallRule", screen)
+        self.assertIn("pc está por relay", screen)
+        self.assertNotIn("celular está por relay", screen)
         self.assertIn("celular", screen)
         self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "no"})
 
