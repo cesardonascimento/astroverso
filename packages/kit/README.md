@@ -97,6 +97,13 @@ Validadores para `ui.ask`: devolvem o valor normalizado ou levantam `ValueError`
 números e hífen, até 63) e `email`. Toda resposta que vai para um `.env` ou um arquivo de configuração passa por
 um deles.
 
+## net
+
+- `lan_ip()`: o IP da máquina na rede de casa, pelo endereço de saída de um socket UDP (nenhum pacote é enviado).
+  Um IP do Tailscale (`100.64.0.0/10`, com exit node) ou a falta de rede terminam com "IP da rede local não
+  encontrado": tudo funciona pela rede local.
+- `hostname()`: o nome curto da máquina, em minúsculas.
+
 ## logo
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao
