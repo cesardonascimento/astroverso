@@ -26,8 +26,8 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 | `secret(rótulo, confirm=True)` | Pergunta sem eco, com confirmação (ou sem, com `confirm=False`) |
 | `ask_list(rótulo, validate=)` | Lista de valores, um por pergunta, até um Enter vazio |
 | `confirm(pergunta, default=False)` | Sim ou não (`s`, `sim`, `n`, `não`...) |
-| `menu(título, itens)` | Devolve o índice escolhido |
-| `checklist(título, itens, selected=, all_option=, cancel=)` | Devolve os índices marcados, ou `None` se cancelado com Esc |
+| `menu(título, itens, details=)` | Devolve o índice escolhido. `details`: um texto em cinza ao lado de cada item, alinhado |
+| `checklist(título, itens, selected=, all_option=, cancel=, details=)` | Devolve os índices marcados, ou `None` se cancelado com Esc |
 
 - **Validadores** recebem o texto e devolvem o valor normalizado, ou levantam `ValueError("motivo")`. O motivo
   aparece na tela.
@@ -44,3 +44,14 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao
 magenta) e a fonte do nome (`FONT`), desenhados pelo `ui.banner()` com meio-blocos (`▀▄█`).
+
+## app
+
+`Action(id, rótulo, função)`, o `Protocol` `App` e `REQUIRED`, os nomes obrigatórios do `app.py` (contrato em
+`apps/README.md`).
+
+## testing
+
+`run_in_pty(função, teclas, lines=24, columns=100)` roda a função num pseudo-terminal (processo filho), envia as
+teclas uma a uma e devolve `PtyRun(result, screen, code)`: o retorno da função (em JSON), a tela sem as cores e o
+código de saída. É assim que menus e prompts de qualquer pacote ou app são testados.

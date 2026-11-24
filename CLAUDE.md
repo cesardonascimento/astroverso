@@ -73,7 +73,7 @@ backup/           código antigo, só referência
   `astroverso` e com o nome `astroverso-<app>` (`astroverso-<app>-<parte>` quando houver mais de um).
 - **Estado fora do repositório:** tudo o que a instalação gera fica em `~/.astroverso/<app>`; o repositório só
   tem código.
-- **Backup das configurações.** Cada app implementa `backup <pasta>` e `restore <pasta>`. Se o pacote `backup`
+- **Backup das configurações.** Cada app implementa `backup(pasta)` e `restore(pasta)`. Se o pacote `backup`
   estiver instalado, o app entra na rotina sozinho; se não, a instalação avisa e segue.
 
 ### Configurações do sistema
@@ -83,7 +83,10 @@ ligado e desligado, num app especial de configurações do sistema. O desenho de
 
 ### Pacotes previstos
 
-- `kit`: interface (`kit.ui`: logs, prompts, menus, logo), configuração (`.env`, validadores), camada `distro`, domínio padrão.
+- `kit`: interface (`kit.ui`: logs, prompts, menus, logo), contrato dos apps (`kit.app`), testes por `pty`
+  (`kit.testing`), configuração (`.env`, validadores), camada `distro`, domínio padrão.
+- `manager`: o gerenciador (`./astroverso`): menu de instalar e gerenciar, e o uso direto
+  `astroverso <app> <comando>`. Contrato do `app.py` em `apps/README.md`.
 - `backup`: rotina de backup das configurações; instalado uma vez, descobre os apps instalados.
 - Cliente do Discord (avisos), quando chegar a vez. O servidor do bot fica no repositório `astroverso-discord`.
 

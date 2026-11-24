@@ -433,18 +433,28 @@ class _List:
         self.term.write(f"\033[{self.drawn + 1}A\r\033[J{self.term.answered(self.title, answer, rgb)}\n")
 
 
-def menu(title: str, items: Sequence[str]) -> int:
+def _labels(items: Sequence[str], details: Sequence[str], term: _Tty) -> list[tuple[str, str]]:
+    width = max((len(item) for item in items), default=0)
+    return [
+        (item.ljust(width) if details else item, f"  {term.paint(details[i], GRAY)}" if i < len(details) and details[i] else "")
+        for i, item in enumerate(items)
+    ]
+
+
+def menu(title: str, items: Sequence[str], details: Sequence[str] = ()) -> int:
     back = len(items) - 1 if items and items[-1] in ("Voltar", "Sair") else None
     hint = "↑/↓ e Enter" + (f", Esc {'volta' if items[-1] == 'Voltar' else 'sai'}" if back is not None else "")
     with _terminal(title) as term, term.raw():
         view = _List(term, title, hint, len(items))
         width = len(str(len(items)))
+        labels = _labels(items, details, term)
 
         def line(i: int, current: bool) -> str:
             number = f"{i + 1:>{width}}."
+            label, detail = labels[i]
             if current:
-                return f"{term.paint('❯', ACCENT, bold=True)} {term.paint(number, ACCENT)} {term.paint(items[i], SOFT, bold=True)}"
-            return f"  {term.paint(number, GRAY)} {items[i]}"
+                return f"{term.paint('❯', ACCENT, bold=True)} {term.paint(number, ACCENT)} {term.paint(label, SOFT, bold=True)}{detail}"
+            return f"  {term.paint(number, GRAY)} {label}{detail}"
 
         while True:
             view.draw(line)
@@ -468,19 +478,21 @@ def checklist(
     selected: Sequence[int] = (),
     all_option: bool = False,
     cancel: bool = False,
+    details: Sequence[str] = (),
 ) -> list[int] | None:
     marks = [i in selected for i in range(len(items))]
     offset = 1 if all_option else 0
     hint = "↑/↓, Espaço marca, a = todos, Enter confirma" + (", Esc volta" if cancel else "")
     with _terminal(title) as term, term.raw():
         view = _List(term, title, hint, len(items) + offset)
+        labels = _labels(items, details, term)
 
         def line(i: int, current: bool) -> str:
-            label, on = ("Todos", all(marks)) if i < offset else (items[i - offset], marks[i - offset])
+            (label, detail), on = (("Todos", ""), all(marks)) if i < offset else (labels[i - offset], marks[i - offset])
             box = term.paint("◉", GREEN, bold=True) if on else term.paint("○", GRAY)
             if current:
-                return f"{term.paint('❯', ACCENT, bold=True)} {box} {term.paint(label, SOFT, bold=True)}"
-            return f"  {box} {label}"
+                return f"{term.paint('❯', ACCENT, bold=True)} {box} {term.paint(label, SOFT, bold=True)}{detail}"
+            return f"  {box} {label}{detail}"
 
         while True:
             view.draw(line)

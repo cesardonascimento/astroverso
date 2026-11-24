@@ -12,3 +12,11 @@ Em reconstrução como monorepo. O código antigo fica em `backup/` até cada pa
 | `apps/` | serviços autônomos: cada um instala, configura e remove a si mesmo |
 | `packages/` | código compartilhado pelos apps |
 | `backup/` | versão anterior, só como referência |
+
+## Como usar
+
+```
+git clone <repositório> && cd astroverso && ./astroverso
+```
+
+Precisa só do Python 3.11 ou mais novo, que já vem no Fedora. Depois da primeira vez, basta digitar `astroverso`.
