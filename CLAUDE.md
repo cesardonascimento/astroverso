@@ -70,8 +70,10 @@ backup/           código antigo, só referência
 - **Endereço.** Todo app com interface na rede tem uma etapa de endereço: `<serviço>.<domínio>`. O domínio é
   perguntado pelo `kit` na primeira instalação e gravado em `~/.astroverso/astroverso.env`; os apps seguintes já
   trazem esse domínio como padrão.
-- **Guarda-chuva.** Todo container fica no projeto compose `astroverso` (`name: astroverso`), na rede
-  `astroverso` e com o nome `astroverso-<app>` (`astroverso-<app>-<parte>` quando houver mais de um).
+- **Containers por Quadlet** (`kit.container`): cada container é uma unidade do systemd do usuário
+  (`~/.config/containers/systemd/<nome>.container`), com início no boot e reinício em falha, sem podman-compose
+  nem podman-restart. Nome `astroverso-<app>` (`astroverso-<app>-<parte>` quando houver mais de um), na rede
+  `astroverso` (ou na do host, quando precisar), imagem oficial com a versão fixada no código do app.
 - **Estado fora do repositório:** tudo o que a instalação gera fica em `~/.astroverso/<app>`; o repositório só
   tem código.
 - **README com a tabela de mudanças.** Todo `apps/<app>/README.md` tem uma tabela **Mudança | Por quê** com
@@ -124,8 +126,8 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 
 ## Regras de segurança ao testar
 
-- **Nunca testar no container real nem no estado real.** Copiar para o scratchpad e trocar o nome do projeto
-  compose, `container_name`, imagem e portas. Um teste antigo recriou um container real e apagou um `.env` real.
+- **Nunca testar no container real nem no estado real.** Usar outro nome de container (que não comece por
+  `astroverso`), outra rede, outra imagem e outras portas, e remover tudo no fim. Um teste antigo recriou um container real e apagou um `.env` real.
 - Nunca apagar nada em `~/.astroverso`: contém segredos e não está no git. Para testar, usar outro `HOME`,
   mantendo `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e `XDG_RUNTIME_DIR` reais (senão o Podman usa outro armazenamento).
 - A instalação antiga roda a partir de `~/Projects/astroverso-homelab`: não mexer naquela pasta.

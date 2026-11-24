@@ -107,6 +107,38 @@ um deles.
   encontrado": tudo funciona pela rede local.
 - `hostname()`: o nome curto da máquina, em minúsculas.
 
+## container
+
+Containers como unidades do systemd do usuário, por Quadlet (sem podman-compose).
+
+```python
+from kit import container
+
+spec = container.Container(
+    name="astroverso-network-adguard",
+    image="docker.io/adguard/adguardhome:v0.107.80",
+    description="Astroverso network: AdGuard",
+    network="host",
+    volumes=[container.Volume(pasta / "conf", "/opt/adguardhome/conf")],
+    health="wget -q --spider http://127.0.0.1:8080/login.html",
+)
+container.prepare()
+container.start(spec)
+container.remove(spec.name, spec.image)
+```
+
+| Função | O que faz |
+|---|---|
+| `prepare()` | Instala o Podman e liga o *linger* (os containers sobem no boot sem ninguém logado) |
+| `start(spec, timeout=180)` | Baixa a imagem, grava `~/.config/containers/systemd/<nome>.container` (e o `.network` da rede), recarrega o systemd, reinicia a unidade se algo mudou ou se ela estava parada e espera o container ficar `healthy` (com `health`) ou `running`. Se não ficar, mostra o fim do log e para |
+| `active(nome)` | A unidade está rodando |
+| `remove(nome, imagem=)` | Para a unidade, apaga o arquivo e, se pedida, a imagem; apaga a rede quando nenhum outro container a usa |
+| `once(imagem, args, input=)` | Roda um comando num container descartável e devolve a saída (segredos pela entrada padrão) |
+
+- Unidade `<nome>.service`, com `Restart=always` e `WantedBy=default.target`. Logs: `journalctl --user -u <nome>`.
+- Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. Quebra de linha é
+  recusada.
+
 ## logo
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao
