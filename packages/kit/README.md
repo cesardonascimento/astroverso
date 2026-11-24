@@ -6,7 +6,7 @@ Pacote base dos apps do Astroverso. Só a biblioteca padrão do Python.
 from kit import ui
 ```
 
-Testes: `python3 -m unittest discover -s packages/kit`.
+Testes: `python3 -m unittest discover -s packages -t packages` (todos os pacotes).
 
 ## ui
 
@@ -55,6 +55,28 @@ A única porta para comandos do sistema: os apps não chamam o `subprocess` dire
 - `sudo=True` põe `sudo` na frente; sem terminal (systemd), `sudo -n`, que falha na hora em vez de esperar senha.
 - Sem `input=`, o comando herda o terminal: o que pede uma ação do usuário (ex.: o endereço de login do
   `tailscale up`) aparece ao vivo e espera.
+
+## distro
+
+Pacotes, serviços, firewall e ajustes do sistema, sem que o app saiba qual é a distribuição. `kit/distro/__init__.py`
+lê o `/etc/os-release` e repassa para o módulo dela (`fedora.py`). Distribuição sem módulo: `distro.check()` (chamado
+pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição não suportada: <nome>".
+
+| Grupo | Funções |
+|---|---|
+| Pacotes | `installed(pacote)`, `install(pacotes)`, `uninstall(pacotes)`, `add_repo(nome, url)`, `remove_repo(nome)` |
+| Serviços do sistema | `service_active(nome)`, `service_enable(nome)` (agora e no boot), `service_disable(nome)` |
+| Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_masquerade(ligado)` |
+| sysctl | `sysctl_set(nome, valores)` (`/etc/sysctl.d/99-astroverso-<nome>.conf`, aplicado na hora), `sysctl_remove(nome)` |
+
+- Tudo é idempotente: só age, e só mostra um ✔, quando algo muda.
+- Fedora: `dnf -q`; o arquivo do repositório é baixado pelo Python e gravado em `/etc/yum.repos.d/<nome>.repo`.
+- Firewall só com o `firewalld` ativo (conferido pelo `systemctl`: o `firewall-cmd --state` pede o polkit). As
+  consultas usam a configuração em uso (sem `sudo`); as mudanças vão para a permanente, com `--reload`. Abrir e
+  fechar comparam o item exato da lista: uma porta dentro de uma faixa liberada é aberta à parte, e fechar nunca
+  parte uma faixa.
+- `sysctl_remove` apaga o arquivo e reaplica os outros; o valor em uso só volta ao padrão por completo depois de
+  reiniciar.
 
 ## logo
 

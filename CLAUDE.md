@@ -40,7 +40,8 @@ o app ou pacote delas for migrado.
   os entrypoints dos containers.
 - Comandos do sistema só pelo `kit.run` (`cmd`, `capture`, `succeeds`), com a lista de argumentos.
 - Anotações de tipo em tudo.
-- Testes com `unittest`, na pasta `tests/` de cada pacote ou app (`python3 -m unittest discover -s packages/kit`).
+- Testes com `unittest`, na pasta `tests/` de cada pacote ou app. Todos os pacotes de uma vez:
+  `python3 -m unittest discover -s packages -t packages`.
   Menus e prompts são testados por `pty` dentro dos próprios testes.
 - O script de entrada põe `packages/` no `PYTHONPATH`; os apps importam assim: `from kit import ui`.
 

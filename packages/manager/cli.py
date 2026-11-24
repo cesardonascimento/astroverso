@@ -5,7 +5,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from kit import ui
+from kit import distro, ui
 from manager.apps import APPS, ROOT, LoadedApp, call, discover, installed
 
 USAGE = "uso: astroverso [<app> install | remove | status | backup <pasta> | restore <pasta> | action <id>]"
@@ -93,6 +93,7 @@ def _manage(apps: list[LoadedApp]) -> None:
 
 def interactive(folder: Path) -> int:
     ui.banner()
+    distro.check()
     while True:
         apps = _valid(discover(folder))
         if not apps:
@@ -116,6 +117,8 @@ def direct(folder: Path, argv: Sequence[str]) -> int:
         ui.fail(f"app não encontrado: {name}")
     if app.module is None:
         ui.fail(f"app inválido: {app.name}: {app.problem}")
+    if command != "status":
+        distro.check()
     if command == "status" and not rest:
         present = installed(app)
         ui.info(f"{app.name}: {'instalado' if present else 'não instalado'}")

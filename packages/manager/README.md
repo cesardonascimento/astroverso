@@ -15,4 +15,4 @@ astroverso <app> install | remove | status | backup <pasta> | restore <pasta> | 
 
 `status` sai com 0 se o app está instalado e 1 se não. Ctrl+C sai com 130.
 
-Testes: `python3 -m unittest discover -s packages/manager`.
+Testes: `python3 -m unittest discover -s packages -t packages` (todos os pacotes).
