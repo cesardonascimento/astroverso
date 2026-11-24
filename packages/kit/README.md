@@ -78,6 +78,25 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 - `sysctl_remove` apaga o arquivo e reaplica os outros; o valor em uso só volta ao padrão por completo depois de
   reiniciar.
 
+## config
+
+O estado de cada app em `~/.astroverso/<app>` (fora do repositório).
+
+| Função | O que faz |
+|---|---|
+| `state(app)` | Cria a pasta do app (`700`) e devolve o caminho |
+| `load(app)` / `save(app, valores)` | Lê e grava o `.env` do app (`CHAVE=valor`, `600`). O `save` junta com o que já existe; `None` apaga a chave. Gravação atômica; chaves em maiúsculas e valores sem quebra de linha |
+| `reuse(app)` | "Usar a configuração já salva?" (falso sem perguntar, se não houver `.env`) |
+| `domain()` | O domínio dos endereços, em `~/.astroverso/astroverso.env` (`DOMAIN`), perguntado e guardado na primeira vez |
+| `purge(app)` | Apaga a pasta do app (com `podman unshare` se houver arquivos de containers). Só aceita um nome de app válido, nunca atalhos nem a pasta inteira |
+
+## validate
+
+Validadores para `ui.ask`: devolvem o valor normalizado ou levantam `ValueError` com o motivo.
+`domain` (minúsculo; tira `http://`, `*.` e o ponto ou barra do fim), `ipv4`, `port`, `name` (minúsculo, letras,
+números e hífen, até 63) e `email`. Toda resposta que vai para um `.env` ou um arquivo de configuração passa por
+um deles.
+
 ## logo
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao
