@@ -89,6 +89,14 @@ def firewall_masquerade(enabled: bool) -> None:
     backend().firewall_masquerade(enabled)
 
 
+def resolver_route(name: str, domain: str, server: str) -> None:
+    backend().resolver_route(name, domain, server)
+
+
+def resolver_route_remove(name: str) -> None:
+    backend().resolver_route_remove(name)
+
+
 def sysctl_set(name: str, values: Mapping[str, str]) -> None:
     backend().sysctl_set(name, values)
 

@@ -87,6 +87,10 @@ def reuse(app: str) -> bool:
     return ui.confirm("usar a configuração já salva?", default=True)
 
 
+def saved_domain() -> str:
+    return _read(home() / "astroverso.env").get("DOMAIN", "")
+
+
 def domain() -> str:
     path = home() / "astroverso.env"
     values = _read(path)

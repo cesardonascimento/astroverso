@@ -9,6 +9,7 @@ from kit import run, ui
 
 REPOS = Path("/etc/yum.repos.d")
 SYSCTL = Path("/etc/sysctl.d")
+RESOLVED = Path("/etc/systemd/resolved.conf.d")
 PORT = re.compile(r"^\d+(-\d+)?/(tcp|udp|sctp|dccp)$")
 
 
@@ -140,6 +141,33 @@ def firewall_masquerade(enabled: bool) -> None:
     run.cmd(["firewall-cmd", "-q", "--permanent", f"--{'add' if enabled else 'remove'}-masquerade"], sudo=True)
     run.cmd(["firewall-cmd", "-q", "--reload"], sudo=True)
     ui.ok(f"masquerade {'ligado' if enabled else 'desligado'} no firewall")
+
+
+def _resolver_path(name: str) -> Path:
+    return RESOLVED / f"99-astroverso-{name}.conf"
+
+
+def resolver_route(name: str, domain: str, server: str) -> None:
+    path = _resolver_path(name)
+    content = f"[Resolve]\nDNS={server}\nDomains=~{domain}\n"
+    try:
+        if path.read_text() == content:
+            return
+    except OSError:
+        pass
+    run.cmd(["mkdir", "-p", str(RESOLVED)], sudo=True)
+    _write(path, content)
+    run.cmd(["systemctl", "restart", "systemd-resolved"], sudo=True)
+    ui.ok(f"esta máquina pergunta a {server} pelos nomes de {domain}")
+
+
+def resolver_route_remove(name: str) -> None:
+    path = _resolver_path(name)
+    if not path.exists():
+        return
+    run.cmd(["rm", "-f", str(path)], sudo=True)
+    run.cmd(["systemctl", "restart", "systemd-resolved"], sudo=True)
+    ui.ok(f"ajuste de DNS {path.name} removido")
 
 
 def _sysctl_path(name: str) -> Path:

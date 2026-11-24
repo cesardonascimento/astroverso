@@ -154,11 +154,16 @@ def remove(name: str, image: str | None = None) -> None:
         path.unlink()
         _systemctl("daemon-reload")
         ui.ok(f"container {name} removido")
-    if image and run.succeeds(["podman", "image", "exists", image]):
-        run.cmd(["podman", "rmi", image], quiet=True)
-        ui.ok(f"imagem {image} removida")
+    if image:
+        remove_image(image)
     if network.endswith(".network"):
         _drop_network(network.removesuffix(".network"))
+
+
+def remove_image(image: str) -> None:
+    if run.succeeds(["podman", "image", "exists", image]):
+        run.cmd(["podman", "rmi", image], quiet=True)
+        ui.ok(f"imagem {image} removida")
 
 
 def _drop_network(name: str) -> None:

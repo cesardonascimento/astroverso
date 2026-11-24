@@ -232,14 +232,13 @@ def summary() -> None:
                     f"{_peer_name(peer)} está por relay: se ele estiver em casa, libere a porta UDP 41641 no "
                     "firewall dele (veja os comandos na instalação ou no README do network)"
                 )
+
+
+def port_rows() -> list[list[str | ui.Cell]]:
     router = config.load(APP).get("ROUTER_FORWARD")
-    ui.section("Portas")
-    ui.table(
-        [[
-            PORT,
-            "Tailscale",
-            ui.good("liberada") if distro.firewall_allowed(PORT) else ui.pending("fechada"),
-            ui.good("feito") if router == "yes" else ui.pending("pendente"),
-        ]],
-        ["Porta", "Para quê", "Firewall", "Roteador"],
-    )
+    return [[
+        PORT,
+        "Tailscale",
+        ui.good("liberada") if distro.firewall_allowed(PORT) else ui.pending("fechada"),
+        ui.good("feito") if router == "yes" else ui.pending("pendente"),
+    ]]

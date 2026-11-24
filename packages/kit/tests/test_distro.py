@@ -160,6 +160,24 @@ class DistroTest(unittest.TestCase):
             ("firewall-cmd", "-q", "--reload"),
         ])
 
+    def test_resolver(self) -> None:
+        recorder = self.use(Recorder())
+        path = self.root / "99-astroverso-teste.conf"
+        with mock.patch.object(fedora, "RESOLVED", self.root):
+            fedora.resolver_route("teste", "casa.com", "127.0.0.1")
+            path.write_text("[Resolve]\nDNS=127.0.0.1\nDomains=~casa.com\n")
+            fedora.resolver_route("teste", "casa.com", "127.0.0.1")
+            fedora.resolver_route_remove("teste")
+            path.unlink()
+            fedora.resolver_route_remove("teste")
+        self.assertEqual(recorder.calls, [
+            ("cmd", ("mkdir", "-p", str(self.root)), True, None),
+            ("cmd", ("tee", str(path)), True, "[Resolve]\nDNS=127.0.0.1\nDomains=~casa.com\n"),
+            ("cmd", ("systemctl", "restart", "systemd-resolved"), True, None),
+            ("cmd", ("rm", "-f", str(path)), True, None),
+            ("cmd", ("systemctl", "restart", "systemd-resolved"), True, None),
+        ])
+
     def test_sysctl(self) -> None:
         recorder = self.use(Recorder())
         path = self.root / "99-astroverso-teste.conf"
