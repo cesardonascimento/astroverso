@@ -101,6 +101,24 @@ a pasta de um app.
 | `containing(caminho)` / `available(caminho)` | O disco onde fica uma pasta; se ela está num disco que responde (verdadeiro fora dos discos) |
 | `usage(caminho)` | `(usado, total)` em bytes |
 
+## clouds
+
+As pastas ligadas a uma nuvem, publicadas pelo app que sincroniza (`~/.astroverso/clouds/<app>.json`, pasta de nenhum
+app, como os endereços do `kit.routes`). Só servem para mostrar a marca ☁ nos seletores: nenhum app decide nada por
+elas.
+
+| Função | O que faz |
+|---|---|
+| `publish(app, [Linked(caminho, rótulo)])` / `withdraw(app)` | Publica (ou retira) as pastas ligadas do app |
+| `load()` | Todas as pastas publicadas |
+| `mark(caminho)` | O rótulo da pasta ligada que contém esse caminho, ou `""` |
+
+## folders
+
+`pick(pergunta, atual=, validate=)` é o seletor de pastas de todos os apps: um menu com a pasta atual, os discos do
+`kit.disks`, as pastas do `kit.clouds` e o home, cada uma com o disco, o espaço livre e a marca ☁ (`describe`), mais
+"Digitar outra pasta…". Depois, Enter confirma a pasta, um nome vira uma subpasta dela e um caminho completo a troca.
+
 ## config
 
 O estado de cada app em `~/.astroverso/<app>` (fora do repositório).
