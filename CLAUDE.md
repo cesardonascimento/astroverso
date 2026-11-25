@@ -173,10 +173,20 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
     restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada, pastas de destino por pasta e o passo a passo em
     `docs/windows.md`; quem avisa no `#backup` é o servidor. O Remover apaga a tarefa e as senhas, desinstala o restic
     com confirmação e deixa os backups no servidor. Nada da cópia antiga do Windows é migrado.
-  - **App `cloud`** (rclone): sincronizações de duas vias (`bisync`) e envios de uma via, cadastrados pelo
-    gerenciador. O destino é escolha do usuário; o `cloud` publica as pastas ligadas pelo `kit.clouds` só para a marca
-    ☁ nos seletores.
 - Sem prioridade mínima (`Nice`, `ionice`) nos backups e sincronizações: a máquina não divide mais o hardware.
+
+### App `cloud`
+
+- rclone do pacote da distribuição, sem container. Contas por provedor (um módulo cada; por enquanto `proton.py`),
+  com a senha ofuscada no `rclone.conf` do app (`600`) e o código das duas etapas só no login, por variável de ambiente.
+- Sincronizações de duas vias (`bisync` de hora em hora: o mais novo vence, `--resync --resync-mode newer` na primeira
+  rodada ou quando o estado se perde, trava de 5% de exclusões) e envios de uma via (`rclone sync` às 05:00, depois dos
+  backups; espelho por decisão do usuário, com trava de 5% dos arquivos da pasta). "Liberar exclusões" mostra a lista e
+  roda com `--force`.
+- O destino é escolha do usuário, sem regra nem validação. O `cloud` publica as pastas ligadas pelo `kit.clouds` só
+  para a marca ☁ nos seletores.
+- Roda por `podman unshare` (arquivos de containers), com trava entre rodadas e sem rodar com o disco indisponível.
+- O backup do app não leva as senhas: na restauração, cada conta pede o login de novo.
 
 ### App `disks`
 
@@ -275,5 +285,11 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
   - O `ntfs3` usa a permissão gravada no disco; um NTFS desligado sem fechar (inicialização rápida do Windows) não
     monta até `ntfsfix -d`.
   - Com ACL, o `chmod` mexe na máscara: pasta com ACL usa `770`.
+- rclone (trazido do antigo):
+  - `bisync` com `--resilient` não pede `--resync` quando as listas somem ("cannot find prior Path1 or Path2
+    listings"): o app detecta essa mensagem e a de "must run --resync" e junta os dois lados.
+  - `bisync --dry-run` também para na trava de exclusões: para mostrar o que seria apagado, `--dry-run --force`.
+  - Uma senha ofuscada pelo `rclone obscure` é reversível: vai pela entrada padrão, nunca como argumento (por isso o
+    app não usa `rclone config create` com senha).
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.
