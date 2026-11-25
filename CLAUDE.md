@@ -167,7 +167,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   - **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo
     cliente. Windows: script PowerShell (Instalar e Remover) gerado pela ação "Preparar um PC sem Astroverso", com o
     restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada e o passo a passo em `docs/windows.md`; quem avisa no
-    `#backup` é o servidor. A cópia antiga do `V:` do Windows vira isso.
+    `#backup` é o servidor. Nada da cópia antiga do Windows é migrado: o usuário configura pelo app.
   - **App `cloud`** (rclone): sincronizações de duas vias (`bisync`) e envios de uma via, cadastrados pelo
     gerenciador. O destino é escolha do usuário, sem regra automática; os seletores de pasta só marcam as pastas
     ligadas a uma nuvem (o `cloud` publica as dele numa pasta de contrato).
