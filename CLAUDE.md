@@ -122,11 +122,23 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Testar só com outro nome de container e sem o token real: dois processos com o mesmo token recebem os mesmos
   cliques.
 
-### Configurações do sistema
+### Mudanças no sistema
 
-Toda mudança que o Astroverso faz no sistema (energia, SSH, suspensão...) é um módulo que pode ser ligado e
-desligado, num app especial de configurações do sistema. O que só existe por causa de um app (ex.: a porta do
-Tailscale no firewall) fica nesse app e sai no `remove` dele. O desenho dele terá a própria etapa.
+- Toda mudança de um app no sistema, por menor que seja, é um `kit.changes.Change`: perguntada na instalação (padrão
+  sim), desfeita e refeita na ação "Mudanças no sistema" do app, desfeita no `remove`. As essenciais têm
+  `danger=True` (vermelho, ⚠).
+- O que só existe por causa de um app (ex.: a porta do Tailscale no firewall) fica nesse app.
+
+### App `system`
+
+- Configurações da própria máquina, um arquivo por módulo: `power.py` (suspensão mascarada, tampa e teclas
+  ignoradas no `logind`, tela do console apagada) e `ssh.py` (`sshd`, SSH só da rede local e do Tailscale,
+  `AllowUsers` + `PermitRootLogin no`, chaves autorizadas e a chave da máquina para o GitHub).
+- O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado
+  for perdido). O `remove` não desliga o `sshd` nem apaga o `authorized_keys`.
+- `~/.ssh/authorized_keys` é gerado a partir de `~/.astroverso/system/ssh-keys.json` (nome do PC + chave).
+- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura, Wake-on-LAN,
+  discos) ficam para depois do refactor, para o usuário revisar com calma.
 
 ### Pacotes previstos
 

@@ -53,7 +53,7 @@ A única porta para comandos do sistema: os apps não chamam o `subprocess` dire
 | `cmd(args, sudo=, input=, quiet=, timeout=)` | Saída e erros, linha a linha, ao vivo, com o prefixo e em cinza | `ui.fail` com o comando e o código. Com `quiet=True`, a saída só aparece se der erro |
 | `capture(args, sudo=, input=, timeout=)` | Nada: devolve a saída padrão (sem o `\n` do fim) | `ui.fail`, mostrando a saída de erro |
 | `succeeds(args, sudo=, timeout=)` | Nada | Devolve `False` (também para comando inexistente ou tempo esgotado) |
-| `output(args, timeout=, env=)` | Nada: devolve `(código, saída)`, com a saída padrão e a de erro juntas | Não falha: código `127` (comando inexistente) ou `124` (tempo esgotado) |
+| `output(args, timeout=, env=, input=)` | Nada: devolve `(código, saída)`, com a saída padrão e a de erro juntas | Não falha: código `127` (comando inexistente) ou `124` (tempo esgotado) |
 | `sudo_prepare(motivo)` | Explica o motivo e pede a senha uma vez (`sudo -v`), se ainda não houver permissão | Sem terminal: "rode num terminal" |
 
 - **Segredos** só por `input=` (entrada padrão), nunca nos argumentos.

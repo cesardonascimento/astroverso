@@ -12,6 +12,12 @@ Cada pasta é um serviço autônomo do Astroverso, reconhecido pelo gerenciador 
 Cada app tem um `README.md` com a tabela **Mudança | Por quê** de tudo que o instalador muda na máquina e dos
 passos fora dela, sempre atualizada junto com o instalador.
 
+**Mudanças perguntadas e reversíveis.** Toda mudança que o app faz no sistema (firewall, arquivos em `/etc`,
+unidades do systemd, ajustes do kernel...), por menor que seja, é um `kit.changes.Change`: perguntada na instalação
+(padrão sim), listada e desfeita ou refeita na ação **Mudanças no sistema**, e desfeita no `remove`. As essenciais
+para o app funcionar levam `danger=True` e aparecem em vermelho com ⚠. Os componentes do próprio app (os containers,
+o estado em `~/.astroverso/<app>`) não são mudanças: são o app.
+
 **Passos em plataformas de terceiros** (Tailscale, Cloudflare, Discord, roteador, firewall de outro computador)
 ficam em `apps/<app>/docs/<plataforma>.md`, com o passo a passo completo, e uma seção para cada passo. Na etapa
 que precisa de um deles, o instalador mostra só uma frase curta (o que fazer, com os valores desta máquina) e o

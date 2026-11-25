@@ -96,11 +96,13 @@ def capture(args: Sequence[str], sudo: bool = False, input: str | None = None, t
     return done.stdout.rstrip("\n")
 
 
-def output(args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None) -> tuple[int, str]:
+def output(
+    args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None, input: str | None = None
+) -> tuple[int, str]:
     try:
         done = subprocess.run(
-            list(args), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            timeout=timeout, env={**os.environ, **(env or {})},
+            list(args), input=input, stdin=None if input is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, timeout=timeout, env={**os.environ, **(env or {})},
         )
     except FileNotFoundError:
         return 127, f"comando não encontrado: {args[0]}"
