@@ -30,6 +30,10 @@ class Container:
     command: Sequence[str] = ()
     health: str = ""
     env_file: Path | None = None
+    requires: Sequence[str] = ()
+    entrypoint: str = ""
+    health_start: str = "30s"
+    stop_signal: str = ""
 
 
 def quadlets() -> Path:
@@ -44,6 +48,8 @@ def _quote(value: str) -> str:
     if "\n" in value:
         ui.fail(f"valor com quebra de linha não é aceito num container: {value!r}")
     text = value.replace("%", "%%").replace("$", "$$")
+    if not text:
+        return '""'
     if any(char.isspace() or char in "\"'\\;" for char in text):
         return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return text
@@ -51,9 +57,10 @@ def _quote(value: str) -> str:
 
 def render(spec: Container) -> str:
     network = "host" if spec.network == "host" else f"{spec.network}.network"
-    lines = [
-        "[Unit]",
-        f"Description={spec.description}",
+    lines = ["[Unit]", f"Description={spec.description}"]
+    for other in spec.requires:
+        lines += [f"Requires={unit(other)}", f"After={unit(other)}"]
+    lines += [
         "",
         "[Container]",
         f"ContainerName={spec.name}",
@@ -65,10 +72,14 @@ def render(spec: Container) -> str:
     lines += [f"Environment={_quote(f'{key}={value}')}" for key, value in spec.environment.items()]
     if spec.env_file:
         lines.append(f"EnvironmentFile={_quote(str(spec.env_file))}")
+    if spec.entrypoint:
+        lines.append(f"Entrypoint={_quote(spec.entrypoint)}")
+    if spec.stop_signal:
+        lines.append(f"StopSignal={spec.stop_signal}")
     if spec.command:
         lines.append(f"Exec={' '.join(_quote(part) for part in spec.command)}")
     if spec.health:
-        lines += [f"HealthCmd={_quote(spec.health)}", "HealthInterval=30s", "HealthStartPeriod=30s", "HealthRetries=3"]
+        lines += [f"HealthCmd={_quote(spec.health)}", "HealthInterval=30s", f"HealthStartPeriod={spec.health_start}", "HealthRetries=3"]
     lines += ["", "[Service]", "Restart=always", "TimeoutStartSec=600", "", "[Install]", "WantedBy=default.target", ""]
     return "\n".join(lines)
 
@@ -115,8 +126,13 @@ def build(image: str, file: Path, args: Mapping[str, str] | None = None) -> None
     ui.ok(f"imagem {image} montada")
 
 
-def exec(name: str, args: Sequence[str]) -> str:
-    return run.capture(["podman", "exec", name, *args])
+def exec(name: str, args: Sequence[str], user: str = "", input: str | None = None) -> str:
+    return run.capture(["podman", "exec", *(["-i"] if input is not None else []), *(["-u", user] if user else []), name, *args], input=input)
+
+
+def exec_output(name: str, args: Sequence[str], user: str = "", env: Mapping[str, str] | None = None) -> tuple[int, str]:
+    names = [f"-e{key}" for key in (env or {})]
+    return run.output(["podman", "exec", *(["-u", user] if user else []), *names, name, *args], env=dict(env or {}))
 
 
 def start(spec: Container, timeout: float = 180) -> None:
@@ -193,8 +209,10 @@ def _drop_network(name: str) -> None:
     users = [item for item in quadlets().glob("*.container") if f"Network={name}.network" in item.read_text()]
     if users or not file.exists():
         return
+    run.succeeds(["systemctl", "--user", "stop", f"{name}-network.service"])
     file.unlink()
     _systemctl("daemon-reload")
+    run.succeeds(["systemctl", "--user", "reset-failed", f"{name}-network.service"])
     if run.succeeds(["podman", "network", "exists", name]):
         run.cmd(["podman", "network", "rm", name], quiet=True)
 

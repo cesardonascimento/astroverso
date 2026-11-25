@@ -114,3 +114,21 @@ def purge(app: str) -> None:
     except PermissionError:
         run.cmd(["podman", "unshare", "rm", "-rf", str(folder)])
     ui.ok(f"configuração apagada: {folder}")
+
+
+def timezone() -> str:
+    target = str(Path("/etc/localtime").resolve())
+    return target.split("zoneinfo/", 1)[1] if "zoneinfo/" in target else "UTC"
+
+
+def region(zone: str = "") -> str:
+    zone = zone or timezone()
+    try:
+        lines = Path("/usr/share/zoneinfo/zone.tab").read_text().splitlines()
+    except OSError:
+        return ""
+    for line in lines:
+        parts = line.split("\t")
+        if len(parts) >= 3 and not line.startswith("#") and parts[2] == zone:
+            return parts[0]
+    return ""

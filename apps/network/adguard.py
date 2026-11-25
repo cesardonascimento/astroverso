@@ -45,11 +45,6 @@ def installed() -> bool:
     return container.active(NAME)
 
 
-def timezone() -> str:
-    target = str(Path("/etc/localtime").resolve())
-    return target.split("zoneinfo/", 1)[1] if "zoneinfo/" in target else "UTC"
-
-
 def language() -> str:
     return "pt-br" if os.environ.get("LANG", "").lower().startswith("pt") else "en"
 
@@ -61,7 +56,7 @@ def render(user: str, password_hash: str, domain: str, address: str) -> str:
         ADGUARD_PASSWORD_HASH=password_hash,
         ADGUARD_LANGUAGE=language(),
         DNS_BIND_HOSTS=f"    - {address}\n    - 127.0.0.1",
-        TZ=timezone(),
+        TZ=config.timezone(),
         ADGUARD_REWRITES_YAML=f"[{{domain: '*.{domain}', answer: '{address}', enabled: true}}]",
     )
 

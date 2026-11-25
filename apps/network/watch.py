@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import changes, config, discord, docs, net, ui, units
+from kit import changes, config, discord, docs, net, ui, watch as kit_watch
+from kit.watch import Problem
 
 from . import adguard, caddy, tailscale
 
@@ -17,34 +16,8 @@ WARN_DAYS = 14
 CRITICAL_DAYS = 3
 
 
-@dataclass(frozen=True)
-class Problem:
-    level: str
-    title: str
-    text: str = ""
-    kind: str = ""
-
-    @property
-    def identity(self) -> str:
-        return self.kind or self.title
-
-
 def state_file() -> Path:
-    return config.state(APP) / "watch.json"
-
-
-def _load() -> dict[str, dict[str, str]]:
-    try:
-        saved = json.loads(state_file().read_text())
-    except (OSError, ValueError):
-        return {}
-    return {key: value for key, value in saved.items() if isinstance(value, dict)} if isinstance(saved, dict) else {}
-
-
-def _save(state: dict[str, dict[str, str]]) -> None:
-    temporary = state_file().with_suffix(".tmp")
-    temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n")
-    temporary.replace(state_file())
+    return kit_watch.state_file(APP)
 
 
 def _days(moment: datetime, now: datetime) -> int:
@@ -114,8 +87,7 @@ def _tailscale(saved_ip: str, now: datetime, previous: dict[str, dict[str, str]]
                                      "A conexão com o servidor passa por um servidor intermediário, mais lento. "
                                      "Veja as causas: " + docs.link(DOCS / "tailscale.md", "direto-ou-por-relay"))
         elif key in previous:
-            found[key] = Problem(previous[key]["level"], previous[key]["title"], previous[key].get("text", ""),
-                                 previous[key].get("kind", ""))
+            found[key] = kit_watch.carry(previous, key)
     return found
 
 
@@ -141,70 +113,20 @@ def collect(previous: dict[str, dict[str, str]] | None = None) -> dict[str, Prob
 
 
 def check() -> None:
-    previous = _load()
-    found = collect(previous)
-    if not discord.configured():
-        for problem in found.values():
-            ui.warn(problem.title)
-        ui.info("Discord não configurado nesta máquina: os problemas só aparecem aqui (instale o app discord)")
-        return
-    state = dict(previous)
-    for key, problem in found.items():
-        before = previous.get(key)
-        if before and before.get("level") == problem.level and (before.get("kind") or before.get("title")) == problem.identity:
-            continue
-        if discord.notify(APP, problem.level, problem.title, problem.text, actions=BUTTONS):
-            state[key] = {"level": problem.level, "title": problem.title, "text": problem.text, "kind": problem.kind}
-            ui.warn(f"avisado no Discord: {problem.title}")
-    for key, before in previous.items():
-        if key in found:
-            continue
-        title = f"{before.get('title', key)}: resolvido"
-        if discord.notify(APP, "sucesso", title):
-            state.pop(key, None)
-            ui.ok(f"avisado no Discord: {title}")
-    _save(state)
-    if not found:
-        ui.ok("rede em ordem")
+    kit_watch.run(APP, collect, BUTTONS, "rede em ordem")
 
 
 def units_text() -> dict[str, str]:
-    command = Path(__file__).resolve().parents[2] / "astroverso"
-    return {
-        f"{NAME}.timer": "\n".join([
-            "[Unit]",
-            "Description=Astroverso network: verifica a rede a cada hora e avisa no Discord",
-            "",
-            "[Timer]",
-            "OnActiveSec=10min",
-            "OnUnitActiveSec=1h",
-            "RandomizedDelaySec=2min",
-            "",
-            "[Install]",
-            "WantedBy=timers.target",
-            "",
-        ]),
-        f"{NAME}.service": "\n".join([
-            "[Unit]",
-            "Description=Astroverso network: verificação da rede",
-            "",
-            "[Service]",
-            "Type=oneshot",
-            f"ExecStart={command} network action watch",
-            "",
-        ]),
-    }
+    return kit_watch.units_text(APP, "a rede")
 
 
 def items() -> list[changes.Change]:
     return [
-        changes.Change(
-            "watch", "Verificar a rede de hora em hora e avisar no Discord",
+        kit_watch.change(
+            APP, "Verificar a rede de hora em hora e avisar no Discord",
             f"Um timer do usuário ({NAME}.timer) confere a rede a cada hora (AdGuard e Caddy no ar, cadeado, token da "
             "Cloudflare, Tailscale, IP) e avisa no Discord quando algo quebra e quando volta ao normal.",
-            active,
-            lambda: units.install(units_text(), [f"{NAME}.timer"]),
-            lambda: units.remove([f"{NAME}.timer", f"{NAME}.service"]),
+            "a rede",
         ),
     ]
 
@@ -220,20 +142,8 @@ def remove() -> None:
 
 
 def active() -> bool:
-    return units.active(f"{NAME}.timer")
+    return kit_watch.active(APP)
 
 
 def summary() -> None:
-    state = _load()
-    ui.section("Verificação de hora em hora")
-    rows: list[list[str | ui.Cell]] = [
-        ["Verificação", ui.good("ligada") if active() else ui.pending("desligada")],
-        ["Avisos no Discord", ui.good("ligados") if discord.configured() else ui.pending("instale o app discord")],
-    ]
-    for item in state.values():
-        level = item.get("level", "")
-        cell = ui.bad if level == "erro" else ui.pending if level == "aviso" else ui.off
-        rows.append(["Aviso em aberto" if item is next(iter(state.values())) else "", cell(item.get("title", ""))])
-    if not state:
-        rows.append(["Avisos em aberto", ui.good("nenhum")])
-    ui.table(rows)
+    kit_watch.summary(APP)

@@ -112,6 +112,8 @@ um deles.
   Um IP do Tailscale (`100.64.0.0/10`, com exit node) ou a falta de rede terminam com "IP da rede local não
   encontrado": tudo funciona pela rede local.
 - `hostname()`: o nome curto da máquina, em minúsculas.
+- `config.timezone()` e `config.region()`: o fuso da máquina (de `/etc/localtime`, `UTC` sem ele) e o país dele
+  (`zone.tab`), para os apps que precisam.
 - `lan_network()`: a rede do `lan_ip()` (ex.: `<rede>/24`), pelo `ip -j addr`.
 
 ## container
@@ -134,10 +136,16 @@ container.start(spec)
 container.remove(spec.name, spec.image)
 ```
 
+Outros campos do `Container`: `ports`, `environment`, `command`, `env_file`, `requires` (outros containers que
+sobem antes: `Requires` e `After` do systemd), `entrypoint`, `health_start` (tempo de partida do teste de saúde,
+padrão `30s`) e `stop_signal` (ex.: `SIGTERM` quando a imagem pede um sinal que o processo não atende). O volume
+leva `Z` por padrão (só daquele container); use `z` para uma pasta montada em mais de um container.
+
 | Função | O que faz |
 |---|---|
 | `prepare()` | Instala o Podman e liga o *linger* (os containers sobem no boot sem ninguém logado) |
 | `restart(spec)` | Reinicia o container e espera ficar pronto (ex.: quando o `env_file` mudou) |
+| `exec(nome, args, user=, input=)` / `exec_output(nome, args, user=, env=)` | Comando dentro do container; o `exec_output` não falha (devolve código e saída) e repassa variáveis pelo ambiente (`-eNOME`), sem o valor nos argumentos |
 | `start(spec, timeout=180)` | Baixa a imagem, grava `~/.config/containers/systemd/<nome>.container` (e o `.network` da rede), recarrega o systemd, reinicia a unidade se algo mudou ou se ela estava parada e espera o container ficar `healthy` (com `health`) ou `running`. Se não ficar, mostra o fim do log e para |
 | `active(nome)` | A unidade está rodando |
 | `remove(nome, imagem=)` | Para a unidade, apaga o arquivo e, se pedida, a imagem; apaga a rede quando nenhum outro container a usa |
@@ -221,6 +229,18 @@ oneshot.
 | `remove(nomes)` | Desliga, apaga e faz `daemon-reload`; ignora as que não existem |
 | `restart(nome)` | Reinicia a unidade (ex.: um serviço de longa duração depois de atualizar o código) |
 | `active(nome)` | Se a unidade está ativa |
+
+## watch
+
+A verificação de hora em hora dos apps, com avisos no Discord só quando algo muda.
+
+| Nome | O que faz |
+|---|---|
+| `Problem(nível, título, texto="", kind="")` | Um problema encontrado; `kind` agrupa títulos que mudam (ex.: "Cadeado vence em N dias"), para não repetir o aviso a cada dia |
+| `run(app, collect, botões, saudável)` | Chama `collect(estado_anterior)` → `{chave: Problem}` e avisa o que apareceu, mudou de nível ou de tipo, e o que se resolveu (✅). Aviso não entregue é tentado na próxima. Estado em `~/.astroverso/<app>/watch.json` |
+| `change(app, rótulo, porquê, o_quê)` | A `Change` do timer `astroverso-<app>-watch` (de hora em hora, a primeira 10 min depois de ligar), que roda `astroverso <app> action watch` |
+| `carry(estado, chave)` | Mantém um problema que não deu para conferir agora |
+| `summary(app)` | A tabela da verificação no resumo do app |
 
 ## logo
 
