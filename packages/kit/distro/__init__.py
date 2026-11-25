@@ -103,3 +103,51 @@ def sysctl_set(name: str, values: Mapping[str, str]) -> None:
 
 def sysctl_remove(name: str) -> None:
     backend().sysctl_remove(name)
+
+
+def file_put(path: Path, content: str) -> bool:
+    return bool(backend().file_put(path, content))
+
+
+def file_drop(path: Path) -> bool:
+    return bool(backend().file_drop(path))
+
+
+def units_masked(names: Sequence[str]) -> bool:
+    return bool(backend().units_masked(names))
+
+
+def units_mask(names: Sequence[str]) -> None:
+    backend().units_mask(names)
+
+
+def units_unmask(names: Sequence[str]) -> None:
+    backend().units_unmask(names)
+
+
+def unit_install(name: str, content: str) -> None:
+    backend().unit_install(name, content)
+
+
+def unit_remove(name: str) -> None:
+    backend().unit_remove(name)
+
+
+def unit_enabled(name: str) -> bool:
+    return bool(backend().unit_enabled(name))
+
+
+def reload_service(name: str) -> None:
+    backend().reload_service(name)
+
+
+def firewall_limit(service: str, sources: Sequence[str]) -> None:
+    backend().firewall_limit(service, sources)
+
+
+def firewall_unlimit(service: str, sources: Sequence[str]) -> None:
+    backend().firewall_unlimit(service, sources)
+
+
+def firewall_limited(service: str, sources: Sequence[str]) -> bool:
+    return bool(backend().firewall_limited(service, sources))

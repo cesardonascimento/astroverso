@@ -31,7 +31,7 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 | `ask_list(rótulo, validate=)` | Lista de valores, um por pergunta, até um Enter vazio |
 | `confirm(pergunta, default=False)` | Sim ou não (`s`, `sim`, `n`, `não`...) |
 | `menu(título, itens, details=)` | Devolve o índice escolhido. `details`: um texto em cinza ao lado de cada item, alinhado |
-| `checklist(título, itens, selected=, all_option=, cancel=, details=)` | Devolve os índices marcados, ou `None` se cancelado com Esc |
+| `checklist(título, itens, selected=, all_option=, cancel=, details=, danger=)` | Devolve os índices marcados, ou `None` se cancelado com Esc. Os itens de `danger` aparecem com `⚠` e em vermelho |
 
 - **Validadores** recebem o texto e devolvem o valor normalizado, ou levantam `ValueError("motivo")`. O motivo
   aparece na tela.
@@ -73,6 +73,9 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 | Serviços do sistema | `service_active(nome)`, `service_enable(nome)` (agora e no boot), `service_disable(nome)` |
 | Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_allowed(item)` (liberado, inclusive dentro de uma faixa; verdadeiro sem firewall), `firewall_masquerade(ligado)` |
 | sysctl | `sysctl_set(nome, valores)` (`/etc/sysctl.d/99-astroverso-<nome>.conf`, aplicado na hora), `sysctl_remove(nome)` |
+| Arquivos do sistema | `file_put(caminho, conteúdo)` (com `sudo`, só se mudou; devolve se mudou), `file_drop(caminho)` |
+| systemd | `units_mask(nomes)`, `units_unmask(nomes)`, `units_masked(nomes)`; `unit_install(nome, conteúdo)` (em `/etc/systemd/system`, liga e reinicia), `unit_remove(nome)`, `unit_enabled(nome)`; `reload_service(nome)` (`reload`, ou `HUP`) |
+| Firewall por origem | `firewall_limit(serviço, origens)` (regras ricas só das origens, e tira o serviço aberto para todos; as regras entram antes), `firewall_unlimit(serviço, origens)`, `firewall_limited(serviço, origens)` |
 
 - Tudo é idempotente: só age, e só mostra um ✔, quando algo muda.
 - Fedora: `dnf -q`; o arquivo do repositório é baixado pelo Python e gravado em `/etc/yum.repos.d/<nome>.repo`.
@@ -109,6 +112,7 @@ um deles.
   Um IP do Tailscale (`100.64.0.0/10`, com exit node) ou a falta de rede terminam com "IP da rede local não
   encontrado": tudo funciona pela rede local.
 - `hostname()`: o nome curto da máquina, em minúsculas.
+- `lan_network()`: a rede do `lan_ip()` (ex.: `<rede>/24`), pelo `ip -j addr`.
 
 ## container
 
@@ -168,6 +172,18 @@ from kit import discord
 
 discord.notify("network", "erro", "AdGuard parado", "O DNS da casa está usando o secundário.")
 ```
+
+## changes
+
+As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps/README.md`).
+
+| Nome | O que faz |
+|---|---|
+| `Change(id, rótulo, por_quê, applied, apply, undo, danger=False)` | Uma mudança. O rótulo é uma ação ("Ignorar a tampa fechada"), o porquê aparece antes da pergunta, `applied()` confere no sistema, `apply()`/`undo()` fazem e desfazem. `danger`: importante para o funcionamento do app |
+| `install(app, mudanças, reuse)` | Pergunta cada uma (padrão sim, ou a resposta salva), grava `CHANGE_<ID>=yes/no` no `.env` do app e aplica ou desfaz. Com `reuse`, usa as respostas salvas sem perguntar |
+| `manage(app, mudanças)` | O painel: checklist com as aplicadas marcadas e as `danger` em vermelho; desfazer uma `danger` pede confirmação |
+| `undo_all(mudanças)` | Desfaz todas, na ordem inversa (no `remove`) |
+| `rows(mudanças)` | Linhas de tabela (mudança, aplicada ou desfeita) para o resumo |
 
 ## docs
 

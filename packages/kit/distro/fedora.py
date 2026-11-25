@@ -10,6 +10,7 @@ from kit import run, ui
 REPOS = Path("/etc/yum.repos.d")
 SYSCTL = Path("/etc/sysctl.d")
 RESOLVED = Path("/etc/systemd/resolved.conf.d")
+SYSTEMD = Path("/etc/systemd/system")
 PORT = re.compile(r"^\d+(-\d+)?/(tcp|udp|sctp|dccp)$")
 
 
@@ -194,3 +195,99 @@ def sysctl_remove(name: str) -> None:
     run.cmd(["rm", "-f", str(path)], sudo=True)
     run.cmd(["sysctl", "-q", "--system"], sudo=True)
     ui.ok(f"ajuste do sistema {path.name} removido (volta ao padrão por completo depois de reiniciar)")
+
+
+def file_put(path: Path, content: str) -> bool:
+    try:
+        if path.read_text() == content:
+            return False
+    except OSError:
+        pass
+    run.cmd(["mkdir", "-p", str(path.parent)], sudo=True)
+    _write(path, content)
+    return True
+
+
+def file_drop(path: Path) -> bool:
+    if not path.exists():
+        return False
+    run.cmd(["rm", "-f", str(path)], sudo=True)
+    return True
+
+
+def _unit_state(name: str) -> str:
+    _, output = run.output(["systemctl", "is-enabled", name], timeout=10)
+    return output.strip()
+
+
+def units_masked(names: Sequence[str]) -> bool:
+    return bool(names) and all(_unit_state(name) == "masked" for name in names)
+
+
+def units_mask(names: Sequence[str]) -> None:
+    run.cmd(["systemctl", "mask", "-q", *names], sudo=True)
+
+
+def units_unmask(names: Sequence[str]) -> None:
+    run.cmd(["systemctl", "unmask", "-q", *names], sudo=True)
+
+
+def unit_install(name: str, content: str) -> None:
+    if file_put(SYSTEMD / name, content):
+        run.cmd(["systemctl", "daemon-reload"], sudo=True)
+    if not _service_enabled(name):
+        run.cmd(["systemctl", "enable", "-q", name], sudo=True)
+    run.cmd(["systemctl", "restart", name], sudo=True)
+
+
+def unit_remove(name: str) -> None:
+    if not (SYSTEMD / name).exists():
+        return
+    run.succeeds(["systemctl", "disable", "--now", "-q", name], sudo=True)
+    file_drop(SYSTEMD / name)
+    run.cmd(["systemctl", "daemon-reload"], sudo=True)
+
+
+def unit_enabled(name: str) -> bool:
+    return (SYSTEMD / name).exists() and _service_enabled(name)
+
+
+def reload_service(name: str) -> None:
+    if not run.succeeds(["systemctl", "reload", name], sudo=True):
+        run.cmd(["systemctl", "kill", "-s", "HUP", name], sudo=True)
+
+
+def _rich(source: str, service: str) -> str:
+    return f'rule family="ipv4" source address="{source}" service name="{service}" accept'
+
+
+def firewall_limit(service: str, sources: Sequence[str]) -> None:
+    if not _firewalld():
+        return
+    for source in sources:
+        if not run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]):
+            run.cmd(["firewall-cmd", "-q", "--permanent", "--add-rich-rule", _rich(source, service)], sudo=True)
+    if service in _listed("service"):
+        run.cmd(["firewall-cmd", "-q", "--permanent", "--remove-service", service], sudo=True)
+    run.cmd(["firewall-cmd", "-q", "--reload"], sudo=True)
+    ui.ok(f"{service} no firewall só de: {', '.join(sources)}")
+
+
+def firewall_unlimit(service: str, sources: Sequence[str]) -> None:
+    if not _firewalld():
+        return
+    if service not in _listed("service"):
+        run.cmd(["firewall-cmd", "-q", "--permanent", "--add-service", service], sudo=True)
+    for source in sources:
+        if run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]):
+            run.cmd(["firewall-cmd", "-q", "--permanent", "--remove-rich-rule", _rich(source, service)], sudo=True)
+    run.cmd(["firewall-cmd", "-q", "--reload"], sudo=True)
+    ui.ok(f"{service} liberado no firewall para qualquer origem")
+
+
+def firewall_limited(service: str, sources: Sequence[str]) -> bool:
+    if not _firewalld():
+        return False
+    return service not in _listed("service") and all(
+        run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]) for source in sources
+    )

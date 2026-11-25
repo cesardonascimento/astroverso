@@ -587,20 +587,23 @@ def checklist(
     all_option: bool = False,
     cancel: bool = False,
     details: Sequence[str] = (),
+    danger: Sequence[int] = (),
 ) -> list[int] | None:
     marks = [i in selected for i in range(len(items))]
+    shown = [f"⚠ {item}" if i in danger else item for i, item in enumerate(items)]
     offset = 1 if all_option else 0
     hint = "↑/↓, Espaço marca, a = todos, Enter confirma" + (", Esc volta" if cancel else "")
     with _terminal(title) as term, term.raw():
         view = _List(term, title, hint, len(items) + offset)
-        labels = _labels(items, details, term)
+        labels = _labels(shown, details, term)
 
         def line(i: int, current: bool) -> str:
             (label, detail), on = (("Todos", ""), all(marks)) if i < offset else (labels[i - offset], marks[i - offset])
+            risky = i >= offset and (i - offset) in danger
             box = term.paint("◉", GREEN, bold=True) if on else term.paint("○", GRAY)
             if current:
-                return f"{term.paint('❯', ACCENT, bold=True)} {box} {term.paint(label, SOFT, bold=True)}{detail}"
-            return f"  {box} {label}{detail}"
+                return f"{term.paint('❯', ACCENT, bold=True)} {box} {term.paint(label, RED if risky else SOFT, bold=True)}{detail}"
+            return f"  {box} {term.paint(label, RED) if risky else label}{detail}"
 
         while True:
             view.draw(line)
