@@ -6,13 +6,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from kit import backup as kit_backup
-from kit import changes, config, container, distro, docs, net, routes, ui, validate, watch
+from kit import changes, config, container, distro, docs, net, routes, ui, watch
 from kit.app import Action
 
 from . import server
 
 APP = "backup"
-DESCRIPTION = "Backup das configurações dos apps de todas as máquinas, criptografado, num servidor da casa (restic)"
+DESCRIPTION = "Servidor de backup da casa (restic): guarda, criptografados, os backups que os apps de todas as máquinas mandam"
 DOCS = Path(__file__).with_name("docs")
 MODES = ("server", "client")
 BUTTONS = (("Resumo dos backups", "backup:summary"),)
@@ -24,6 +24,14 @@ def mode() -> str:
 
 def status() -> bool:
     return server.installed() if mode() == "server" else mode() == "client" and kit_backup.configured()
+
+
+def _verify(values: dict[str, str]) -> str:
+    for item in kit_backup.destinations():
+        problem = kit_backup.ensure_repository(values, item)
+        if problem:
+            return f"{item.path}: {problem}"
+    return ""
 
 
 def items() -> list[changes.Change]:
@@ -45,6 +53,7 @@ def _show(name: str, values: dict[str, str]) -> None:
     ui.info(f"usuário: {name}")
     ui.info(f"senha de acesso: {values['PASSWORD']}")
     ui.info(f"senha do repositório: {values['REPO_PASSWORD']}")
+    ui.info(f"código de ligação: {server.link_code(name)}")
 
 
 def _server(reuse: bool) -> None:
@@ -57,53 +66,68 @@ def _server(reuse: bool) -> None:
     server.start()
     values = server.clients()[local]
     kit_backup.save(f"https://{server.address()}", local, values["PASSWORD"], values["REPO_PASSWORD"])
+    server.sync_local()
     if not reuse:
         ui.note("Esta é a senha do repositório desta máquina. Ela criptografa os backups e não fica em nenhum outro lugar seguro.")
         _show(local, values)
-    problem = kit_backup.ensure_repository(kit_backup.settings())
+    problem = _verify(kit_backup.settings())
     if problem:
         ui.warn(f"o repositório desta máquina ainda não respondeu ({problem}): ele depende do Caddy e do DNS do app network")
+
+
+def _link() -> None:
+    ui.note(
+        "Na máquina com o servidor de backup, use a ação Adicionar uma máquina (ou Mostrar os dados de uma máquina) do "
+        "app backup: ela mostra o código de ligação (endereço, usuário e pastas de destino) e as duas senhas."
+    )
+    while True:
+        url, user, items = kit_backup.read_code(ui.ask("código de ligação", validate=_code))
+        password = ui.secret("senha de acesso", confirm=False)
+        repository = ui.secret("senha do repositório", confirm=False)
+        attempt = dict(zip(kit_backup.KEYS, (url, user, password, repository)))
+        kit_backup.save_destinations(items)
+        problem = _verify(attempt)
+        if not problem:
+            break
+        ui.warn(f"o servidor não aceitou: {problem}")
+    kit_backup.save(url, user, password, repository)
+    ui.ok(f"esta máquina manda os backups para {url} ({len(items)} pasta(s) de destino)")
+
+
+def _code(value: str) -> str:
+    kit_backup.read_code(value)
+    return "".join(value.split())
 
 
 def _client(reuse: bool) -> None:
     distro.install(["restic"])
     current = kit_backup.settings()
-    if reuse and kit_backup.configured() and not kit_backup.ensure_repository(current):
+    if reuse and kit_backup.configured() and not _verify(current):
         ui.ok("esta máquina continua ligada ao servidor de backup")
         return
-    ui.note(
-        "Na máquina com o servidor de backup, use a ação Adicionar uma máquina do app backup: ela mostra o endereço, o "
-        "usuário e as duas senhas para colar aqui."
-    )
-    domain = config.saved_domain()
-    while True:
-        url = ui.ask("endereço do servidor de backup", default=current.get("BACKUP_URL") or f"https://backup.{domain}", validate=_url)
-        user = ui.ask("usuário desta máquina", default=current.get("BACKUP_USER") or net.hostname(), validate=validate.name)
-        password = ui.secret("senha de acesso", confirm=False)
-        repository = ui.secret("senha do repositório", confirm=False)
-        attempt = dict(zip(kit_backup.KEYS, (url, user, password, repository)))
-        problem = kit_backup.ensure_repository(attempt)
-        if not problem:
-            break
-        ui.warn(f"o servidor não aceitou: {problem}")
-    kit_backup.save(url, user, password, repository)
-    ui.ok(f"esta máquina manda os backups para {url}")
+    _link()
 
 
-def _url(value: str) -> str:
-    value = value.strip().rstrip("/")
-    if not value.startswith("https://") or " " in value:
-        raise ValueError("endereço com https://, como https://backup.casa.com")
-    return value
+def update_destinations() -> None:
+    values = kit_backup.settings()
+    if not kit_backup.configured():
+        ui.fail("esta máquina ainda não está ligada a um servidor de backup: instale o app backup")
+    ui.note("Cole o código de ligação desta máquina, de Mostrar os dados de uma máquina no servidor. As senhas continuam as mesmas.")
+    url, user, items = kit_backup.read_code(ui.ask("código de ligação", validate=_code))
+    if (url, user) != (values["BACKUP_URL"], values["BACKUP_USER"]):
+        ui.fail(f"esse código é de {user} em {url}; esta máquina é {values['BACKUP_USER']} em {values['BACKUP_URL']}")
+    kit_backup.save_destinations(items)
+    ui.ok("pastas de destino atualizadas: " + ", ".join(item.path for item in items))
+    ui.info("os apps que mandavam para uma pasta que saiu avisam no #backup: desligue e ligue o backup deles para escolher de novo")
 
 
 def install(reuse: bool | None = None) -> None:
     again = config.reuse(APP) if reuse is None else reuse
-    ui.step("Backup das configurações")
+    ui.step("Backup")
     ui.note(
-        "Cada app guarda todo dia a própria configuração (respostas, senhas, bancos), criptografada, num servidor de "
-        "backup da casa, e pode ser restaurado de qualquer versão guardada. Uma máquina tem o servidor; as outras só "
-        "mandam os backups dos apps delas."
+        "Cada app guarda todo dia a própria configuração (respostas, senhas, bancos) e, se tiver, os próprios dados, "
+        "criptografados, num servidor de backup da casa, e pode ser restaurado de qualquer versão guardada. Uma máquina "
+        "tem o servidor, com as pastas de destino; cada app escolhe para quais pastas manda o backup dele."
     )
     chosen = mode() if again and mode() in MODES else ""
     if not chosen:
@@ -125,13 +149,16 @@ def remove() -> None:
     if mode() == "server":
         container.remove(server.NAME, server.IMAGE)
         routes.withdraw(APP)
-        ui.info(f"os backups ficaram em {server.repos()} (apague à mão, se quiser)")
+        for item in server.destinations():
+            ui.info(f"os backups ficaram em {item.path} (apague à mão, se quiser)")
     kit_backup.forget()
     config.purge(APP)
 
 
 def backup(folder: Path) -> None:
     shutil.copy2(config.env_file(APP), folder / ".env")
+    if server.destinations_file().exists():
+        shutil.copy2(server.destinations_file(), folder / "destinations.json")
 
 
 def restore(folder: Path) -> None:
@@ -139,7 +166,10 @@ def restore(folder: Path) -> None:
         ui.fail(f"backup sem a configuração do {APP}")
     config.state(APP)
     current = config.read_env(folder / ".env")
-    config.save(APP, {key: value for key, value in current.items() if key in ("MODE", "REPOS", "KEEP_DAILY", "KEEP_MONTHLY")})
+    config.save(APP, {key: value for key, value in current.items() if key in ("MODE", "KEEP_DAILY", "KEEP_MONTHLY")})
+    if (folder / "destinations.json").exists():
+        shutil.copy2(folder / "destinations.json", server.destinations_file())
+        server.destinations_file().chmod(0o600)
     ui.info("as senhas das máquinas não entram no backup: cadastre de novo (ação Adicionar uma máquina) ou use as do gerenciador de senhas")
 
 
@@ -162,7 +192,7 @@ def remove_machine() -> None:
     for index in chosen:
         name = names[index]
         (server.clients_folder() / f"{name}.env").unlink()
-        ui.ok(f"{name} não manda mais backups (o repositório dela ficou em {server.repos() / name})")
+        ui.ok(f"{name} não manda mais backups (os repositórios dela ficaram nas pastas de destino)")
     if chosen:
         server._write_htpasswd()
         server.restart()
@@ -182,23 +212,24 @@ def summary() -> None:
         ui.table([
             ["Servidor", ui.good("no ar") if server.installed() else ui.bad("parado")],
             ["Endereço", f"https://{server.address()}"],
-            ["Pasta", str(server.repos())],
-            ["Espaço", server.free_space()],
             ["Regra", f"{config.load(APP).get('KEEP_DAILY', '30')} diárias e {config.load(APP).get('KEEP_MONTHLY', '12')} mensais"],
         ])
+        ui.section("Pastas de destino")
+        ui.table([[item.path, server.free_space(item) if server.reachable(item) else ui.bad("indisponível"), item.detail()]
+                  for item in server.destinations()] or [[ui.off("nenhuma"), "-", "-"]], ["Pasta", "Espaço", "Nuvem"])
         rows: list[list[str | ui.Cell]] = []
         for name, values in server.clients().items():
-            last = server.latest(server.snapshots(name, values))
-            if not last:
-                rows.append([name, ui.off("nenhum backup ainda"), "-"])
-            for app_name, moment in sorted(last.items()):
-                fresh = datetime.now(timezone.utc) - moment < timedelta(hours=36)
-                rows.append([name, app_name, ui.good(server.ago(moment)) if fresh else ui.bad(server.ago(moment))])
+            for item in server.destinations():
+                last = server.latest(server.snapshots(server.repository(item, name), values))
+                for app_name, moment in sorted(last.items()):
+                    fresh = datetime.now(timezone.utc) - moment < timedelta(hours=36)
+                    rows.append([name, item.path, app_name, ui.good(server.ago(moment)) if fresh else ui.bad(server.ago(moment))])
         ui.section("Máquinas e apps")
-        ui.table(rows or [[ui.off("nenhuma"), "-", "-"]], ["Máquina", "App", "Último backup"])
+        ui.table(rows or [[ui.off("nenhum backup ainda"), "-", "-", "-"]], ["Máquina", "Pasta", "App", "Último backup"])
         watch.summary(APP)
     ui.section("Esta máquina")
-    ui.table([["Servidor de backup", kit_backup.settings().get("BACKUP_URL") or ui.pending("não configurado")]])
+    ui.table([["Servidor de backup", kit_backup.settings().get("BACKUP_URL") or ui.pending("não configurado")]]
+             + [["Pasta de destino", item.path] for item in kit_backup.destinations()])
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
@@ -207,20 +238,29 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
         found["server"] = watch.Problem("erro", "Servidor de backup parado", "Nenhuma máquina consegue guardar backups até ele voltar.")
         return found
     now = datetime.now(timezone.utc)
+    places = [item for item in server.destinations() if server.reachable(item)]
+    for item in server.destinations():
+        if item not in places:
+            found[f"destination:{item.id}"] = watch.Problem(
+                "erro", f"Pasta de destino indisponível: {item.path}",
+                "O disco está desligado ou travado (veja o app disks): os backups para ela falham até ele voltar.", "destination")
     for name, values in server.clients().items():
-        last = server.latest(server.snapshots(name, values))
-        if not last:
+        latest = {item: server.latest(server.snapshots(server.repository(item, name), values)) for item in places}
+        moments = [moment for last in latest.values() for moment in last.values()]
+        if not moments:
             continue
-        newest = max(last.values())
+        newest = max(moments)
         if now - newest > timedelta(hours=36):
             found[f"machine:{name}"] = watch.Problem("erro", f"{name} sem backup há {int((now - newest).total_seconds() // 3600)} h",
                                                      "A máquina pode estar desligada ou sem acesso ao servidor.", f"machine:{name}")
             continue
-        for app_name, moment in last.items():
-            age = now - moment
-            if timedelta(hours=36) < age < timedelta(days=14):
-                found[f"app:{name}:{app_name}"] = watch.Problem("aviso", f"{app_name} de {name} sem backup há {int(age.total_seconds() // 3600)} h",
-                                                                "O backup do app está falhando (veja o #backup).", f"app:{name}:{app_name}")
+        for item, last in latest.items():
+            for app_name, moment in last.items():
+                age = now - moment
+                if timedelta(hours=36) < age < timedelta(days=14):
+                    found[f"app:{name}:{item.id}:{app_name}"] = watch.Problem(
+                        "aviso", f"{app_name} de {name} sem backup em {item.path} há {int(age.total_seconds() // 3600)} h",
+                        "O backup do app está falhando (veja o #backup).", f"app:{name}:{app_name}")
     try:
         report = json.loads(server.maintenance_file().read_text())
     except (OSError, ValueError):
@@ -255,8 +295,9 @@ def actions() -> list[Action]:
         Action("restore-version", "Restaurar uma versão", restore_version),
     ]
     if mode() != "server":
-        return common
+        return common + [Action("update-destinations", "Atualizar as pastas de destino", update_destinations)]
     return common + [
+        Action("destinations", "Pastas de destino", server.manage_destinations),
         Action("add-machine", "Adicionar uma máquina", add_machine),
         Action("show-machine", "Mostrar os dados de uma máquina", show_machine),
         Action("remove-machine", "Descadastrar máquinas", remove_machine),

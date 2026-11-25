@@ -1,8 +1,8 @@
 # Backup: as senhas e como restaurar do zero
 
-Cada máquina manda os backups dos apps dela para o servidor de backup do Astroverso, num repositório só dela. Ela
-tem **três** dados de acesso, mostrados pela ação **Adicionar uma máquina** (e pela **Mostrar os dados de uma
-máquina**):
+Cada máquina manda os backups dos apps dela para o servidor de backup do Astroverso, num repositório só dela em cada
+pasta de destino. Ela tem **três** dados de acesso, mostrados pela ação **Adicionar uma máquina** (e pela **Mostrar os
+dados de uma máquina**), junto com o código de ligação (endereço, usuário e pastas de destino, sem segredos):
 
 | Dado | Para que serve | Se perder |
 |---|---|---|
@@ -20,7 +20,7 @@ o gerenciador de senhas que salva os backups.
 
 Em qualquer app, **Gerenciar → <app> → Restaurar uma versão**:
 
-1. Escolha a data da versão.
+1. Escolha a pasta de destino (se houver mais de uma) e a data da versão.
 2. Antes de trocar, o app guarda a situação atual como uma versão "antes-da-restauracao" (dá para voltar atrás).
 3. O app traz a configuração daquela data e se reinstala com as respostas salvas.
 
@@ -30,11 +30,11 @@ Uma máquina nova (ou formatada), com o mesmo nome da antiga:
 
 1. Instale o Astroverso (clone o repositório e rode `./astroverso`).
 2. Instale o app **backup** e escolha **Só manda os backups dos apps dela para o servidor de outra máquina**. Cole o
-   endereço, o usuário e as duas senhas do gerenciador de senhas.
+   código de ligação (de **Mostrar os dados de uma máquina** no servidor) e as duas senhas do gerenciador de senhas.
 3. Para cada app que existia na máquina: instale o app e use **Restaurar uma versão**.
 
-Se a máquina perdida era a do **servidor**, restaure primeiro o app `backup` no modo servidor apontando para a mesma
-pasta dos repositórios (o disco de backup) e cadastre as máquinas de novo com **Adicionar uma máquina**. Os
+Se a máquina perdida era a do **servidor**, restaure primeiro o app `backup` no modo servidor com as mesmas pastas de
+destino e cadastre as máquinas de novo com **Adicionar uma máquina**. Os
 repositórios continuam lá; as senhas novas de acesso não mudam as senhas dos repositórios, que vêm do gerenciador.
 
 ## Abrir um backup à mão (sem o Astroverso)
@@ -42,8 +42,8 @@ repositórios continuam lá; as senhas novas de acesso não mudam as senhas dos 
 Os repositórios são do [restic](https://restic.net), um programa livre. Com ele instalado, na máquina do servidor:
 
 ```sh
-restic -r <pasta dos backups>/<nome-da-máquina> snapshots
-restic -r <pasta dos backups>/<nome-da-máquina> restore <id> --target /tmp/restaurado
+restic -r <pasta de destino>/<nome-da-máquina> snapshots
+restic -r <pasta de destino>/<nome-da-máquina> restore <id> --target /tmp/restaurado
 ```
 
 O restic pede a senha do repositório.

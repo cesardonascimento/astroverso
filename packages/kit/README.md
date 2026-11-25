@@ -230,15 +230,23 @@ As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps
 ## backup
 
 O backup de cada app no servidor do app `backup` (restic por HTTPS). A máquina fica ligada ao servidor por
-`~/.astroverso/backup.env` (`BACKUP_URL`, `BACKUP_USER`, `BACKUP_PASSWORD`, `BACKUP_REPO_PASSWORD`, `600`).
+`~/.astroverso/backup.env` (`BACKUP_URL`, `BACKUP_USER`, `BACKUP_PASSWORD`, `BACKUP_REPO_PASSWORD`, `600`) e
+`~/.astroverso/backup-destinations.json` (as pastas de destino do servidor: `Destination(id, path, cloud)`). Cada
+pasta de destino é um repositório: `rest:<url>/<máquina>/<id>/`. **Quem escolhe as pastas é o app**, guardadas no
+`.env` dele (`BACKUP_TO` para a configuração; outra chave para cada parte dos dados).
 
 | Nome | O que faz |
 |---|---|
-| `change(app)` | A mudança perguntada do backup diário: timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now` |
-| `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app numa pasta temporária, manda pelo `restic backup` (marcas `astroverso`, `app:<app>` e o rótulo), apaga a pasta e avisa no `#backup` (sucesso silencioso; falha com o botão "Tentar de novo"). Sem servidor configurado, só avisa |
-| `restore(app, backup, restore)` | Escolhe a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
-| `versions(app)` / `summary(app)` | As versões do app nesta máquina e a tabela para o resumo |
-| `configured()` / `settings()` / `save(...)` / `forget()` / `ensure_repository(valores)` | A ligação com o servidor; o `ensure_repository` cria o repositório na primeira vez e traduz os erros comuns |
+| `change(app)` | A mudança perguntada do backup diário: ao ligar, pergunta as pastas de destino (`choose`) e instala o timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now`. Desfazer tira o timer e esquece as pastas |
+| `data_change(app, parte, rótulo, porquê, ação, chave, o_quê)` | Igual, para dados: timer `astroverso-<app>-backup-<parte>` às 02:MM, que roda a ação dada; com `chave=None`, o app guarda as pastas de cada item do jeito dele |
+| `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app numa pasta temporária, manda pelo `restic backup` para cada pasta escolhida (marcas `astroverso`, `app:<app>` e o rótulo), apaga a pasta e avisa no `#backup` (falha com o botão "Tentar de novo"). Sem servidor, só avisa; sem pasta escolhida ou com pasta que saiu do servidor, avisa o erro |
+| `run_data(app, nome, caminho, pastas, ação, unshare=, key=)` | Manda uma pasta de dados direto (marca `dados:<nome>`), com `podman unshare` para os arquivos de containers. Pasta num disco desligado ou travado (`kit.disks.available`): não guarda nada e avisa |
+| `restore(app, backup, restore)` | Escolhe a pasta de destino e a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
+| `restore_data(app, nome)` | Traz uma versão dos dados numa pasta nova e vazia (padrão `~/Restaurado/<app>-<nome>-<data>`), sem mexer na original |
+| `targets(app, chave)` / `choose(app, chave, o_quê)` / `pick(pergunta, atuais)` | As pastas escolhidas por um app e a pergunta (checklist com a marca ☁) |
+| `versions(app, pasta, dados="")` / `summary(app, dados=)` | As versões do app nesta máquina numa pasta (as de configuração, ou as de uma parte dos dados) e a tabela para o resumo |
+| `link_code(url, usuário, pastas)` / `read_code(texto)` | O código de ligação mostrado pelo servidor e colado no cliente (sem segredos) |
+| `configured()` / `settings()` / `save(...)` / `destinations()` / `save_destinations(...)` / `forget()` / `ensure_repository(valores, pasta)` | A ligação com o servidor; o `ensure_repository` cria o repositório na primeira vez e traduz os erros comuns |
 
 As senhas vão por variável de ambiente (`RESTIC_REST_PASSWORD`, `RESTIC_PASSWORD`), nunca em argumentos.
 

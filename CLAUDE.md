@@ -151,26 +151,31 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 ### App `backup`
 
 - Servidor (uma máquina): container `rclone serve restic --append-only --private-repos` publicado em
-  `backup.<domínio>`, um repositório restic por máquina numa pasta (depois, um disco de backup), manutenção semanal
-  (`forget --prune` + `check`) só no servidor, verificação de hora em hora (36 h sem backup).
-- Cliente (todas as máquinas, inclusive a do servidor): só grava `~/.astroverso/backup.env`; quem manda os backups
-  são os próprios apps (decisão do usuário: "cada app manda a própria config").
+  `backup.<domínio>`, manutenção semanal (`forget --prune` + `check`) só no servidor, verificação de hora em hora
+  (36 h sem backup, pasta de destino indisponível).
+- **Pastas de destino:** o servidor só mantém a lista de caminhos (sem nome: decisão do usuário, nome gerava
+  confusão), escolhidos pelo `kit.folders` (disco, espaço e marca ☁). Nenhum conceito de local ou nuvem: o usuário
+  escolhe uma pasta ligada à nuvem se quiser que vá para a nuvem. Sem validação nem regra automática de destino.
+- Um repositório por máquina em cada pasta (`<pasta>/<máquina>`), montado no container em `/<máquina>/<id>` (o
+  `--private-repos` continua separando as máquinas). Os apps da máquina dividem o repositório, separados por marca.
+- **Quem decide para onde vai o backup é cada app** (decisão do usuário), não o app `backup`: a mudança do
+  `kit.backup` pergunta as pastas ao ligar e guarda no `.env` do app; trocar = desligar e ligar.
+- Cliente (todas as máquinas, inclusive a do servidor): `~/.astroverso/backup.env` + `backup-destinations.json`,
+  vindos do código de ligação (sem segredos) e das duas senhas digitadas.
+- **Backup dos dados nos apps donos:** `nextcloud` (pasta dos arquivos) e `disks` (pastas dos discos), pelo
+  `kit.backup.data_change`/`run_data` (trava pelo `kit.disks.available`, `podman unshare` para arquivos de containers),
+  mesma regra de versões. Restaurar dados vai para uma pasta nova, sem mexer na original.
 - A senha do repositório de cada máquina vai para o gerenciador de senhas do usuário; o backup do próprio app não
   leva as senhas.
 - Próximos passos combinados com o usuário:
-  - **Backup dos dados** no app `backup`, pelo mesmo restic (substitui o espelho antigo): ação "Pastas e discos",
-    todo dia, tag `dados:<nome>`, trava pelo `kit.disks.available`, `podman unshare` para os arquivos de containers,
-    mesma regra de versões das configurações. Cada item tem "também fora de casa" (configurações: sim; dados:
-    perguntado, padrão não); no domingo, depois da manutenção, o servidor faz `restic copy` só das versões marcadas
-    para `<pasta dos backups>/fora-de-casa/<máquina>`, uma pasta que o usuário põe onde quiser (ex.: numa pasta
-    sincronizada com a nuvem).
   - **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo
     cliente. Windows: script PowerShell (Instalar e Remover) gerado pela ação "Preparar um PC sem Astroverso", com o
-    restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada e o passo a passo em `docs/windows.md`; quem avisa no
-    `#backup` é o servidor. Nada da cópia antiga do Windows é migrado: o usuário configura pelo app.
+    restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada, pastas de destino por pasta e o passo a passo em
+    `docs/windows.md`; quem avisa no `#backup` é o servidor. O Remover apaga a tarefa e as senhas, desinstala o restic
+    com confirmação e deixa os backups no servidor. Nada da cópia antiga do Windows é migrado.
   - **App `cloud`** (rclone): sincronizações de duas vias (`bisync`) e envios de uma via, cadastrados pelo
-    gerenciador. O destino é escolha do usuário, sem regra automática; os seletores de pasta só marcam as pastas
-    ligadas a uma nuvem (o `cloud` publica as dele numa pasta de contrato).
+    gerenciador. O destino é escolha do usuário; o `cloud` publica as pastas ligadas pelo `kit.clouds` só para a marca
+    ☁ nos seletores.
 - Sem prioridade mínima (`Nice`, `ionice`) nos backups e sincronizações: a máquina não divide mais o hardware.
 
 ### App `disks`
@@ -212,6 +217,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - `kit.backup`: o backup de cada app no servidor do app `backup` (restic), com avisos no `#backup`.
 - `kit.discord`: avisos dos apps no Discord (o bot é o app `discord`).
 - `kit.disks`: os discos de dados montados pelo app `disks` (só leitura, a partir do `fstab`).
+- `kit.folders` (seletor de pastas de todos os apps) e `kit.clouds` (pastas ligadas a uma nuvem, contrato em
+  `~/.astroverso/clouds/`).
 
 Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 

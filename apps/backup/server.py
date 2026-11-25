@@ -4,10 +4,12 @@ import json
 import secrets
 import shutil
 import time
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import changes, config, container, discord, routes, run, ui, units, validate
+from kit import backup as kit_backup
+from kit import changes, clouds, config, container, discord, disks, folders, routes, run, ui, units, validate
 
 APP = "backup"
 NAME = "astroverso-backup"
@@ -15,7 +17,6 @@ IMAGE = "docker.io/rclone/rclone:1.76.0"
 PORT = 8080
 MAINTENANCE = "astroverso-backup-maintenance"
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
-DEFAULT_REPOS = Path.home() / "Backups" / "astroverso"
 
 
 def folder() -> Path:
@@ -34,8 +35,42 @@ def maintenance_file() -> Path:
     return folder() / "maintenance.json"
 
 
-def repos() -> Path:
-    return Path(config.load(APP).get("REPOS") or DEFAULT_REPOS)
+def destinations_file() -> Path:
+    return folder() / "destinations.json"
+
+
+def destinations() -> list[kit_backup.Destination]:
+    try:
+        items = json.loads(destinations_file().read_text())
+    except (OSError, ValueError):
+        return []
+    return [kit_backup.Destination(str(item["id"]), str(item["path"]), clouds.mark(Path(str(item["path"]))))
+            for item in items if isinstance(item, dict) and item.get("id") and item.get("path")] if isinstance(items, list) else []
+
+
+def save_destinations(items: list[kit_backup.Destination]) -> None:
+    temporary = destinations_file().with_suffix(".tmp")
+    temporary.write_text(json.dumps([{"id": item.id, "path": item.path} for item in items], ensure_ascii=False, indent=2) + "\n")
+    temporary.chmod(0o600)
+    temporary.replace(destinations_file())
+
+
+def new_id(path: str, taken: set[str]) -> str:
+    salt = 0
+    while True:
+        value = f"{zlib.crc32(f'{path}#{salt}'.encode()):08x}"
+        if value not in taken:
+            return value
+        salt += 1
+
+
+def repository(destination: kit_backup.Destination, name: str) -> Path:
+    return Path(destination.path) / name
+
+
+def reachable(destination: kit_backup.Destination) -> bool:
+    path = Path(destination.path)
+    return disks.available(path) and path.is_dir()
 
 
 def address() -> str:
@@ -47,9 +82,18 @@ def spec() -> container.Container:
         name=NAME,
         image=IMAGE,
         description="Astroverso backup: servidor dos repositórios (rclone serve restic)",
-        volumes=[container.Volume(repos(), "/data"), container.Volume(htpasswd(), "/config/htpasswd", "ro,Z")],
+        volumes=[*_volumes(), container.Volume(htpasswd(), "/config/htpasswd", "ro,Z")],
         command=["serve", "restic", "/data", "--addr", f":{PORT}", "--append-only", "--private-repos", "--htpasswd", "/config/htpasswd"],
     )
+
+
+def _volumes() -> list[container.Volume]:
+    found = []
+    for name in clients():
+        for item in destinations():
+            options = "rw" if disks.containing(Path(item.path)) else "Z"
+            found.append(container.Volume(repository(item, name), f"/data/{name}/{item.id}", options))
+    return found
 
 
 def installed() -> bool:
@@ -80,12 +124,15 @@ def add(name: str) -> dict[str, str]:
     return values
 
 
-def validate_repos(value: str) -> str:
+def validate_destination(value: str) -> str:
     path = Path(value.strip()).expanduser()
     if not path.is_absolute():
-        raise ValueError("use um caminho completo, como ~/Backups/astroverso")
-    if path.resolve() in (Path.home().resolve(), Path("/")) or str(path.resolve()).startswith(str(config.home().resolve())):
+        raise ValueError("use um caminho completo")
+    resolved = path.resolve()
+    if resolved in (Path.home().resolve(), Path("/")) or resolved == config.home().resolve() or config.home().resolve() in resolved.parents:
         raise ValueError("escolha uma pasta só para os backups (fora do ~/.astroverso)")
+    if str(path) in [item.path for item in destinations()]:
+        raise ValueError("essa pasta já é uma pasta de destino")
     return str(path)
 
 
@@ -97,21 +144,91 @@ def _count(value: str) -> str:
 
 def ask(reuse: bool) -> None:
     current = config.load(APP)
-    if reuse and current.get("REPOS"):
+    if reuse and current.get("KEEP_DAILY") and destinations():
         return
-    ui.note(
-        "A pasta onde ficam os backups de todas as máquinas, um repositório por máquina, criptografado. Quando o app "
-        "de discos existir, escolha aqui um disco de backup."
-    )
-    chosen = ui.ask("pasta dos backups", default=current.get("REPOS") or str(DEFAULT_REPOS), validate=validate_repos)
     ui.note("Quantas versões guardar de cada app: uma por dia nos últimos dias e uma por mês nos últimos meses.")
     daily = ui.ask("versões diárias", default=current.get("KEEP_DAILY") or "30", validate=_count)
     monthly = ui.ask("versões mensais", default=current.get("KEEP_MONTHLY") or "12", validate=_count)
-    config.save(APP, {"REPOS": chosen, "KEEP_DAILY": daily, "KEEP_MONTHLY": monthly})
+    config.save(APP, {"KEEP_DAILY": daily, "KEEP_MONTHLY": monthly})
+    if not destinations():
+        manage_destinations()
+
+
+def _add_destination() -> None:
+    ui.note(
+        "Uma pasta de destino guarda os backups das máquinas, uma subpasta (repositório criptografado) por máquina. "
+        "Cada app escolhe para quais pastas vai o backup dele. A marca ☁ só mostra que a pasta está ligada a uma nuvem."
+    )
+    path = folders.pick("pasta de destino", validate=validate_destination)
+    items = destinations()
+    items.append(kit_backup.Destination(new_id(path, {item.id for item in items}), path, clouds.mark(Path(path))))
+    save_destinations(items)
+    ui.ok(f"pasta de destino {path} cadastrada")
+
+
+def _drop_destinations() -> None:
+    items = destinations()
+    chosen = ui.checklist("Quais pastas deixam de ser destino?", [item.path for item in items], cancel=True) or []
+    if not chosen:
+        return
+    ui.warn("os backups que já estão nelas ficam onde estão; os apps que mandavam para elas param de mandar e avisam no #backup")
+    if not ui.confirm("confirma?", default=False):
+        return
+    save_destinations([item for i, item in enumerate(items) if i not in chosen])
+    for i in chosen:
+        ui.ok(f"{items[i].path} não é mais destino (os backups ficaram na pasta)")
+
+
+def manage_destinations() -> None:
+    before = destinations()
+    while True:
+        items = destinations()
+        if items:
+            ui.table([[item.path, free_space(item), item.detail()] for item in items], ["Pasta de destino", "Espaço", "Nuvem"])
+        options = ["Adicionar uma pasta"] + (["Tirar pastas"] if items else []) + ["Pronto"]
+        choice = options[ui.menu("Pastas de destino", options)]
+        if choice == "Adicionar uma pasta":
+            _add_destination()
+        elif choice == "Tirar pastas":
+            _drop_destinations()
+        elif items:
+            break
+        else:
+            ui.warn("cadastre pelo menos uma pasta de destino")
+    if destinations() != before:
+        apply_destinations()
+
+
+def apply_destinations() -> None:
+    if installed():
+        start()
+    sync_local()
+    if len(clients()) > 1:
+        ui.info("nas outras máquinas, use a ação Atualizar as pastas de destino do app backup, com o código de Mostrar os dados de uma máquina")
+
+
+def sync_local() -> None:
+    if kit_backup.settings().get("BACKUP_URL") == f"https://{address()}":
+        kit_backup.save_destinations(destinations())
+
+
+def link_code(name: str) -> str:
+    return kit_backup.link_code(f"https://{address()}", name, destinations())
+
+
+def prepare_folders() -> None:
+    for item in destinations():
+        if disks.available(Path(item.path)):
+            Path(item.path).mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not reachable(item):
+            ui.warn(f"pasta de destino indisponível: {item.path} (disco desligado ou travado?)")
+            continue
+        for name in clients():
+            repository(item, name).mkdir(exist_ok=True, mode=0o700)
 
 
 def start() -> None:
-    repos().mkdir(parents=True, exist_ok=True, mode=0o700)
+    prepare_folders()
     if not htpasswd().exists():
         _write_htpasswd()
     container.prepare()
@@ -121,17 +238,19 @@ def start() -> None:
 
 def restart() -> None:
     if installed():
+        prepare_folders()
+        container.start(spec())
         container.restart(spec())
 
 
-def _local(name: str, values: dict[str, str]) -> dict[str, str]:
-    return {"RESTIC_REPOSITORY": str(repos() / name), "RESTIC_PASSWORD": values["REPO_PASSWORD"]}
+def _local(path: Path, values: dict[str, str]) -> dict[str, str]:
+    return {"RESTIC_REPOSITORY": str(path), "RESTIC_PASSWORD": values["REPO_PASSWORD"]}
 
 
-def snapshots(name: str, values: dict[str, str]) -> list[dict]:
-    if not (repos() / name / "config").exists():
+def snapshots(path: Path, values: dict[str, str]) -> list[dict]:
+    if not (path / "config").exists():
         return []
-    code, output = run.output(["restic", "snapshots", "--json", "--no-lock"], env=_local(name, values), timeout=120)
+    code, output = run.output(["restic", "snapshots", "--json", "--no-lock"], env=_local(path, values), timeout=120)
     try:
         found = json.loads(output) if code == 0 else []
     except ValueError:
@@ -146,9 +265,12 @@ def latest(items: list[dict]) -> dict[str, datetime]:
             moment = datetime.fromisoformat(str(item["time"]).replace("Z", "+00:00"))
         except (KeyError, ValueError):
             continue
-        for tag in item.get("tags") or []:
-            if tag.startswith("app:") and (tag[4:] not in found or moment > found[tag[4:]]):
-                found[tag[4:]] = moment
+        tags = [str(tag) for tag in item.get("tags") or []]
+        app = next((tag[4:] for tag in tags if tag.startswith("app:")), "")
+        data = next((tag[6:] for tag in tags if tag.startswith("dados:")), "")
+        key = f"{app} ({data})" if data else app
+        if app and (key not in found or moment > found[key]):
+            found[key] = moment
     return found
 
 
@@ -156,19 +278,26 @@ def maintain() -> bool:
     current = config.load(APP)
     keep = ["--keep-daily", current.get("KEEP_DAILY", "30"), "--keep-monthly", current.get("KEEP_MONTHLY", "12")]
     problems: dict[str, str] = {}
-    for name, values in clients().items():
-        if not (repos() / name / "config").exists():
+    for item in destinations():
+        if not reachable(item):
+            problems[item.path] = "pasta indisponível (disco desligado ou travado?)"
+            ui.warn(f"{item.path}: {problems[item.path]}")
             continue
-        ui.info(f"manutenção do repositório de {name}...")
-        code, output = run.output(["restic", "forget", "--prune", *keep], env=_local(name, values))
-        if code == 0:
-            code, output = run.output(["restic", "check"], env=_local(name, values))
-        if code:
-            lines = [line for line in output.splitlines() if line.strip()]
-            problems[name] = lines[-1][:300] if lines else f"restic saiu com {code}"
-            ui.warn(f"{name}: {problems[name]}")
-        else:
-            ui.ok(f"{name}: versões antigas apagadas e repositório conferido")
+        for name, values in clients().items():
+            path = repository(item, name)
+            if not (path / "config").exists():
+                continue
+            ui.info(f"manutenção do repositório de {name} em {item.path}...")
+            code, output = run.output(["restic", "forget", "--prune", *keep], env=_local(path, values))
+            if code == 0:
+                code, output = run.output(["restic", "check"], env=_local(path, values))
+            where = f"{name} em {item.path}"
+            if code:
+                lines = [line for line in output.splitlines() if line.strip()]
+                problems[where] = lines[-1][:300] if lines else f"restic saiu com {code}"
+                ui.warn(f"{where}: {problems[where]}")
+            else:
+                ui.ok(f"{where}: versões antigas apagadas e repositório conferido")
     maintenance_file().write_text(json.dumps({"time": int(time.time()), "problems": problems}, ensure_ascii=False) + "\n")
     if problems:
         discord.notify(APP, "erro", "Manutenção dos backups com problema",
@@ -196,8 +325,6 @@ def _units() -> dict[str, str]:
             "",
             "[Service]",
             "Type=oneshot",
-            "Nice=19",
-            "IOSchedulingClass=idle",
             f"ExecStart={COMMAND} backup action maintenance",
             "",
         ]),
@@ -217,12 +344,14 @@ def change() -> changes.Change:
     )
 
 
-def free_space() -> str:
+def free_space(destination: kit_backup.Destination) -> str:
+    if not reachable(destination):
+        return "indisponível"
     try:
-        usage = shutil.disk_usage(repos())
+        usage = shutil.disk_usage(destination.path)
     except OSError:
         return "-"
-    return f"{usage.free / 1024 ** 3:.0f} GB livres de {usage.total / 1024 ** 3:.0f} GB"
+    return f"{folders.human(usage.free)} livres de {folders.human(usage.total)}"
 
 
 def ago(moment: datetime) -> str:
