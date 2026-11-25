@@ -119,6 +119,10 @@ class NetworkTest(unittest.TestCase):
             mock.patch.object(tailscale, "run", system),
             mock.patch.object(tailscale, "distro", system),
             mock.patch.object(tailscale, "net", fake_net),
+            mock.patch.object(network, "net", fake_net),
+            mock.patch.object(network.watch, "install"),
+            mock.patch.object(network.watch, "remove"),
+            mock.patch.object(network.watch, "summary"),
             mock.patch.object(tailscale.time, "sleep"),
             mock.patch.object(tailscale.getpass, "getuser", return_value="dono"),
             mock.patch.object(network.adguard, "install"),
@@ -157,7 +161,8 @@ class NetworkTest(unittest.TestCase):
         self.assertIn("pc está por relay", screen)
         self.assertNotIn("celular está por relay", screen)
         self.assertIn("celular", screen)
-        self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "no"})
+        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "ROUTER_FORWARD": "no"})
+        self.assertIn("Verificação de hora em hora", screen)
 
     def test_already_connected_and_reuse(self) -> None:
         system = self.use(FakeSystem(installed=True, running=True, approve_after=0))
@@ -177,7 +182,7 @@ class NetworkTest(unittest.TestCase):
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("aprovação pendente", outcome.screen)
         self.assertIn("falta aprovar no painel", outcome.screen)
-        self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "yes"})
+        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "ROUTER_FORWARD": "yes"})
 
     def test_remove(self) -> None:
         system = self.use(FakeSystem(installed=True, running=True))
@@ -215,7 +220,7 @@ class NetworkTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.use(FakeSystem(installed=True, running=True))
-        self.assertEqual([action.id for action in network.actions()], ["summary", "reconnect", "router", "devices", "reload", "router-dns"])
+        self.assertEqual([action.id for action in network.actions()], ["summary", "reconnect", "router", "devices", "reload", "router-dns", "watch"])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             tailscale.mark_router()
         self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "yes"})

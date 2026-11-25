@@ -6,7 +6,7 @@ import ssl
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from kit import config, container, distro, docs, routes as published, run, ui, units, validate
@@ -259,15 +259,20 @@ def _wait_certificate(domain: str, timeout: float = 180) -> None:
     ui.link("causas comuns", docs.link(DOCS / "cloudflare.md", "quando-o-cadeado-demora"))
 
 
-def certificate(domain: str) -> str:
+def expiry(domain: str) -> datetime | None:
     context = ssl.create_default_context()
     try:
         with socket.create_connection(("127.0.0.1", 443), timeout=5) as raw:
             with context.wrap_socket(raw, server_hostname=f"astroverso-teste.{domain}") as tls:
                 expires = tls.getpeercert().get("notAfter", "")
     except (OSError, ssl.SSLError, ValueError):
-        return ""
-    return datetime.fromtimestamp(ssl.cert_time_to_seconds(expires)).strftime("%d/%m/%Y") if expires else ""
+        return None
+    return datetime.fromtimestamp(ssl.cert_time_to_seconds(expires), timezone.utc) if expires else None
+
+
+def certificate(domain: str) -> str:
+    expires = expiry(domain)
+    return expires.astimezone().strftime("%d/%m/%Y") if expires else ""
 
 
 def install(reuse: bool) -> None:

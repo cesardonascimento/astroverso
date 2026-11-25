@@ -3,10 +3,10 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import config, ui
+from kit import config, net, ui
 from kit.app import Action
 
-from . import adguard, caddy, tailscale
+from . import adguard, caddy, tailscale, watch
 
 APP = "network"
 DESCRIPTION = "Rede da casa: acesso de fora (Tailscale), DNS com bloqueio (AdGuard) e endereços com HTTPS (Caddy)"
@@ -18,13 +18,21 @@ def status() -> bool:
 
 def install(reuse: bool | None = None) -> None:
     again = config.reuse(APP) if reuse is None else reuse
+    config.save(APP, {"SERVER_IP": net.lan_ip()})
     tailscale.install(again)
     adguard.install(again)
     caddy.install(again)
+    ui.step("Verificação de hora em hora")
+    ui.note(
+        "A cada hora, esta máquina confere a rede (AdGuard e Caddy no ar, cadeado, token da Cloudflare, Tailscale, IP) "
+        "e avisa no Discord quando algo quebra e quando volta ao normal, sem repetir o mesmo aviso."
+    )
+    watch.install()
     summary()
 
 
 def remove() -> None:
+    watch.remove()
     caddy.remove()
     adguard.remove()
     tailscale.remove()
@@ -69,6 +77,7 @@ def summary() -> None:
     tailscale.summary()
     adguard.summary()
     caddy.summary()
+    watch.summary()
     ui.section("Portas")
     ui.table(tailscale.port_rows() + adguard.port_rows() + caddy.port_rows(), ["Porta", "Para quê", "Firewall", "Roteador"])
 
@@ -81,4 +90,5 @@ def actions() -> list[Action]:
         Action("devices", "Endereços de aparelhos da rede", caddy.manage_devices),
         Action("reload", "Recarregar os endereços do Caddy", caddy.reload),
         Action("router-dns", "Marcar o DNS no roteador como feito", adguard.mark_router),
+        Action("watch", "Verificar a rede agora (e avisar no Discord)", watch.check),
     ]

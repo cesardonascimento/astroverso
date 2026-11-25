@@ -104,6 +104,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   aparelhos da rede entram como endereços (nome, IP, porta), nunca como rotas do Tailscale.
 - Os outros apps publicam endereços pelo `kit.routes` (`~/.astroverso/routes/<app>.json`, pasta de nenhum app); a
   unidade `astroverso-network-routes.path` recarrega o Caddy a cada mudança.
+- Verificação de hora em hora (`astroverso-network-watch.timer`): avisa pelo `kit.discord` só quando um problema
+  aparece, piora ou se resolve (estado em `watch.json`).
 
 ### App `discord`
 

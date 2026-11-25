@@ -163,7 +163,11 @@ def remove() -> None:
     run.cmd(["rm", "-rf", STATE_DIR], sudo=True)
 
 
-def _peer_name(peer: dict) -> str:
+def relayed(peer: dict) -> bool:
+    return bool(peer.get("Online") and not peer.get("CurAddr") and peer.get("Relay"))
+
+
+def peer_name(peer: dict) -> str:
     return (peer.get("DNSName") or "").split(".")[0] or peer.get("HostName") or "?"
 
 
@@ -202,13 +206,13 @@ def summary() -> None:
         else:
             rows.append([label, ui.pending(f"{item}: falta aprovar no painel")])
     ui.table(rows)
-    peers = sorted((state.get("Peer") or {}).values(), key=_peer_name)
+    peers = sorted((state.get("Peer") or {}).values(), key=peer_name)
     if peers:
         ui.section("Aparelhos no Tailscale")
         ui.table(
             [
                 [
-                    _peer_name(peer),
+                    peer_name(peer),
                     (peer.get("TailscaleIPs") or ["-"])[0],
                     peer.get("OS") or "-",
                     ui.good("online") if peer.get("Online") else ui.off("offline"),
@@ -219,11 +223,9 @@ def summary() -> None:
             ["Nome", "IP", "Sistema", "Situação", "Conexão"],
         )
         for peer in peers:
-            if peer.get("Online") and not peer.get("CurAddr") and peer.get("Relay"):
-                ui.warn(
-                    f"{_peer_name(peer)} está por relay: se ele estiver em casa, libere a porta UDP 41641 no "
-                    "firewall dele (veja os comandos na instalação ou no README do network)"
-                )
+            if relayed(peer):
+                ui.warn(f"{peer_name(peer)} está por relay: se ele estiver em casa, libere a porta UDP 41641 no firewall dele")
+                ui.link("como liberar", docs.link(DOCS / "outros-computadores.md"))
 
 
 def port_rows() -> list[list[str | ui.Cell]]:

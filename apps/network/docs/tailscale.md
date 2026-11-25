@@ -47,6 +47,18 @@ domínio passam pelo servidor, e o resto continua com o DNS normal de cada apare
 **Para conferir:** no **Resumo da rede**, a linha **Split DNS** mostra `<domínio> → <ip>` com ✔. Em um celular fora
 de casa, com o Tailscale ligado, `https://adguard.<domínio>` deve abrir com cadeado.
 
+## Desligar a expiração da chave
+
+**Para que serve:** por padrão, o Tailscale pede um login novo de cada máquina a cada 180 dias. Num servidor, isso
+significa que um dia ele sai da rede sozinho e os endereços param de abrir fora de casa. A verificação do `network`
+avisa no Discord 14 dias antes, mas o melhor é desligar a expiração no servidor:
+
+1. Abra <https://login.tailscale.com/admin/machines>.
+2. Clique nos três pontinhos (**⋯**) na linha de `<nome-da-máquina>` e escolha **Disable key expiry**.
+
+Faça isso só nas máquinas da casa que ficam sempre ligadas. Celulares e notebooks podem continuar expirando: se
+um deles for perdido, ele sai da rede sozinho.
+
 ## Direto ou por relay
 
 O Tailscale tenta ligar cada aparelho **direto** ao servidor. Quando não consegue, passa por um servidor

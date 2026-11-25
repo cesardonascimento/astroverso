@@ -23,7 +23,7 @@ Uma explicação curta aparece antes de cada etapa, para quem não conhece o pro
    pergunta se já foi feito.
 9. Caddy: pede o token da Cloudflare (com o link para o passo a passo) e o confere na API; oferece criar endereços
    para aparelhos da rede (opcional); monta a imagem, sobe o Caddy e espera o cadeado do Let's Encrypt.
-10. Mostra os endereços e o Resumo da rede.
+10. Liga a verificação de hora em hora (avisos no Discord) e mostra os endereços e o Resumo da rede.
 
 O "Reinstalar" pode reaproveitar as respostas salvas.
 
@@ -46,7 +46,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `/etc/systemd/resolved.conf.d/99-astroverso-network.conf` (`DNS=127.0.0.1`, `Domains=~<domínio>`) | Esta máquina pergunta ao AdGuard só pelos nomes do domínio e usa o DNS do roteador para o resto: ela nunca fica sem DNS, mesmo com o AdGuard parado |
 | `~/.astroverso/astroverso.env` (`DOMAIN`) | O domínio dos endereços, perguntado uma vez e usado por todos os apps |
 | `~/.astroverso/network/adguard/` (`conf/AdGuardHome.yaml`, `work/`) | A configuração do AdGuard (gerada uma vez; as mudanças feitas no painel ficam) e os dados dele |
-| `~/.astroverso/network/.env` (`ROUTER_FORWARD`, `ROUTER_DNS`, `ADGUARD_USER`, `ADGUARD_PASSWORD_HASH`) | As respostas da instalação, para o Resumo e o Reinstalar; a senha só como hash (bcrypt, calculado pela imagem do Caddy) |
+| `~/.astroverso/network/.env` (`SERVER_IP`, `ROUTER_FORWARD`, `ROUTER_DNS`, `ADGUARD_USER`, `ADGUARD_PASSWORD_HASH`) | As respostas da instalação, para o Resumo e o Reinstalar; a senha só como hash (bcrypt, calculado pela imagem do Caddy) |
 | Imagem local `localhost/astroverso-network-caddy:<versão>` (Caddy oficial + módulo `caddy-dns/cloudflare`, versões fixadas), montada na instalação; a imagem de montagem é apagada depois | O Caddy oficial não fala com a Cloudflare; o módulo permite o cadeado curinga `*.<domínio>` sem abrir nenhuma porta para a internet |
 | Container `astroverso-network-caddy` na rede `astroverso`, portas 80 e 443 (TCP e UDP), unidade Quadlet | Recebe os acessos a `https://<serviço>.<domínio>` e repassa a cada serviço: containers pelo nome, serviços desta máquina por `host.containers.internal`, aparelhos da rede pelo IP |
 | Serviços `http` e `https` e a porta `443/udp` liberados no firewall | Para os aparelhos abrirem os endereços (a 80 só redireciona para a 443; a 443/udp é o HTTP/3) |
@@ -55,6 +55,8 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/network/caddy/data/` e `config/` | O cadeado do Let's Encrypt e o estado do Caddy (o cadeado renova sozinho) |
 | `~/.astroverso/network/caddy/devices.json` | Os endereços de aparelhos da rede (nome, IP, porta, HTTP ou HTTPS) |
 | Unidades do usuário `astroverso-network-routes.path` e `.service` em `~/.config/systemd/user/` | Quando um app publica ou retira um endereço em `~/.astroverso/routes/`, o Caddy recarrega sozinho, sem reiniciar (`astroverso network action reload`) |
+| Unidades do usuário `astroverso-network-watch.timer` e `.service` | A cada hora (a primeira 10 min depois de ligar), confere a rede e avisa no Discord pelo `kit.discord` quando algo quebra e quando volta ao normal (`astroverso network action watch`) |
+| `~/.astroverso/network/watch.json` | Os avisos em aberto, para não repetir o mesmo aviso a cada hora |
 | Pasta `~/.astroverso/routes/` (`700`), se ainda não existir | Onde os apps publicam os endereços deles (`kit.routes`); não é de nenhum app e fica no `remove` |
 | Painel do AdGuard só por `https://adguard.<domínio>` (a porta 8080 não é aberta na rede) | Com login e cadeado; a 8080 só é alcançada pelo Caddy |
 
@@ -82,11 +84,32 @@ frase e o link para o doc no GitHub, para abrir no navegador.
 | Marcar o redirecionamento no roteador como feito | Para quando ele for feito depois da instalação |
 | Marcar o DNS no roteador como feito | Idem, para o DNS do roteador |
 | Endereços de aparelhos da rede | Lista, cria e remove endereços `https://<nome>.<domínio>` para painéis de aparelhos da casa (IP, porta, HTTP ou HTTPS); o Caddy recarrega sem reiniciar |
+| Verificar a rede agora (e avisar no Discord) | Roda na hora a verificação de hora em hora (abaixo) |
 | Recarregar os endereços do Caddy | Regera o Caddyfile (inclusive com os endereços publicados por outros apps em `~/.astroverso/routes/`) e recarrega. Normalmente não é preciso: a unidade `astroverso-network-routes.path` faz isso sozinha |
+
+## Verificação de hora em hora
+
+Avisa no canal `#network` do Discord (pelo `kit.discord`, se o app `discord` estiver ligado nesta máquina) **só
+quando algo muda**: quando um problema aparece, quando ele piora (de aviso para erro) e quando volta ao normal
+(✅ resolvido). Um aviso que não foi entregue é tentado de novo na hora seguinte.
+
+| O que confere | Nível |
+|---|---|
+| AdGuard parado (a casa fica no DNS secundário) | erro |
+| Caddy parado (os endereços não abrem) | erro |
+| Cadeado vence em menos de 14 dias / menos de 3 / inválido ou vencido | aviso / erro / erro |
+| Token da Cloudflare recusado (sem internet não conta) | erro |
+| IP desta máquina diferente do da instalação (reserva no roteador falhou) | erro |
+| Máquina fora do Tailscale, ou o anúncio `<ip>/32` sem aprovação | erro |
+| Chave desta máquina no Tailscale vence em menos de 14 dias | aviso |
+| Aparelho com conexão ativa passando por relay | info |
+
+Cada aviso traz o link para o doc que resolve. Sem o Discord, a verificação só escreve no log
+(`journalctl --user -u astroverso-network-watch`). Com esta máquina desligada ou sem internet, não há aviso.
 
 ## Remover
 
-Desfaz tudo da tabela de mudanças: remove as unidades da recarga automática, os containers e as imagens do Caddy e do AdGuard, tira o ajuste de DNS
+Desfaz tudo da tabela de mudanças: remove as unidades da verificação e da recarga automática, os containers e as imagens do Caddy e do AdGuard, tira o ajuste de DNS
 desta máquina, fecha as portas, apaga o ajuste de portas baixas, tira a máquina da conta do Tailscale
 (`tailscale logout`), desliga o serviço, desinstala o pacote e apaga `/var/lib/tailscale` e `~/.astroverso/network`.
 O Podman, o *linger* e o `astroverso.env` ficam (são de todos os apps). Os passos fora da máquina ficam: a
