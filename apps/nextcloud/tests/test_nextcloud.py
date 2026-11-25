@@ -112,6 +112,7 @@ class NextcloudTest(unittest.TestCase):
             mock.patch.object(nextcloud, "run", FakeRun(self.host)),
             mock.patch.object(nextcloud, "DEFAULT_FILES", self.home / "Nextcloud"),
             mock.patch.object(nextcloud.time, "sleep"),
+            mock.patch.object(__import__("kit.disks").disks, "mounts", return_value=[]),
             mock.patch.object(app.accounts, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change(
@@ -121,7 +122,7 @@ class NextcloudTest(unittest.TestCase):
             self.addCleanup(patch.stop)
 
     def test_fresh_install(self) -> None:
-        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n", b"\n"]
+        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\r", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(reuse=False), self.host.calls)[1], keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]
@@ -145,7 +146,7 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual((nextcloud.secrets_folder() / "db_password").stat().st_mode & 0o777, 0o644)
 
     def test_reinstall_asks_nothing(self) -> None:
-        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes", "CHANGE_BACKUP": "yes"})
+        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes", "CHANGE_BACKUP": "yes", "CHANGE_BACKUP_FILES": "yes"})
         (nextcloud.html() / "config").mkdir(parents=True)
         (nextcloud.html() / "config" / "config.php").write_text("<?php")
         outcome = run_in_pty(lambda: (app.install(reuse=True), self.host.calls)[1], [], columns=160)
@@ -230,7 +231,17 @@ class NextcloudTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True), ("backup-now", True), ("restore-version", False)])
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True), ("backup-now", True), ("restore-version", False),
+                          ("backup-files", True), ("restore-files", False)])
+        self.assertEqual([item.id for item in app.items()][-2:], ["backup", "backup-files"])
+
+    def test_backup_files(self) -> None:
+        with mock.patch.object(app.kit_backup, "run_data", return_value=True) as run_data, \
+                mock.patch.object(app.kit_backup, "targets", return_value=["x"]):
+            self.assertTrue(app.backup_files())
+        args, kwargs = run_data.call_args
+        self.assertEqual(args, ("nextcloud", "arquivos", nextcloud.files(), ["x"], "backup-files"))
+        self.assertEqual((kwargs["unshare"], kwargs["key"], kwargs["exclude"]), (True, "BACKUP_FILES_TO", ("appdata_*/preview",)))
 
 
 if __name__ == "__main__":

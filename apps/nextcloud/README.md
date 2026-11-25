@@ -23,7 +23,7 @@ systemd), e o cron depois do Nextcloud.
 | Endereço do Nextcloud | `nextcloud.<domínio>` |
 | Usuário administrador (só na primeira vez) | `astroverso` |
 | Senha do administrador (só na primeira vez) | sem padrão; se o Nextcloud recusar (curta, comum ou vazada), pede de novo |
-| Pasta dos arquivos (só na primeira vez) | `~/Nextcloud`; vazia ou a de um Nextcloud anterior |
+| Pasta dos arquivos (só na primeira vez) | `~/Nextcloud`; vazia ou a de um Nextcloud anterior. Escolhida pelo seletor de pastas (`kit.folders`): os discos do app `disks` com o espaço livre e a marca ☁ das pastas ligadas a uma nuvem |
 
 1. Gera a senha do banco e uma senha inicial do administrador em `~/.astroverso/nextcloud/secrets/`, lidas pelos
    containers por arquivo (`*_FILE`): nunca vão para o `.env` nem para argumentos de comando.
@@ -37,7 +37,8 @@ systemd), e o cron depois do Nextcloud.
 5. O `apache.conf` avisa ao Apache que o endereço público é `https://` (sem isso, `/.well-known/caldav` e
    `/.well-known/carddav` redirecionam para `http://`) e liga o HSTS.
 6. Publica `nextcloud.<domínio>` pelo `kit.routes` (o Caddy do `network` recarrega sozinho).
-7. Pergunta as mudanças no sistema: as contas de e-mail automáticas e a verificação de hora em hora.
+7. Pergunta as mudanças no sistema: as contas de e-mail automáticas, a verificação de hora em hora e os dois
+   backups, cada um com as próprias pastas de destino (do servidor do app `backup`).
 8. **Contas de e-mail:** para cada caixa publicada por outro app em `~/.astroverso/mailboxes/` (`kit.mailboxes`, ex.: o
    app `mail`), liga o app Mail do Nextcloud (instala se faltar) e cria ou atualiza no Mail do administrador a conta
    `Astroverso <Nome>`. A senha vai por variável de ambiente para um script PHP pela entrada padrão (o `occ` só aceita
@@ -54,7 +55,8 @@ systemd), e o cron depois do Nextcloud.
 | `~/.astroverso/routes/nextcloud.json` | O endereço publicado para o Caddy |
 | Unidades do usuário `astroverso-nextcloud-mailboxes.path` e `.service` (perguntada, padrão sim) | Quando uma caixa de e-mail é publicada ou retirada, a conta no Nextcloud Mail é criada, atualizada ou apagada na hora (`astroverso nextcloud action mailboxes`) |
 | Unidades do usuário `astroverso-nextcloud-watch.timer` e `.service` (perguntada, padrão sim, em **Mudanças no sistema**) | A cada hora, confere o Nextcloud e avisa no Discord quando algo quebra e quando volta ao normal |
-| Unidades do usuário `astroverso-nextcloud-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` |
+| Unidades do usuário `astroverso-nextcloud-backup.timer` e `.service` (perguntada, padrão sim, com as pastas de destino) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` |
+| Unidades do usuário `astroverso-nextcloud-backup-files.timer` e `.service` (perguntada, padrão sim, com as pastas de destino) | Backup diário da pasta dos arquivos (`kit.backup.run_data`, por `podman unshare`, sem `appdata_*/preview`), com aviso no `#backup`. Pasta num disco desligado ou travado: não guarda nada e avisa |
 
 ## Fora da máquina (passos seus)
 
@@ -73,6 +75,7 @@ systemd), e o cron depois do Nextcloud.
 | Reparar o Nextcloud | Índices do banco, reparos e a reverificação dos arquivos (`occ files:scan --all`), útil depois de copiar arquivos por fora. Também no Discord, com confirmação |
 | Verificar agora | Roda a verificação de hora em hora na hora |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
+| Fazer backup dos arquivos agora / Restaurar os arquivos de uma versão | Backup da pasta dos arquivos na hora (também no Discord) e restauração de uma versão numa pasta nova, sem mexer na pasta do Nextcloud (depois, copie dela o que precisar e rode Reparar o Nextcloud) |
 
 ## Verificação de hora em hora
 
@@ -88,11 +91,12 @@ Nextcloud** e **Verificar de novo**:
 
 ## Backup
 
-O app implementa `backup(pasta)` e `restore(pasta)`, chamados pelo futuro app de backup das configurações:
+Dois backups separados, cada um com as próprias pastas de destino:
 
-- **backup:** dump do banco (`pg_dump`, com o Nextcloud rodando), `config/`, `custom_apps/`, `themes/` e
-  `version.php` (por `podman unshare tar`, que guarda os donos), o `.env` e as senhas. Os arquivos da pasta ficam de
-  fora: o backup deles é de outro app.
+- **configuração** (`backup(pasta)` e `restore(pasta)`, pelo `kit.backup`): dump do banco (`pg_dump`, com o Nextcloud
+  rodando), `config/`, `custom_apps/`, `themes/` e `version.php` (por `podman unshare tar`, que guarda os donos), o
+  `.env` e as senhas.
+- **arquivos:** a pasta dos arquivos inteira, direto pelo restic (marca `dados:arquivos`), sem as miniaturas.
 - **restore:** para os containers, traz a configuração (mantendo o código que a imagem recria), apaga o banco, sobe
   só o Postgres, recria o usuário do banco que o Nextcloud criou na instalação (nome e senha do `config.php`, pela
   entrada padrão) e carrega o dump; depois reinstala com as respostas salvas e roda `occ

@@ -311,7 +311,7 @@ def run_backup(app: str, save_function: Callable[[Path], None], label: str = "",
 
 
 def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], retry: str, unshare: bool = False,
-             key: str = "", notify: bool = True) -> bool:
+             key: str = "", exclude: Sequence[str] = (), notify: bool = True) -> bool:
     if not configured():
         ui.info("esta máquina não está ligada a um servidor de backup (instale o app backup): nada a fazer")
         return False
@@ -323,7 +323,7 @@ def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], ret
         return _report(app, what, [f"{path} indisponível (disco desligado, travado ou pasta apagada): nada foi guardado"],
                        0, retry, notify, [])
     started = time.monotonic()
-    tags = ["--tag", TAG, "--tag", f"app:{app}", "--tag", f"dados:{name}"]
+    tags = ["--tag", TAG, "--tag", f"app:{app}", "--tag", f"dados:{name}", *[f"--exclude={rule}" for rule in exclude]]
     for item in chosen:
         ui.info(f"guardando {path} em {item.path}...")
         code, output = restic("backup", str(path), "--host", net.hostname(), *tags, destination=item, unshare=unshare)

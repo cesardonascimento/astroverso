@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from kit import backup as kit_backup
-from kit import changes, config, container, docs, routes, ui, validate, watch
+from kit import changes, config, container, docs, folders, routes, ui, validate, watch
 from kit.app import Action
 
 from . import accounts
@@ -15,6 +15,9 @@ APP = "nextcloud"
 DESCRIPTION = "Nuvem própria: arquivos, fotos, agenda e contatos em https://nextcloud.<domínio>"
 DOCS = Path(__file__).with_name("docs")
 BUTTONS = (("Resumo do Nextcloud", "nextcloud:summary"), ("Verificar de novo", "nextcloud:watch"))
+FILES_TO = "BACKUP_FILES_TO"
+FILES_DATA = "arquivos"
+SKIP = ("appdata_*/preview",)
 
 
 def items() -> list[changes.Change]:
@@ -28,7 +31,18 @@ def items() -> list[changes.Change]:
             "o Nextcloud",
         ),
         kit_backup.change(APP),
+        kit_backup.data_change(
+            APP, "files", "Fazer o backup dos arquivos do Nextcloud todo dia",
+            "Guarda a pasta dos arquivos de todos os usuários do Nextcloud (sem as miniaturas, que ele recria), nas pastas "
+            "de destino que você escolher, separada do backup da configuração.",
+            "backup-files", FILES_TO, "dos arquivos do Nextcloud",
+        ),
     ]
+
+
+def backup_files() -> bool:
+    return kit_backup.run_data(APP, FILES_DATA, nextcloud.files(), kit_backup.targets(APP, FILES_TO), "backup-files",
+                               unshare=True, key=FILES_TO, exclude=SKIP)
 
 
 def status() -> bool:
@@ -53,8 +67,8 @@ def _ask(reuse: bool) -> str:
             "A pasta onde ficam os arquivos de todos os usuários do Nextcloud. Ela pertence ao Nextcloud: só ele mexe "
             "nos arquivos dela."
         )
-        answers["FILES"] = ui.ask("pasta dos arquivos", default=values.get("FILES") or str(nextcloud.DEFAULT_FILES),
-                                  validate=nextcloud.validate_folder)
+        answers["FILES"] = folders.pick("pasta dos arquivos", values.get("FILES") or str(nextcloud.DEFAULT_FILES),
+                                        validate=nextcloud.validate_folder)
     elif values.get("FILES") is None:
         answers["FILES"] = str(nextcloud.files())
     config.save(APP, answers)
@@ -132,6 +146,7 @@ def summary() -> None:
     ui.table([[spec.name, ui.good("no ar") if container.active(spec.name) else ui.bad("parado")] for spec in nextcloud.specs()],
              ["Container", "Situação"])
     watch.summary(APP)
+    kit_backup.summary(APP, [("Arquivos", "files", FILES_TO, FILES_DATA)])
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
@@ -185,4 +200,6 @@ def actions() -> list[Action]:
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-files", "Fazer backup dos arquivos agora", backup_files, remote=True),
+        Action("restore-files", "Restaurar os arquivos de uma versão (numa pasta nova)", lambda: kit_backup.restore_data(APP, FILES_DATA)),
     ]
