@@ -205,6 +205,21 @@ def load_entities(source: Path) -> None:
     ui.ok("rotinas, credenciais e usuários do backup carregados")
 
 
+def credential_names() -> set[tuple[str, str]]:
+    code, output = cli("export:credentials", "--all", timeout=120)
+    start = output.find("[")
+    try:
+        items = json.loads(output[start:]) if code == 0 and start >= 0 else []
+    except ValueError:
+        items = []
+    return {(str(item.get("type")), str(item.get("name"))) for item in items if isinstance(item, dict)}
+
+
+def needed(item: dict) -> set[tuple[str, str]]:
+    return {(kind, str(value.get("name"))) for node in item.get("nodes") or [] for kind, value in (node.get("credentials") or {}).items()
+            if isinstance(value, dict)}
+
+
 def workflows(folder: Path) -> list[dict]:
     found = []
     for path in sorted(folder.glob("*.json")):

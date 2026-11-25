@@ -216,7 +216,11 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   imagem é refeita pelo resumo dos arquivos. Ligar e desligar rotinas é no próprio n8n (decisão do usuário).
 - **Conexões do Astroverso:** credenciais com `id` fixo só a partir dos contratos do kit (`kit.mail`, `kit.mailboxes`,
   `kit.discord`) e a chave das chamadas; credenciais de um assunto o usuário cadastra no n8n.
-- Comandos do Discord para rotinas (como o antigo `contas:email`) ficam para a migração das contas.
+- Módulo `contas` (QR Codes do Pix em PDFs e imagens, QR Code do Pix e código de barras em SVG/PNG) substitui as
+  bibliotecas do executor antigo: os nós Code chamam o módulo por `this.helpers.httpRequest` (testado no executor
+  externo), e o runners fica na imagem oficial. As rotinas de contas foram migradas fora do repositório (dados
+  pessoais) e entram pela ação "Importar rotinas".
+- Comandos do Discord para rotinas (como o antigo `contas:email`): ainda a desenhar.
 
 ### App `cockpit`
 
@@ -326,6 +330,10 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
     `publish:workflow --id=<id>`, que o n8n rodando aplica sozinho.
   - `export:workflow` sem nenhuma rotina sai com erro ("No workflows found with specified filters").
   - O `podman exec` no container do n8n roda como `-u 1000` (o nome `node` pode não resolver).
+  - A importação de rotinas liga cada nó à credencial pelo `id` e, sem ele, pela credencial de mesmo nome e tipo.
+  - No nó Code com o executor externo, `this.helpers.httpRequest` roda no n8n principal (alcança os containers da rede
+    pelo nome); o executor oficial libera só o `crypto` e o `moment` no `require`.
+- `python3 -I` não põe a pasta do script no caminho de importação.
 - Python como processo 1 de um container ignora o SIGTERM sem tratador: cada parada espera 10 s e termina à força.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.

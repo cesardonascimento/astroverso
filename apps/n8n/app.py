@@ -155,6 +155,44 @@ def restore_workflow() -> None:
     ui.ok(f"rotina {chosen['name']} de volta como estava em {moment}" + (" e ligada" if active else ""))
 
 
+def _folder(value: str) -> str:
+    path = Path(value.strip()).expanduser()
+    if not path.is_dir():
+        raise ValueError("essa pasta não existe")
+    if not n8n.workflows(path):
+        raise ValueError("essa pasta não tem rotinas do n8n (arquivos .json)")
+    return str(path)
+
+
+def import_workflows() -> None:
+    if not n8n.installed():
+        ui.fail("o n8n precisa estar no ar")
+    ui.note(
+        "Traz rotinas de arquivos JSON (exportadas de outro n8n ou do backup). Elas entram desligadas; uma rotina com o "
+        "mesmo id é substituída. As credenciais são ligadas pelo id ou, se não houver, pelo nome e tipo: crie antes, no "
+        "n8n, as que faltarem, com o mesmo nome."
+    )
+    folder = Path(ui.ask("pasta com as rotinas", default=str(Path.home()), validate=_folder))
+    found = n8n.workflows(folder)
+    chosen = ui.checklist("Quais rotinas importar?", [str(item["name"]) for item in found], selected=list(range(len(found))), cancel=True)
+    if not chosen:
+        return
+    existing = n8n.credential_names()
+    missing = sorted({pair for i in chosen for pair in n8n.needed(found[i])} - existing)
+    if missing:
+        ui.warn("credenciais que ainda não existem no n8n: " + ", ".join(f"{name} ({kind})" for kind, name in missing))
+        ui.warn("sem elas, os nós que as usam ficam sem credencial (dá para escolher depois, no n8n)")
+        if not ui.confirm("Importar assim mesmo?", default=False):
+            return
+    for i in chosen:
+        code, output = n8n.import_file("workflow", json.dumps(found[i]))
+        if code:
+            ui.warn(f"{found[i]['name']}: o n8n não importou ({output.strip()[-200:]})")
+        else:
+            ui.ok(f"{found[i]['name']} importada, desligada")
+    ui.info(f"confira cada rotina em https://{n8n.host()} e ligue as que estiverem certas")
+
+
 def summary() -> None:
     ui.step("Resumo do n8n")
     values = config.load(APP)
@@ -217,6 +255,7 @@ def actions() -> list[Action]:
         Action("connections", "Atualizar as conexões do Astroverso", connections.sync, remote=True),
         Action("password", "Trocar a senha do administrador", password),
         Action("restore-workflow", "Restaurar uma rotina", restore_workflow),
+        Action("import-workflows", "Importar rotinas (arquivos JSON)", import_workflows),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),

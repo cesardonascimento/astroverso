@@ -23,6 +23,8 @@ modules/<módulo>/
   rotinas migrarem: nenhuma rotina quebra em silêncio.
 - **Arquivos** (PDF, imagem, vídeo) chegam pelo corpo da requisição (o HTTP Request do n8n manda o binário sem código),
   e a resposta é JSON.
+- **`python3 -I` não põe a pasta do script no caminho de importação:** um `service.py` que importa outro arquivo do
+  módulo acrescenta a própria pasta ao `sys.path` antes (e um teste sobe o serviço como o container sobe).
 - **Parar no SIGTERM:** no container, o Python é o processo 1 e ignora o SIGTERM sem um tratador; sem ele, cada
   parada espera 10 s e termina à força (o esqueleto já trata).
 - **Sem segredos no módulo:** credenciais (ex.: chave de uma API externa) ficam no n8n e vão na requisição, quando

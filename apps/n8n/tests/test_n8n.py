@@ -216,6 +216,22 @@ class N8nTest(unittest.TestCase):
         self.assertEqual(outcome.result, [{"id": "abc", "name": "Contas", "active": True}, ["publish:workflow", "--id=abc"]])
         self.assertIn("de volta como estava em 12/11/2026 01:10 e ligada", outcome.screen)
 
+    def test_import_workflows_warns_missing_credentials(self) -> None:
+        folder = self.home / "rotinas"
+        folder.mkdir()
+        node = {"name": "NC", "credentials": {"nextCloudApi": {"id": "astroversoNextcloud", "name": "Astroverso: Nextcloud"}}}
+        (folder / "a.json").write_text(json.dumps({"id": "abc", "name": "Contas", "active": True, "nodes": [node]}))
+        (folder / "b.json").write_text(json.dumps({"id": "def", "name": "Avisos", "nodes": []}))
+        imported: list = []
+        with mock.patch.object(n8n, "installed", return_value=True), \
+                mock.patch.object(n8n, "cli", return_value=(0, 'aviso antes\n[{"id": "x", "name": "Astroverso: Discord", "type": "httpHeaderAuth"}]')), \
+                mock.patch.object(n8n, "import_file", side_effect=lambda kind, content: imported.append(json.loads(content)["name"]) or (0, "")):
+            keys = [f"{folder}\n".encode(), b"\r", b"s\n"]
+            outcome = run_in_pty(lambda: (app.import_workflows(), imported)[1], keys, columns=200)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("credenciais que ainda não existem no n8n: Astroverso: Nextcloud (nextCloudApi)", outcome.screen)
+        self.assertEqual(outcome.result, ["Avisos", "Contas"])
+
     def test_collect(self) -> None:
         make_module(self.modules, "contas")
         with mock.patch.object(container, "active", return_value=False):
@@ -229,7 +245,7 @@ class N8nTest(unittest.TestCase):
         self.assertEqual([item.id for item in app.items()], ["watch", "backup"])
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
                          [("summary", True), ("connections", True), ("password", False), ("restore-workflow", False),
-                          ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
+                          ("import-workflows", False), ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
 
 
 if __name__ == "__main__":

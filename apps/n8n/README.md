@@ -3,7 +3,8 @@
 Rotinas automáticas montadas pelo navegador ([n8n](https://n8n.io)), com blocos prontos para centenas de serviços, em
 `https://n8n.<domínio>` (só na rede de casa e no Tailscale). As rotinas ficam no banco do n8n: você cria, edita, liga e
 desliga por lá, e o que está no n8n é a fonte de verdade. Os **módulos do Astroverso** ([modules/](modules/README.md))
-sobem junto, como APIs pequenas que as rotinas chamam.
+sobem junto, como APIs pequenas que as rotinas chamam. Hoje: [contas](modules/contas/README.md) (QR Codes do Pix e
+códigos de barras das contas a pagar).
 
 ## Containers
 
@@ -95,6 +96,7 @@ A restauração para os containers, apaga o banco e carrega a exportação **num
 | Atualizar as conexões do Astroverso | Regrava as credenciais das conexões (também no Discord) |
 | Trocar a senha do administrador | Novo hash e reinício do n8n |
 | Restaurar uma rotina / Restaurar uma versão | Veja "Versões das rotinas" |
+| Importar rotinas (arquivos JSON) | Traz rotinas de uma pasta (exportadas de outro n8n ou do backup), desligadas; a de mesmo `id` é substituída. Antes, avisa as credenciais que ainda não existem (a importação liga cada nó pelo `id` ou pelo nome e tipo) |
 | Mudanças no sistema / Verificar agora / Fazer backup agora | Como nos outros apps |
 
 ## Verificação de hora em hora
