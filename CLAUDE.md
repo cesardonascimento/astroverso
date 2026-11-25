@@ -123,6 +123,17 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Testar só com outro nome de container e sem o token real: dois processos com o mesmo token recebem os mesmos
   cliques.
 
+### App `nextcloud`
+
+- Quatro containers por Quadlet (Nextcloud apache, Postgres, Valkey sem disco, cron com `/cron.sh`), sem porta na
+  máquina, endereço pelo `kit.routes`. Sem tema do Astroverso (decisão do usuário: o logo fica só no projeto por
+  enquanto).
+- Pasta dos arquivos padrão `~/Nextcloud`, do `www-data` do container (`podman unshare chown 33:33`). Os discos da
+  máquina entram depois, pelo `kit.disks`, como armazenamento externo.
+- Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
+  como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
+- `backup`/`restore` implementados (dump SQL + `config/`), sem a rotina de backup ainda.
+
 ### Mudanças no sistema
 
 - Toda mudança de um app no sistema, por menor que seja, é um `kit.changes.Change`: perguntada na instalação (padrão
@@ -172,5 +183,18 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - `sudo` não funciona na sessão do Claude (sem TTY). Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
 - Não pedir nem aceitar segredos (tokens, senhas) no chat: eles entram pela instalação.
+- Teste real de containers por Quadlet: `HOME` temporário, mas `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e
+  `XDG_RUNTIME_DIR` reais e o `container.quadlets` apontando para a pasta real (o systemd do usuário só lê de lá);
+  nomes `claude-teste-*`, rede própria (`dataclasses.replace(spec, network=...)`: o padrão do `Container` é fixado na
+  definição da classe) e, no fim, conferir unidades, containers, redes e imagens que sobraram.
+
+## Armadilhas
+
+- Uma rede do Quadlet vira a unidade `<rede>-network.service` (fica ativa depois de criar a rede): ao apagar a rede
+  no Podman, parar a unidade antes, senão o systemd não cria a rede de novo e o container falha com "network not
+  found". O `kit.container` já faz isso.
+- A imagem do Nextcloud pede `StopSignal=SIGWINCH` (do Apache); o container do cron (`crond`) ignora e é morto em
+  10 s, marcando a unidade como falha: o cron usa `stop_signal="SIGTERM"`.
+- Duas unidades que usam a mesma imagem: remover todos os containers antes das imagens.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.
