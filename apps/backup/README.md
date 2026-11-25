@@ -68,6 +68,7 @@ Sem a máquina ligada a um servidor, ligar o backup só avisa: ele fica para dep
 | Passo | Por quê | Como fazer |
 |---|---|---|
 | Guardar a senha do repositório de cada máquina no gerenciador de senhas | Sem ela, os backups não abrem | [senhas.md](docs/senhas.md) |
+| PC com Windows (sem Astroverso): restic, dois arquivos `.ps1` e uma tarefa agendada | O PC manda os backups das pastas dele para o servidor, acompanhado como as outras máquinas (etiquetas `app:windows` e `dados:<nome>`) | [windows.md](docs/windows.md) |
 
 ## Ações
 
@@ -75,7 +76,7 @@ Sem a máquina ligada a um servidor, ligar o backup só avisa: ele fica para dep
 |---|---|
 | Resumo dos backups | Servidor, regra, pastas de destino com o espaço e a marca ☁, e o último backup de cada app de cada máquina em cada pasta. Também no Discord |
 | Pastas de destino (servidor) | Adicionar (pelo seletor de pastas) e tirar pastas de destino. Os backups de uma pasta tirada ficam nela |
-| Adicionar uma máquina / Mostrar os dados de uma máquina / Descadastrar máquinas (servidor) | Os dados de acesso e o código de ligação de cada máquina (os repositórios de quem sai ficam nas pastas). Máquina que está voltando: usa a senha do repositório antiga, conferida nos backups que já existem; só a senha de acesso é nova |
+| Adicionar uma máquina / Mostrar os dados de uma máquina / Descadastrar máquinas (servidor) | Os dados de acesso, o código de ligação e o endereço do repositório em cada pasta de destino (para um PC sem Astroverso) de cada máquina (os repositórios de quem sai ficam nas pastas). Máquina que está voltando: usa a senha do repositório antiga, conferida nos backups que já existem; só a senha de acesso é nova |
 | Atualizar as pastas de destino (cliente) | Cola o código de ligação novo depois de uma mudança nas pastas do servidor |
 | Manutenção dos repositórios agora | A manutenção semanal na hora (também no Discord, com confirmação) |
 | Fazer backup agora / Restaurar uma versão | Do próprio app backup |

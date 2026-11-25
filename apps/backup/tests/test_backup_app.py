@@ -168,6 +168,9 @@ class BackupAppTest(unittest.TestCase):
         self.assertIn(["restart", server.NAME], outcome.result)
         self.assertTrue((self.home / "Backups" / "notebook").is_dir())
         self.assertIn("usuário: notebook", outcome.screen)
+        item = server.destinations()[0]
+        self.assertIn(f"repositório em {item.path}: rest:https://backup.casa.com/notebook/{item.id}/", outcome.screen)
+        self.assertIn("docs/windows.md", outcome.screen)
         code = next(line for line in outcome.screen.splitlines() if "código de ligação" in line).split(": ", 1)[1].strip()
         self.assertEqual(kit_backup.read_code(code)[1], "notebook")
 

@@ -54,6 +54,8 @@ def _show(name: str, values: dict[str, str]) -> None:
     ui.info(f"senha de acesso: {values['PASSWORD']}")
     ui.info(f"senha do repositório: {values['REPO_PASSWORD']}")
     ui.info(f"código de ligação: {server.link_code(name)}")
+    for item in server.destinations():
+        ui.info(f"repositório em {item.path}: rest:https://{server.address()}/{name}/{item.id}/")
 
 
 def _server(reuse: bool) -> None:
@@ -205,6 +207,7 @@ def add_machine() -> None:
     ui.ok(f"máquina {name} cadastrada")
     _show(name, values)
     ui.note("Na outra máquina, instale o app backup, escolha mandar os backups para o servidor de outra máquina e cole os dados acima.")
+    ui.link("PC com Windows (sem Astroverso): o restic e uma tarefa agendada, com os repositórios acima", docs.link(DOCS / "windows.md"))
 
 
 def remove_machine() -> None:

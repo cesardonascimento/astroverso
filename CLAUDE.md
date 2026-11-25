@@ -167,12 +167,10 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   mesma regra de versões. Restaurar dados vai para uma pasta nova, sem mexer na original.
 - A senha do repositório de cada máquina vai para o gerenciador de senhas do usuário; o backup do próprio app não
   leva as senhas.
-- Próximos passos combinados com o usuário:
-  - **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo
-    cliente. Windows: script PowerShell (Instalar e Remover) gerado pela ação "Preparar um PC sem Astroverso", com o
-    restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada, pastas de destino por pasta e o passo a passo em
-    `docs/windows.md`; quem avisa no `#backup` é o servidor. O Remover apaga a tarefa e as senhas, desinstala o restic
-    com confirmação e deixa os backups no servidor. Nada da cópia antiga do Windows é migrado.
+- **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo cliente.
+  Windows: sem script (decisão do usuário): passo a passo em `apps/backup/docs/windows.md` com o restic, dois `.ps1` e
+  uma tarefa agendada como SYSTEM (`--use-fs-snapshot`), etiquetas `app:windows` + `dados:<nome>` para o servidor
+  acompanhar. Os endereços dos repositórios aparecem em "Mostrar os dados de uma máquina".
 - Sem prioridade mínima (`Nice`, `ionice`) nos backups e sincronizações: a máquina não divide mais o hardware.
 
 ### App `cloud`
