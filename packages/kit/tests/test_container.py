@@ -46,7 +46,7 @@ SPEC = container.Container(
     description="Teste",
     volumes=[container.Volume(Path("/dados/conf"), "/conf")],
     ports=["8080:80"],
-    environment={"TZ": "America/Sao_Paulo", "FRASE": "com espaço"},
+    environment={"TZ": "Europe/Paris", "FRASE": "com espaço"},
     command=["sh", "-c", "echo $HOME 100% > /x"],
     health="wget -q --spider http://127.0.0.1/",
 )
