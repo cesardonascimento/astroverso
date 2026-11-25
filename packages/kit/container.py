@@ -130,9 +130,17 @@ def exec(name: str, args: Sequence[str], user: str = "", input: str | None = Non
     return run.capture(["podman", "exec", *(["-i"] if input is not None else []), *(["-u", user] if user else []), name, *args], input=input)
 
 
-def exec_output(name: str, args: Sequence[str], user: str = "", env: Mapping[str, str] | None = None) -> tuple[int, str]:
+def exec_raw(name: str, args: Sequence[str], user: str = "") -> tuple[int, bytes]:
+    return run.output_raw(["podman", "exec", *(["-u", user] if user else []), name, *args])
+
+
+def exec_output(
+    name: str, args: Sequence[str], user: str = "", env: Mapping[str, str] | None = None, input: str | bytes | None = None,
+    timeout: float | None = None,
+) -> tuple[int, str]:
     names = [f"-e{key}" for key in (env or {})]
-    return run.output(["podman", "exec", *(["-u", user] if user else []), *names, name, *args], env=dict(env or {}))
+    flags = (["-i"] if input is not None else []) + (["-u", user] if user else []) + names
+    return run.output(["podman", "exec", *flags, name, *args], env=dict(env or {}), input=input, timeout=timeout)
 
 
 def start(spec: Container, timeout: float = 180) -> None:
@@ -199,9 +207,15 @@ def remove(name: str, image: str | None = None) -> None:
 
 
 def remove_image(image: str) -> None:
-    if run.succeeds(["podman", "image", "exists", image]):
-        run.cmd(["podman", "rmi", image], quiet=True)
+    if not run.succeeds(["podman", "image", "exists", image]):
+        return
+    code, output = run.output(["podman", "rmi", image])
+    if code == 0:
         ui.ok(f"imagem {image} removida")
+    elif "in use" in output:
+        ui.info(f"imagem {image} ficou: outro container ainda a usa")
+    else:
+        ui.warn(f"imagem {image} não foi removida: {output.strip().splitlines()[-1] if output.strip() else code}")
 
 
 def _drop_network(name: str) -> None:

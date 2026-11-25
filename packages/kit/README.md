@@ -53,6 +53,7 @@ A única porta para comandos do sistema: os apps não chamam o `subprocess` dire
 | `cmd(args, sudo=, input=, quiet=, timeout=)` | Saída e erros, linha a linha, ao vivo, com o prefixo e em cinza | `ui.fail` com o comando e o código. Com `quiet=True`, a saída só aparece se der erro |
 | `capture(args, sudo=, input=, timeout=)` | Nada: devolve a saída padrão (sem o `\n` do fim) | `ui.fail`, mostrando a saída de erro |
 | `succeeds(args, sudo=, timeout=)` | Nada | Devolve `False` (também para comando inexistente ou tempo esgotado) |
+| `output_raw(args, timeout=, env=, input=)` | Como o `output`, mas devolve os bytes (para conteúdo binário, como um e-mail) | Não falha |
 | `output(args, timeout=, env=, input=)` | Nada: devolve `(código, saída)`, com a saída padrão e a de erro juntas | Não falha: código `127` (comando inexistente) ou `124` (tempo esgotado) |
 | `sudo_prepare(motivo)` | Explica o motivo e pede a senha uma vez (`sudo -v`), se ainda não houver permissão | Sem terminal: "rode num terminal" |
 
@@ -145,7 +146,8 @@ leva `Z` por padrão (só daquele container); use `z` para uma pasta montada em 
 |---|---|
 | `prepare()` | Instala o Podman e liga o *linger* (os containers sobem no boot sem ninguém logado) |
 | `restart(spec)` | Reinicia o container e espera ficar pronto (ex.: quando o `env_file` mudou) |
-| `exec(nome, args, user=, input=)` / `exec_output(nome, args, user=, env=)` | Comando dentro do container; o `exec_output` não falha (devolve código e saída) e repassa variáveis pelo ambiente (`-eNOME`), sem o valor nos argumentos |
+| `exec_raw(nome, args, user=)` | Comando no container devolvendo `(código, bytes)` |
+| `exec(nome, args, user=, input=)` / `exec_output(nome, args, user=, env=, input=)` | Comando dentro do container; o `exec_output` não falha (devolve código e saída) e repassa variáveis pelo ambiente (`-eNOME`), sem o valor nos argumentos |
 | `start(spec, timeout=180)` | Baixa a imagem, grava `~/.config/containers/systemd/<nome>.container` (e o `.network` da rede), recarrega o systemd, reinicia a unidade se algo mudou ou se ela estava parada e espera o container ficar `healthy` (com `health`) ou `running`. Se não ficar, mostra o fim do log e para |
 | `active(nome)` | A unidade está rodando |
 | `remove(nome, imagem=)` | Para a unidade, apaga o arquivo e, se pedida, a imagem; apaga a rede quando nenhum outro container a usa |
@@ -192,6 +194,27 @@ As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps
 | `manage(app, mudanças)` | O painel: checklist com as aplicadas marcadas e as `danger` em vermelho; desfazer uma `danger` pede confirmação |
 | `undo_all(mudanças)` | Desfaz todas, na ordem inversa (no `remove`) |
 | `rows(mudanças)` | Linhas de tabela (mudança, aplicada ou desfeita) para o resumo |
+
+## mail
+
+Envio de e-mails pelos apps, pelo Worker do app `mail` (nesta ou em outra máquina). A máquina fica ligada ao envio
+por `~/.astroverso/mail.env` (`MAIL_URL`, `MAIL_KEY`, `600`).
+
+| Nome | O que faz |
+|---|---|
+| `send(para, assunto, texto="", html="", attachments=())` | Envia e devolve quem recebeu. `para`: um endereço ou uma lista; `attachments`: `Attachment(nome, tipo, dados, cid="")` (com `cid`, vai embutido no HTML). Sem configuração, não faz nada; falha ou destinatário não confirmado viram aviso na tela |
+| `configured()` / `settings()` / `save(url, chave)` / `forget()` | Lê, grava e apaga o `mail.env` |
+| `check(url=, key=)` | Confere o endereço e a chave (`GET /conferir`); levanta `MailError` |
+
+## mailboxes
+
+O contrato das caixas de e-mail entre apps, no padrão do `kit.routes`: o app `mail` publica, o Nextcloud cria as
+contas no Mail.
+
+| Nome | O que faz |
+|---|---|
+| `Mailbox(nome, endereço, servidor, porta, usuário, arquivo_da_senha, smtp_port=0)` | Uma caixa IMAP; `password()` lê a senha do arquivo (`600`, do app dono), que nunca vai para o JSON |
+| `publish(app, caixas)` / `withdraw(app)` / `load()` | Grava `~/.astroverso/mailboxes/<app>.json` (`600`, de uma vez), apaga e lê todas, com o app de origem |
 
 ## docs
 

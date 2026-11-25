@@ -97,18 +97,26 @@ def capture(args: Sequence[str], sudo: bool = False, input: str | None = None, t
 
 
 def output(
-    args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None, input: str | None = None
+    args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None, input: str | bytes | None = None
 ) -> tuple[int, str]:
+    code, data = output_raw(args, timeout, env, input)
+    return code, data.decode(errors="replace")
+
+
+def output_raw(
+    args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None, input: str | bytes | None = None
+) -> tuple[int, bytes]:
+    data = input.encode() if isinstance(input, str) else input
     try:
         done = subprocess.run(
-            list(args), input=input, stdin=None if input is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True, timeout=timeout, env={**os.environ, **(env or {})},
+            list(args), input=data, stdin=None if data is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, timeout=timeout, env={**os.environ, **(env or {})},
         )
     except FileNotFoundError:
-        return 127, f"comando não encontrado: {args[0]}"
+        return 127, f"comando não encontrado: {args[0]}".encode()
     except subprocess.TimeoutExpired as problem:
-        text = problem.output.decode(errors="replace") if isinstance(problem.output, bytes) else (problem.output or "")
-        return 124, f"{text}\no comando passou de {timeout:g} s"
+        partial = problem.output if isinstance(problem.output, bytes) else (problem.output or "").encode()
+        return 124, partial + f"\no comando passou de {timeout:g} s".encode()
     return done.returncode, done.stdout
 
 

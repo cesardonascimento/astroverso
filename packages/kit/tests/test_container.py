@@ -33,6 +33,10 @@ class FakeRun:
             return "resultado"
         return ""
 
+    def output(self, args, timeout=None, env=None, input=None):
+        self.calls.append(tuple(args))
+        return (1, "Error: image is in use by a container") if "em-uso" in args[-1] else (0, "")
+
     def succeeds(self, args, sudo=False, timeout=None):
         self.calls.append(tuple(args))
         if args[:3] == ["systemctl", "--user", "is-active"]:
@@ -117,6 +121,10 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(list(container.quadlets().iterdir()), [])
         self.assertIn(("systemctl", "--user", "stop", "astroverso-teste.service"), fake.calls)
         self.assertIn(("podman", "rmi", "docker.io/library/existe:1"), fake.calls)
+        out = io.StringIO()
+        with mock.patch.object(sys, "stdout", out):
+            container.remove_image("docker.io/library/existe-em-uso:1")
+        self.assertIn("ficou: outro container ainda a usa", out.getvalue())
         self.assertIn(("podman", "network", "rm", "astroverso"), fake.calls)
 
     def test_remove_keeps_shared_network(self) -> None:
