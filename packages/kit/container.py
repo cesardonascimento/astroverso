@@ -131,6 +131,12 @@ def start(spec: Container, timeout: float = 180) -> None:
     ui.ok(f"container {spec.name} no ar")
 
 
+def restart(spec: Container, timeout: float = 180) -> None:
+    _systemctl("restart", unit(spec.name))
+    wait(spec.name, bool(spec.health), timeout)
+    ui.ok(f"container {spec.name} reiniciado")
+
+
 def active(name: str) -> bool:
     return run.succeeds(["systemctl", "--user", "is-active", "-q", unit(name)])
 

@@ -34,7 +34,7 @@ def env_file(app: str) -> Path:
     return _folder(app) / ".env"
 
 
-def _read(path: Path) -> dict[str, str]:
+def read_env(path: Path) -> dict[str, str]:
     try:
         lines = path.read_text().splitlines()
     except FileNotFoundError:
@@ -49,7 +49,7 @@ def _read(path: Path) -> dict[str, str]:
     return values
 
 
-def _write(path: Path, values: Mapping[str, str]) -> None:
+def write_env(path: Path, values: Mapping[str, str]) -> None:
     for key, value in values.items():
         if not KEY.match(key):
             ui.fail(f"chave inválida no {path.name}: {key!r}")
@@ -67,7 +67,7 @@ def _write(path: Path, values: Mapping[str, str]) -> None:
 
 
 def load(app: str) -> dict[str, str]:
-    return _read(env_file(app))
+    return read_env(env_file(app))
 
 
 def save(app: str, values: Mapping[str, str | None]) -> None:
@@ -78,7 +78,7 @@ def save(app: str, values: Mapping[str, str | None]) -> None:
             merged.pop(key, None)
         else:
             merged[key] = value
-    _write(env_file(app), merged)
+    write_env(env_file(app), merged)
 
 
 def reuse(app: str) -> bool:
@@ -88,17 +88,17 @@ def reuse(app: str) -> bool:
 
 
 def saved_domain() -> str:
-    return _read(home() / "astroverso.env").get("DOMAIN", "")
+    return read_env(home() / "astroverso.env").get("DOMAIN", "")
 
 
 def domain() -> str:
     path = home() / "astroverso.env"
-    values = _read(path)
+    values = read_env(path)
     if values.get("DOMAIN"):
         return values["DOMAIN"]
     chosen = ui.ask("domínio dos endereços (ex.: casa.com)", validate=validate.domain)
     home().mkdir(mode=0o700, exist_ok=True)
-    _write(path, {**values, "DOMAIN": chosen})
+    write_env(path, {**values, "DOMAIN": chosen})
     ui.ok(f"domínio {chosen} guardado para todos os apps")
     return chosen
 

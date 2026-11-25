@@ -90,6 +90,7 @@ O estado de cada app em `~/.astroverso/<app>` (fora do repositório).
 |---|---|
 | `state(app)` | Cria a pasta do app (`700`) e devolve o caminho |
 | `load(app)` / `save(app, valores)` | Lê e grava o `.env` do app (`CHAVE=valor`, `600`). O `save` junta com o que já existe; `None` apaga a chave. Gravação atômica; chaves em maiúsculas e valores sem quebra de linha |
+| `read_env(arquivo)` / `write_env(arquivo, valores)` | Leem e gravam qualquer arquivo `CHAVE=valor` (gravação atômica, `600`), como os compartilhados entre apps |
 | `reuse(app)` | "Usar a configuração já salva?" (falso sem perguntar, se não houver `.env`) |
 | `domain()` | O domínio dos endereços, em `~/.astroverso/astroverso.env` (`DOMAIN`), perguntado e guardado na primeira vez |
 | `purge(app)` | Apaga a pasta do app (com `podman unshare` se houver arquivos de containers). Só aceita um nome de app válido, nunca atalhos nem a pasta inteira |
@@ -131,6 +132,7 @@ container.remove(spec.name, spec.image)
 | Função | O que faz |
 |---|---|
 | `prepare()` | Instala o Podman e liga o *linger* (os containers sobem no boot sem ninguém logado) |
+| `restart(spec)` | Reinicia o container e espera ficar pronto (ex.: quando o `env_file` mudou) |
 | `start(spec, timeout=180)` | Baixa a imagem, grava `~/.config/containers/systemd/<nome>.container` (e o `.network` da rede), recarrega o systemd, reinicia a unidade se algo mudou ou se ela estava parada e espera o container ficar `healthy` (com `health`) ou `running`. Se não ficar, mostra o fim do log e para |
 | `active(nome)` | A unidade está rodando |
 | `remove(nome, imagem=)` | Para a unidade, apaga o arquivo e, se pedida, a imagem; apaga a rede quando nenhum outro container a usa |
@@ -145,6 +147,26 @@ arquivo da unidade.
 - Unidade `<nome>.service`, com `Restart=always` e `WantedBy=default.target`. Logs: `journalctl --user -u <nome>`.
 - Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. Quebra de linha é
   recusada.
+
+## discord
+
+Avisos dos apps no Discord do Astroverso (o bot é o app `discord`, nesta ou em outra máquina). A máquina fica ligada
+ao bot por `~/.astroverso/discord.env` (`DISCORD_URL`, `DISCORD_KEY`, `600`), gravado pela instalação do app
+`discord`.
+
+| Nome | O que faz |
+|---|---|
+| `notify(app, nível, título, texto="", campos=None)` | Manda um aviso para o canal `#<app>`, no padrão do Astroverso. `nível`: `info`, `sucesso`, `aviso` ou `erro` (veja o README do app `discord`). Sem configuração, não faz nada; se o bot não responder, mostra um aviso e segue. Devolve se o aviso foi entregue |
+| `configured()` | Se esta máquina está ligada ao bot |
+| `settings()` / `save(url, chave)` / `forget()` | Lê, grava e apaga o `discord.env` |
+| `whoami(url=, key=)` | O nome do cliente da chave (`GET /v1/eu`); levanta `DiscordError` se o bot recusar ou não responder |
+| `request(método, caminho, dados=None)` | Chamada qualquer à API v1, com a chave desta máquina |
+
+```python
+from kit import discord
+
+discord.notify("network", "erro", "AdGuard parado", "O DNS da casa está usando o secundário.")
+```
 
 ## docs
 
