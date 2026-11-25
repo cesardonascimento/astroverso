@@ -200,6 +200,19 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Backup das pastas dos discos (dados que não são de nenhum app): cada pasta com as próprias pastas de destino, em
   `backups.json`.
 
+### App `cockpit`
+
+- Pacotes do sistema (`cockpit`, `cockpit-podman`, `cockpit-storaged`, `cockpit-files`), não container: ele administra a
+  própria máquina. Endereço padrão `<nome-da-máquina>.<domínio>` (um painel por máquina), publicado pelo `kit.routes`
+  para `http://host.containers.internal:9090`.
+- `cockpit.conf` no modo proxy e o serviço `cockpit` fechado no firewall (só pelo Caddy; o SSH é o caminho de volta).
+  Os pacotes ficam no `remove`. Sem verificação de hora em hora (sobe sob demanda).
+- Montar disco é pelo app `disks`; o Armazenamento do Cockpit fica para formatar e consultar.
+
+### Fora do refactor
+
+- **samba** e **sunshine** não voltam (decisão do usuário): nada de pasta na rede nem de acesso remoto por Moonlight.
+
 ### Mudanças no sistema
 
 - Toda mudança de um app no sistema, por menor que seja, é um `kit.changes.Change`: perguntada na instalação (padrão
