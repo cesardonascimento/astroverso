@@ -139,7 +139,8 @@ class AdGuardTest(unittest.TestCase):
         self.assertIn("'*.casa.com', answer: '192.168.0.10'", conf)
         self.assertEqual(adguard.conf_file().stat().st_mode & 0o777, 0o600)
         self.assertIn("Split DNS do Tailscale: casa.com → 192.168.0.10", outcome.screen)
-        self.assertIn("DNS público (como 1.1.1.1) como secundário", outcome.screen)
+        self.assertIn("como secundário (assim os aparelhos nunca ficam sem DNS)", outcome.screen)
+        self.assertIn("docs/roteador.md#reservar-o-ip-e-apontar-o-dns", outcome.screen)
         self.assertNotIn("senha1", outcome.screen)
 
     def test_reuse_keeps_configuration(self) -> None:
@@ -164,6 +165,8 @@ class AdGuardTest(unittest.TestCase):
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("ainda manda casa.com para 192.168.0.99", outcome.screen)
         self.assertIn("Split DNS pendente", outcome.screen)
+        self.assertIn("docs/tailscale.md#split-dns", outcome.screen)
+        self.assertNotIn("Restrict to domain", outcome.screen)
 
     def test_remove(self) -> None:
         host = self.use(FakeHost())

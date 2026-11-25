@@ -3,19 +3,16 @@ from __future__ import annotations
 import getpass
 import json
 import time
+from pathlib import Path
 
-from kit import config, distro, net, run, ui
+from kit import config, distro, docs, net, run, ui
 
 APP = "network"
 PACKAGE = "tailscale"
 SERVICE = "tailscaled"
 PORT = "41641/udp"
 STATE_DIR = "/var/lib/tailscale"
-ADMIN = "https://login.tailscale.com/admin/machines"
-WINDOWS_RULE = (
-    'New-NetFirewallRule -DisplayName "Tailscale" -Direction Inbound -Protocol UDP -LocalPort 41641 -Action Allow'
-)
-LINUX_RULE = "sudo firewall-cmd --permanent --add-port=41641/udp && sudo firewall-cmd --reload"
+DOCS = Path(__file__).with_name("docs")
 
 
 def status() -> dict:
@@ -102,10 +99,8 @@ def _advertise() -> None:
     if approved():
         ui.ok(f"{address} aprovado no painel do Tailscale")
         return
-    ui.note(
-        f"Falta aprovar esse anúncio no painel do Tailscale (só na primeira vez): abra {ADMIN}, clique nos três "
-        f"pontinhos ao lado de {net.hostname()}, escolha Edit route settings, marque {address} e salve."
-    )
+    ui.note(f"Falta aprovar o anúncio de {address} para {net.hostname()} no painel do Tailscale (só na primeira vez).")
+    ui.link("passo a passo", docs.link(DOCS / "tailscale.md", "aprovar-a-rota-do-servidor"))
     while ui.confirm("Já aprovou?", default=True):
         for _ in range(5):
             if approved():
@@ -122,12 +117,11 @@ def _router(reuse: bool) -> None:
         return
     port = PORT.split("/")[0]
     ui.note(
-        "Opcional, mas recomendado: fora de casa, o Tailscale tenta ligar o seu aparelho direto a esta máquina. "
-        "Quando não consegue, passa por um servidor intermediário, bem mais lento (ruim para vídeo e jogos). "
-        "Para garantir a ligação direta, entre nas configurações do roteador e procure Redirecionamento de portas, "
-        f"Port Forwarding ou Servidor virtual. Crie uma regra: protocolo UDP, porta {port}, para o IP "
-        f"{net.lan_ip()}, porta {port}. Essa porta só aceita aparelhos da sua conta do Tailscale."
+        "Opcional, mas recomendado: fora de casa, o Tailscale tenta ligar o seu aparelho direto a esta máquina; "
+        "quando não consegue, passa por um servidor intermediário, bem mais lento. Um redirecionamento no roteador "
+        f"garante a ligação direta: UDP {port} → {net.lan_ip()}, porta {port}."
     )
+    ui.link("passo a passo", docs.link(DOCS / "roteador.md", "redirecionar-a-porta-do-tailscale"))
     done = ui.confirm("Já fez esse redirecionamento no roteador?", default=saved == "yes")
     config.save(APP, {"ROUTER_FORWARD": "yes" if done else "no"})
     if not done:
@@ -136,13 +130,11 @@ def _router(reuse: bool) -> None:
 
 def _other_machines() -> None:
     ui.note(
-        "Importante: o mesmo vale para os outros computadores da casa que têm o Tailscale. Se o firewall deles "
-        "bloquear a porta UDP 41641, a conexão com esta máquina passa pelo servidor intermediário até dentro de "
-        "casa. Libere a entrada dessa porta em cada um deles:"
+        "Importante: nos outros computadores da casa que têm o Tailscale, libere a entrada da porta UDP 41641 no "
+        "firewall. Sem isso, até dentro de casa a conexão com esta máquina passa pelo servidor intermediário. O "
+        "Resumo da rede mostra, aparelho por aparelho, se a conexão está direta ou por relay."
     )
-    ui.info(f"  Windows (PowerShell como administrador): {WINDOWS_RULE}")
-    ui.info(f"  Linux com firewalld: {LINUX_RULE}")
-    ui.note("O Resumo da rede mostra, aparelho por aparelho, se a conexão está direta ou por relay.")
+    ui.link("como liberar (Windows, Linux, macOS)", docs.link(DOCS / "outros-computadores.md"))
 
 
 def reconnect() -> None:

@@ -11,6 +11,21 @@ Cada pasta é um serviço autônomo do Astroverso, reconhecido pelo gerenciador 
 Cada app tem um `README.md` com a tabela **Mudança | Por quê** de tudo que o instalador muda na máquina e dos
 passos fora dela, sempre atualizada junto com o instalador.
 
+**Passos em plataformas de terceiros** (Tailscale, Cloudflare, Discord, roteador, firewall de outro computador)
+ficam em `apps/<app>/docs/<plataforma>.md`, com o passo a passo completo, e uma seção para cada passo. Na etapa
+que precisa de um deles, o instalador mostra só uma frase curta (o que fazer, com os valores desta máquina) e o
+link do doc no GitHub, montado pelo `kit.docs.link`:
+
+```python
+DOCS = Path(__file__).with_name("docs")
+ui.note(f"Falta o Split DNS no painel do Tailscale ({domain} → {address}).")
+ui.link("passo a passo", docs.link(DOCS / "tailscale.md", "split-dns"))
+```
+
+O que explica o próprio Astroverso (o que é o AdGuard, para que serve uma pergunta) continua como `ui.note` na
+tela. Os docs usam só marcadores (`<ip>`, `<domínio>`, `<nome-da-máquina>`). Um teste do app confere que toda âncora
+usada no código existe no doc.
+
 ## Contrato do `app.py`
 
 Funções simples no módulo (o `Protocol` `kit.app.App` documenta os tipos):

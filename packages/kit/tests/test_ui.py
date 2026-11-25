@@ -39,10 +39,12 @@ class LogTest(unittest.TestCase):
             ui.warn("cuidado")
             ui.info("texto")
             ui.prefixed("a\nb")
+            ui.link("passo a passo", "https://exemplo.com/guia.md#token")
         self.assertEqual(
             out.getvalue(),
             "[teste] ==> etapa\n[teste]     ok: feito\n[teste]     aviso: cuidado\n"
-            "[teste]     texto\n[teste]       a\n[teste]       b\n",
+            "[teste]     texto\n[teste]       a\n[teste]       b\n"
+            "[teste]     → passo a passo: https://exemplo.com/guia.md#token\n",
         )
 
     def test_colors_on_terminal(self) -> None:

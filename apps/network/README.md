@@ -5,18 +5,23 @@ com HTTPS pelo **Caddy** (`<serviço>.<domínio>`, iguais dentro e fora de casa)
 
 ## O que a instalação faz
 
-Uma explicação curta aparece antes de cada etapa, para quem não conhece o projeto:
+Uma explicação curta aparece antes de cada etapa, para quem não conhece o projeto. Os passos em sites de terceiros
+(Tailscale, Cloudflare, roteador) aparecem como link para os docs em [`docs/`](docs/):
 
 1. Instala o Tailscale, liga o serviço e libera a porta dele no firewall.
 2. Conecta esta máquina à sua conta do Tailscale (um endereço de login aparece para abrir no navegador).
-3. Anuncia o IP desta máquina na rede de casa e acompanha a aprovação no painel do Tailscale.
-4. Pergunta se o redirecionamento da porta UDP já foi feito no roteador (opcional, mas recomendado).
-5. Avisa para liberar a mesma porta no firewall dos outros computadores que têm o Tailscale.
+3. Anuncia o IP desta máquina na rede de casa e acompanha a aprovação no painel do Tailscale (link para o passo a
+   passo).
+4. Pergunta se o redirecionamento da porta UDP já foi feito no roteador (opcional, mas recomendado; link para o
+   passo a passo).
+5. Avisa para liberar a mesma porta no firewall dos outros computadores que têm o Tailscale (link para o passo a
+   passo).
 6. AdGuard: pergunta o domínio (só na primeira vez de qualquer app), o usuário e a senha do painel; sobe o AdGuard
    com a reescrita `*.<domínio>` → IP desta máquina e confere se os nomes respondem.
-7. Confere o Split DNS do Tailscale e, se faltar, mostra o passo a passo no painel.
-8. Explica como apontar o DNS do roteador para esta máquina (com um secundário) e pergunta se já foi feito.
-9. Caddy: pede o token da Cloudflare (com o passo a passo para criar) e o confere na API; oferece criar endereços
+7. Confere o Split DNS do Tailscale e, se faltar, mostra o link para o passo a passo.
+8. Pede para apontar o DNS do roteador para esta máquina (com um secundário), com o link para o passo a passo, e
+   pergunta se já foi feito.
+9. Caddy: pede o token da Cloudflare (com o link para o passo a passo) e o confere na API; oferece criar endereços
    para aparelhos da rede (opcional); monta a imagem, sobe o Caddy e espera o cadeado do Let's Encrypt.
 10. Mostra os endereços e o Resumo da rede.
 
@@ -53,25 +58,18 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 
 ## Fora da máquina (passos seus)
 
-| Passo | Por quê |
-|---|---|
-| Aprovar o anúncio `<ip>/32` no painel do Tailscale (Machines → `<nome-da-máquina>` → Edit route settings) | O Tailscale só usa um anúncio depois de aprovado pelo dono da conta |
-| No roteador, redirecionar UDP `41641` para `<ip>`, porta `41641` | Garante a conexão direta vinda de fora de casa (4G, outra rede); a porta só aceita aparelhos da sua conta |
-| Nos outros computadores com Tailscale, liberar a entrada UDP `41641` no firewall | Sem isso, até dentro de casa a conexão com esta máquina passa por relay |
-| No roteador, reservar o IP `<ip>` para esta máquina | O DNS e o anúncio do Tailscale dependem desse IP não mudar |
-| No roteador, DNS primário `<ip>` e um público (como `1.1.1.1`) como secundário | Os aparelhos da casa passam a usar o AdGuard; o secundário os mantém navegando se esta máquina estiver desligada (sem bloqueio e sem os endereços da casa) |
-| No painel do Tailscale (DNS → Nameservers), Split DNS `<domínio>` → `<ip>` | Fora de casa, os aparelhos perguntam ao AdGuard pelos endereços do domínio |
-| Na Cloudflare, criar um token com Zone → Zone → Read e Zone → DNS → Edit, só para a zona do domínio e sem expiração | O Caddy prova ao Let's Encrypt que o domínio é seu criando um registro temporário no DNS; se o token expirar, o cadeado para de renovar |
+O passo a passo de cada um fica em [`docs/`](docs/). Na instalação, a etapa que precisa de um deles mostra só uma
+frase e o link para o doc no GitHub, para abrir no navegador.
 
-Comandos para liberar a porta do Tailscale nos outros computadores:
-
-```
-Windows (PowerShell como administrador):
-New-NetFirewallRule -DisplayName "Tailscale" -Direction Inbound -Protocol UDP -LocalPort 41641 -Action Allow
-
-Linux com firewalld:
-sudo firewall-cmd --permanent --add-port=41641/udp && sudo firewall-cmd --reload
-```
+| Passo | Por quê | Como fazer |
+|---|---|---|
+| Aprovar o anúncio `<ip>/32` no painel do Tailscale | O Tailscale só usa um anúncio depois de aprovado pelo dono da conta | [tailscale.md](docs/tailscale.md#aprovar-a-rota-do-servidor) |
+| No painel do Tailscale, Split DNS `<domínio>` → `<ip>` | Fora de casa, os aparelhos perguntam ao AdGuard pelos endereços do domínio | [tailscale.md](docs/tailscale.md#split-dns) |
+| No roteador, reservar o IP `<ip>` para esta máquina | O DNS e o anúncio do Tailscale dependem desse IP não mudar | [roteador.md](docs/roteador.md#reservar-o-ip-e-apontar-o-dns) |
+| No roteador, DNS primário `<ip>` e um público (como `1.1.1.1`) como secundário | Os aparelhos da casa passam a usar o AdGuard; o secundário os mantém navegando se esta máquina estiver desligada (sem bloqueio e sem os endereços da casa) | [roteador.md](docs/roteador.md#reservar-o-ip-e-apontar-o-dns) |
+| No roteador, redirecionar UDP `41641` para `<ip>`, porta `41641` (opcional, recomendado) | Garante a conexão direta vinda de fora de casa (4G, outra rede); a porta só aceita aparelhos da sua conta | [roteador.md](docs/roteador.md#redirecionar-a-porta-do-tailscale) |
+| Nos outros computadores com Tailscale, liberar a entrada UDP `41641` no firewall | Sem isso, até dentro de casa a conexão com esta máquina passa por relay | [outros-computadores.md](docs/outros-computadores.md) |
+| Na Cloudflare, criar um token só para a zona do domínio, sem expiração | O Caddy prova ao Let's Encrypt que o domínio é seu criando um registro temporário no DNS; se o token expirar, o cadeado para de renovar | [cloudflare.md](docs/cloudflare.md#criar-o-token) |
 
 ## Ações
 

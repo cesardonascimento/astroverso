@@ -9,7 +9,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from kit import config, container, distro, run, ui, validate
+from kit import config, container, distro, docs, run, ui, validate
 
 from . import adguard
 
@@ -21,8 +21,8 @@ IMAGE = f"localhost/astroverso-network-caddy:{VERSION}-{CLOUDFLARE_VERSION}"
 BASE = f"docker.io/library/caddy:{VERSION}-alpine"
 BUILDER = f"docker.io/library/caddy:{VERSION}-builder-alpine"
 CONTAINERFILE = Path(__file__).with_name("caddy.Containerfile")
+DOCS = Path(__file__).with_name("docs")
 API = "https://api.cloudflare.com/client/v4"
-TOKENS = "https://dash.cloudflare.com/profile/api-tokens"
 HOST = "host.containers.internal"
 PORTS = ["http", "https", "443/udp"]
 
@@ -217,12 +217,9 @@ def _token(reuse: bool, domain: str) -> None:
         return
     ui.note(
         f"O Caddy precisa de uma chave (token) da Cloudflare, onde fica o DNS de {domain}, para provar ao Let's "
-        f"Encrypt que o domínio é seu. Como criar (1 minuto): abra {TOKENS} e clique em Create Token; use o modelo "
-        "Edit zone DNS; na política, deixe duas permissões, Zone → Zone → Read e Zone → DNS → Edit; em Zone "
-        f"Resources, escolha Include → Specific zone → {domain}; deixe sem data de expiração (se expirar, o cadeado "
-        "para de renovar); clique em Continue to summary e Create Token; copie o token e guarde no seu gerenciador "
-        "de senhas, porque ele só aparece uma vez."
+        f"Encrypt que o domínio é seu. Crie um token com acesso só à zona {domain} e sem data de expiração."
     )
+    ui.link("passo a passo", docs.link(DOCS / "cloudflare.md", "criar-o-token"))
     while True:
         token = ui.secret("token da Cloudflare", confirm=False)
         problem = check_token(token, domain)
@@ -246,6 +243,7 @@ def _wait_certificate(domain: str, timeout: float = 180) -> None:
     if problems:
         ui.prefixed("\n".join(problems))
     ui.warn("o cadeado ainda não saiu: o Caddy continua tentando sozinho (confira em Resumo da rede)")
+    ui.link("causas comuns", docs.link(DOCS / "cloudflare.md", "quando-o-cadeado-demora"))
 
 
 def certificate(domain: str) -> str:

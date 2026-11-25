@@ -5,7 +5,7 @@ import socket
 import string
 from pathlib import Path
 
-from kit import config, container, distro, net, run, ui, validate
+from kit import config, container, distro, docs, net, run, ui, validate
 
 from . import tailscale
 
@@ -15,7 +15,7 @@ IMAGE = "docker.io/adguard/adguardhome:v0.107.80"
 HASHER = "docker.io/library/caddy:2.11.9-alpine"
 WEB_PORT = 8080
 TEMPLATE = Path(__file__).with_name("adguard.yaml")
-DNS_ADMIN = "https://login.tailscale.com/admin/dns"
+DOCS = Path(__file__).with_name("docs")
 
 
 def folder() -> Path:
@@ -145,11 +145,10 @@ def _split_dns(domain: str, address: str) -> None:
         ui.ok(f"Split DNS do Tailscale: {domain} → {address}")
         return
     ui.note(
-        f"Falta um ajuste no painel do Tailscale para os endereços funcionarem fora de casa: o Split DNS, que manda "
-        f"as perguntas sobre {domain} para o AdGuard desta máquina. Abra {DNS_ADMIN}, em Nameservers clique em Add "
-        f"nameserver, escolha Custom, coloque {address}, ligue Restrict to domain (Split DNS), coloque {domain} e "
-        "salve. Se houver outra entrada para esse domínio, apague."
+        f"Falta o Split DNS no painel do Tailscale ({domain} → {address}): é ele que manda as perguntas sobre "
+        f"{domain} para o AdGuard desta máquina e faz os endereços abrirem fora de casa."
     )
+    ui.link("passo a passo", docs.link(DOCS / "tailscale.md", "split-dns"))
     while ui.confirm("Já configurou?", default=True):
         server = split_dns(domain)
         if server == address:
@@ -164,11 +163,11 @@ def _router(reuse: bool, address: str) -> None:
     if reuse and saved:
         return
     ui.note(
-        "Para os aparelhos da casa usarem o AdGuard, entre nas configurações do roteador (DHCP ou LAN) e faça duas "
-        f"coisas: reserve o IP {address} para esta máquina, para ele nunca mudar; e coloque {address} como DNS "
-        "primário, com um DNS público (como 1.1.1.1) como secundário. O secundário garante que os aparelhos continuem "
-        "navegando se esta máquina estiver desligada, só que sem o bloqueio e sem os endereços da casa."
+        f"Para os aparelhos da casa usarem o AdGuard, falta configurar o roteador: reservar o IP {address} para esta "
+        f"máquina e entregar {address} como DNS primário, com um DNS público como secundário (assim os aparelhos "
+        "nunca ficam sem DNS)."
     )
+    ui.link("passo a passo", docs.link(DOCS / "roteador.md", "reservar-o-ip-e-apontar-o-dns"))
     done = ui.confirm("Já configurou o roteador?", default=saved == "yes")
     config.save(APP, {"ROUTER_DNS": "yes" if done else "no"})
     if not done:

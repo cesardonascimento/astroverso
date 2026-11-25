@@ -154,6 +154,14 @@ def note(text: str) -> None:
     sys.stdout.flush()
 
 
+def link(label: str, url: str) -> None:
+    depth = _stream_depth(sys.stdout)
+    arrow = _paint("→", depth, ACCENT, bold=True)
+    target = f"\033[4m{_paint(url, depth, SOFT)}\033[0m" if depth else url
+    sys.stdout.write(f"{_tag(depth)}     {arrow} {label}: {target}\n")
+    sys.stdout.flush()
+
+
 def section(title: str) -> None:
     depth = _stream_depth(sys.stdout)
     sys.stdout.write(f"{chr(10) if depth else ''}{_tag(depth)}     {_paint(title, depth, SOFT, bold=True)}\n")

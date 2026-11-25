@@ -79,6 +79,10 @@ backup/           código antigo, só referência
 - **README com a tabela de mudanças.** Todo `apps/<app>/README.md` tem uma tabela **Mudança | Por quê** com
   cada mudança que o instalador faz (pacotes, serviços, portas, arquivos do sistema, contas, estado) e outra com
   os passos fora da máquina. Ela é atualizada no mesmo commit de qualquer mudança no instalador.
+- **Passos em terceiros vão para docs.** Configuração em plataforma externa (Tailscale, Cloudflare, Discord,
+  roteador, outro computador) tem o passo a passo em `apps/<app>/docs/<plataforma>.md`; o instalador mostra só uma
+  frase com os valores desta máquina e o link (`ui.link` + `kit.docs.link`). Explicações do próprio Astroverso
+  continuam como `ui.note`.
 - **Backup das configurações.** Cada app implementa `backup(pasta)` e `restore(pasta)`. Se o pacote `backup`
   estiver instalado, o app entra na rotina sozinho; se não, a instalação avisa e segue.
 

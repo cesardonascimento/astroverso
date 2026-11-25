@@ -155,6 +155,8 @@ class CaddyTest(unittest.TestCase):
         self.assertEqual(caddy.env_file().stat().st_mode & 0o777, 0o600)
         self.assertIn("adguard.casa.com", caddy.caddyfile().read_text())
         self.assertIn("não aceitou esse token", outcome.screen)
+        self.assertIn("docs/cloudflare.md#criar-o-token", outcome.screen)
+        self.assertNotIn("Create Token", outcome.screen)
         self.assertIn("cadeado válido para *.casa.com", outcome.screen)
         self.assertIn("https://adguard.casa.com", outcome.screen)
         self.assertNotIn("ruim", outcome.screen)

@@ -23,6 +23,7 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 | `error(texto)` / `fail(texto)` | Erro na saída de erro; `fail` também encerra com código 1 |
 | `prefixed(texto)` | Saída de um comando, linha a linha, com o prefixo e em cinza |
 | `note(texto)` | Explicação em itálico, recuada e quebrada na largura do terminal (antes de uma pergunta ou etapa) |
+| `link(rótulo, url)` | `→ rótulo: url`, com o endereço sublinhado e sem quebra (para o terminal reconhecer o link) |
 | `section(título)` | Título de um bloco, como as tabelas de um resumo |
 | `table(linhas, columns=)` | Tabela com bordas arredondadas (sem `columns`, vira uma tabela de rótulo e valor). Células com situação: `good` (✔ verde), `pending` (! âmbar), `off` (○ cinza), `bad` (✘ vermelho). As colunas encolhem com `…` se o terminal for estreito; sem cor, sai em colunas alinhadas, sem bordas |
 | `ask(rótulo, default=, validate=)` | Pergunta e devolve o texto, repetindo enquanto o validador recusar |
@@ -144,6 +145,18 @@ arquivo da unidade.
 - Unidade `<nome>.service`, com `Restart=always` e `WantedBy=default.target`. Logs: `journalctl --user -u <nome>`.
 - Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. Quebra de linha é
   recusada.
+
+## docs
+
+Links para a documentação dos apps (os passos em plataformas de terceiros, em `apps/<app>/docs/`).
+
+| Função | O que faz |
+|---|---|
+| `link(arquivo, âncora="")` | Endereço do arquivo no GitHub, montado na hora a partir do `origin` do clone e do branch atual (`https://github.com/<dono>/<repo>/blob/<branch>/<caminho>#<âncora>`). Sem `git`, sem `origin` no GitHub ou fora de um clone, devolve o caminho local. Fora de um branch, usa `main` |
+| `slug(título)` | A âncora que o GitHub dá a um título (`Split DNS` → `split-dns`) |
+| `anchors(arquivo)` | As âncoras de todos os títulos do arquivo, fora dos blocos de código (para os testes conferirem os links) |
+
+O endereço do repositório nunca fica escrito no código: vem do clone.
 
 ## logo
 
