@@ -38,6 +38,9 @@ o app ou pacote delas for migrado.
 - **Python 3.11 ou mais novo, só a biblioteca padrão.** Nada de `pip`, venv ou build: clonar e rodar.
 - **sh só onde não há alternativa:** o script de entrada `astroverso` (confere o `python3` e chama o programa) e
   os entrypoints dos containers.
+- Exceção: os módulos do n8n (`apps/n8n/modules/<módulo>/`) são APIs em containers próprios e podem instalar
+  dependências dentro da imagem (`pip` com versões fixadas no `Containerfile`). O código que roda na máquina continua só
+  com a biblioteca padrão.
 - Comandos do sistema só pelo `kit.run` (`cmd`, `capture`, `succeeds`), com a lista de argumentos.
 - Anotações de tipo em tudo.
 - Testes com `unittest`, na pasta `tests/` de cada pacote ou app. Todos os pacotes de uma vez:
@@ -200,6 +203,21 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Backup das pastas dos discos (dados que não são de nenhum app): cada pasta com as próprias pastas de destino, em
   `backups.json`.
 
+### App `n8n`
+
+- Uma instância só, com várias rotinas (decisão do usuário: módulos por assunto, não um n8n por rotina). Containers por
+  Quadlet: `astroverso-n8n` e `astroverso-n8n-runners` (imagens oficiais, mesma versão), SQLite, `n8n.<domínio>`,
+  administrador mantido pela instalação (hash bcrypt), isolado da empresa.
+- **Rotinas só no banco do n8n** (fonte de verdade, sem sincronizar código; nada pessoal no repositório). Versões: o
+  histórico do n8n, "Restaurar uma rotina" (uma rotina de um backup, como cópia ou substituindo) e "Restaurar uma versão".
+  O backup leva o `export:entities` e cada rotina num JSON separado.
+- **Módulos** (`apps/n8n/modules/<módulo>/`): APIs em Python, um container cada (`astroverso-n8n-<módulo>:8080`, sem
+  porta nem endereço), rotas `/v1/...` versionadas e `/v1/saude`. Não aparecem no instalador: todos sobem sozinhos, e a
+  imagem é refeita pelo resumo dos arquivos. Ligar e desligar rotinas é no próprio n8n (decisão do usuário).
+- **Conexões do Astroverso:** credenciais com `id` fixo só a partir dos contratos do kit (`kit.mail`, `kit.mailboxes`,
+  `kit.discord`) e a chave das chamadas; credenciais de um assunto o usuário cadastra no n8n.
+- Comandos do Discord para rotinas (como o antigo `contas:email`) ficam para a migração das contas.
+
 ### App `cockpit`
 
 - Pacotes do sistema (`cockpit`, `cockpit-podman`, `cockpit-storaged`, `cockpit-files`), não container: ele administra a
@@ -302,5 +320,12 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
   - `bisync --dry-run` também para na trava de exclusões: para mostrar o que seria apagado, `--dry-run --force`.
   - Uma senha ofuscada pelo `rclone obscure` é reversível: vai pela entrada padrão, nunca como argumento (por isso o
     app não usa `rclone config create` com senha).
+- n8n:
+  - `import:entities --truncateTables=true` só funciona num banco novo (sem `database.sqlite`).
+  - `import:workflow` desliga a rotina importada; `--activeState=fromJson` só vale no modo fila. Para religar:
+    `publish:workflow --id=<id>`, que o n8n rodando aplica sozinho.
+  - `export:workflow` sem nenhuma rotina sai com erro ("No workflows found with specified filters").
+  - O `podman exec` no container do n8n roda como `-u 1000` (o nome `node` pode não resolver).
+- Python como processo 1 de um container ignora o SIGTERM sem tratador: cada parada espera 10 s e termina à força.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.

@@ -4,7 +4,8 @@ import base64
 import json
 import time
 import zlib
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -397,6 +398,28 @@ def restore(app: str, save_function: Callable[[Path], None], restore_function: C
     finally:
         _clean(target)
     ui.ok(f"{app} restaurado da versão de {when(chosen)}")
+
+
+@contextmanager
+def opened(app: str) -> Iterator[tuple[Path, str] | None]:
+    if not configured():
+        ui.fail("esta máquina não está ligada a um servidor de backup: instale o app backup")
+    picked = _source(app)
+    if picked is None:
+        yield None
+        return
+    place, chosen = picked
+    target = config.home() / ".backup-restore" / app
+    _clean(target)
+    target.mkdir(parents=True, mode=0o700)
+    code, output = restic("restore", f"{chosen['id']}:{chosen['paths'][0]}", "--target", str(target), destination=place)
+    if code:
+        _clean(target)
+        ui.fail(f"o restic não trouxe a versão: {tail(output)}")
+    try:
+        yield target, when(chosen)
+    finally:
+        _clean(target)
 
 
 def _empty_target(value: str) -> str:
