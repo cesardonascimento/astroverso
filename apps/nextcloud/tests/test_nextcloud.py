@@ -108,9 +108,11 @@ class NextcloudTest(unittest.TestCase):
         for patch in (
             mock.patch.object(nextcloud, "container", self.host),
             mock.patch.object(app, "container", self.host),
+            mock.patch.object(app.accounts, "container", self.host),
             mock.patch.object(nextcloud, "run", FakeRun(self.host)),
             mock.patch.object(nextcloud, "DEFAULT_FILES", self.home / "Nextcloud"),
             mock.patch.object(nextcloud.time, "sleep"),
+            mock.patch.object(app.accounts, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change(
                 "watch", a[1], a[2], lambda: False, lambda: self.host.record("watch_on"), lambda: self.host.record("watch_off"))),
         ):
@@ -118,7 +120,7 @@ class NextcloudTest(unittest.TestCase):
             self.addCleanup(patch.stop)
 
     def test_fresh_install(self) -> None:
-        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n"]
+        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(reuse=False), self.host.calls)[1], keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]
@@ -142,7 +144,7 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual((nextcloud.secrets_folder() / "db_password").stat().st_mode & 0o777, 0o644)
 
     def test_reinstall_asks_nothing(self) -> None:
-        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes"})
+        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes"})
         (nextcloud.html() / "config").mkdir(parents=True)
         (nextcloud.html() / "config" / "config.php").write_text("<?php")
         outcome = run_in_pty(lambda: (app.install(reuse=True), self.host.calls)[1], [], columns=160)
@@ -191,9 +193,43 @@ class NextcloudTest(unittest.TestCase):
             nextcloud.validate_folder(str(config.home() / "x"))
         self.assertEqual(nextcloud.validate_folder(str(self.home / "Arquivos")), str(self.home / "Arquivos"))
 
+    def test_accounts_sync(self) -> None:
+        from kit import mailboxes
+        secret = self.home / "senha"
+        secret.write_text("segredo-imap")
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            mailboxes.publish("mail", [mailboxes.Mailbox("inbox", "inbox@casa.com", "astroverso-mail", 31143, "inbox", str(secret), 31587)])
+        calls: list[tuple] = []
+        exported = [{"id": 7, "email": "velha@casa.com", "name": "Astroverso Velha"}, {"id": 8, "email": "eu@gmail.com", "name": "Pessoal"}]
+
+        def occ_output(*args, env=None):
+            calls.append(args)
+            if args[0] == "app:list":
+                return 0, json.dumps({"enabled": {}, "disabled": {}})
+            if args[0] == "mail:account:export":
+                return 0, json.dumps(exported)
+            return 0, ""
+
+        def exec_output(name, args, user="", env=None, input=None, timeout=None):
+            calls.append(("php", env, input))
+            return 0, ""
+
+        self.host.running.add(nextcloud.NAME)
+        with mock.patch.object(nextcloud, "occ_output", side_effect=occ_output), \
+                mock.patch.object(self.host, "exec_output", side_effect=exec_output), mock.patch.object(sys, "stdout", io.StringIO()):
+            app.accounts.sync()
+        self.assertIn(("app:install", "mail"), calls)
+        php = next(call for call in calls if call[0] == "php")
+        self.assertEqual(php[1], {"ASTROVERSO_SECRET": "segredo-imap"})
+        self.assertIn('json_decode(\'["occ", "mail:account:create", "astroverso", "Astroverso Inbox", "inbox@casa.com"', php[2])
+        self.assertEqual(app.accounts._literal("a'b\\c"), "'a\\'b\\\\c'")
+        self.assertNotIn("segredo-imap", php[2])
+        self.assertIn(("mail:account:delete", "7"), calls)
+        self.assertNotIn(("mail:account:delete", "8"), calls)
+
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("watch", True)])
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True)])
 
 
 if __name__ == "__main__":

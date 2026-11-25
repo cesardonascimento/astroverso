@@ -6,6 +6,7 @@ from pathlib import Path
 from kit import changes, config, container, docs, routes, ui, validate, watch
 from kit.app import Action
 
+from . import accounts
 from . import backup as copies
 from . import nextcloud
 
@@ -17,6 +18,7 @@ BUTTONS = (("Resumo do Nextcloud", "nextcloud:summary"), ("Verificar de novo", "
 
 def items() -> list[changes.Change]:
     return [
+        accounts.change(),
         watch.change(
             APP, "Verificar o Nextcloud de hora em hora e avisar no Discord",
             f"Um timer do usuário ({watch.name(APP)}.timer) confere a cada hora se os containers estão no ar, se o "
@@ -77,6 +79,7 @@ def install(reuse: bool | None = None) -> None:
     nextcloud.tune(nextcloud.host(), first)
     nextcloud.publish(nextcloud.host())
     changes.install(APP, items(), again)
+    accounts.sync()
     ui.info(f"https://{nextcloud.host()} (usuário {nextcloud.admin()})")
     ui.link("conectar o celular, o computador, a agenda e os contatos", docs.link(DOCS / "apps.md"))
     summary()
@@ -176,5 +179,6 @@ def actions() -> list[Action]:
         Action("changes", "Mudanças no sistema", manage),
         Action("password", "Trocar a senha do administrador", password),
         Action("repair", "Reparar o Nextcloud", repair, remote=True, confirm=True),
+        Action("mailboxes", "Atualizar as contas de e-mail", accounts.sync, remote=True),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
     ]

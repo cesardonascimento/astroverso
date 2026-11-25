@@ -37,7 +37,11 @@ systemd), e o cron depois do Nextcloud.
 5. O `apache.conf` avisa ao Apache que o endereço público é `https://` (sem isso, `/.well-known/caldav` e
    `/.well-known/carddav` redirecionam para `http://`) e liga o HSTS.
 6. Publica `nextcloud.<domínio>` pelo `kit.routes` (o Caddy do `network` recarrega sozinho).
-7. Pergunta a verificação de hora em hora.
+7. Pergunta as mudanças no sistema: as contas de e-mail automáticas e a verificação de hora em hora.
+8. **Contas de e-mail:** para cada caixa publicada por outro app em `~/.astroverso/mailboxes/` (`kit.mailboxes`, ex.: o
+   app `mail`), liga o app Mail do Nextcloud (instala se faltar) e cria ou atualiza no Mail do administrador a conta
+   `Astroverso <Nome>`. A senha vai por variável de ambiente para um script PHP pela entrada padrão (o `occ` só aceita
+   senha como argumento). Contas `Astroverso ...` cujas caixas sumiram são apagadas.
 
 ## Mudanças na máquina
 
@@ -48,6 +52,7 @@ systemd), e o cron depois do Nextcloud.
 | `~/.astroverso/nextcloud/` (`html/`, `db/`, `secrets/`, `apache.conf`, `.env`) | O código e a configuração do Nextcloud, o banco, as senhas e as respostas da instalação |
 | `~/Nextcloud` (ou a pasta escolhida), do `www-data` do container | Os arquivos de todos os usuários do Nextcloud |
 | `~/.astroverso/routes/nextcloud.json` | O endereço publicado para o Caddy |
+| Unidades do usuário `astroverso-nextcloud-mailboxes.path` e `.service` (perguntada, padrão sim) | Quando uma caixa de e-mail é publicada ou retirada, a conta no Nextcloud Mail é criada, atualizada ou apagada na hora (`astroverso nextcloud action mailboxes`) |
 | Unidades do usuário `astroverso-nextcloud-watch.timer` e `.service` (perguntada, padrão sim, em **Mudanças no sistema**) | A cada hora, confere o Nextcloud e avisa no Discord quando algo quebra e quando volta ao normal |
 
 ## Fora da máquina (passos seus)
@@ -61,7 +66,8 @@ systemd), e o cron depois do Nextcloud.
 | Ação | O que faz |
 |---|---|
 | Resumo do Nextcloud | Situação, versão, endereço, administrador, pasta e espaço livre, última rodada das tarefas, erros da verificação do Nextcloud (`occ setupchecks`), os containers e os avisos em aberto. Também no Discord: `/astro nextcloud:summary` |
-| Mudanças no sistema | Liga ou desliga a verificação de hora em hora |
+| Mudanças no sistema | Liga ou desliga as contas de e-mail automáticas e a verificação de hora em hora |
+| Atualizar as contas de e-mail | Cria, atualiza ou apaga as contas do Nextcloud Mail a partir das caixas publicadas (também no Discord) |
 | Trocar a senha do administrador | Pede a nova senha e a aplica (pede de novo se o Nextcloud recusar) |
 | Reparar o Nextcloud | Índices do banco, reparos e a reverificação dos arquivos (`occ files:scan --all`), útil depois de copiar arquivos por fora. Também no Discord, com confirmação |
 | Verificar agora | Roda a verificação de hora em hora na hora |
