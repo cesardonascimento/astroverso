@@ -195,6 +195,21 @@ As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps
 | `undo_all(mudanças)` | Desfaz todas, na ordem inversa (no `remove`) |
 | `rows(mudanças)` | Linhas de tabela (mudança, aplicada ou desfeita) para o resumo |
 
+## backup
+
+O backup de cada app no servidor do app `backup` (restic por HTTPS). A máquina fica ligada ao servidor por
+`~/.astroverso/backup.env` (`BACKUP_URL`, `BACKUP_USER`, `BACKUP_PASSWORD`, `BACKUP_REPO_PASSWORD`, `600`).
+
+| Nome | O que faz |
+|---|---|
+| `change(app)` | A mudança perguntada do backup diário: timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now` |
+| `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app numa pasta temporária, manda pelo `restic backup` (marcas `astroverso`, `app:<app>` e o rótulo), apaga a pasta e avisa no `#backup` (sucesso silencioso; falha com o botão "Tentar de novo"). Sem servidor configurado, só avisa |
+| `restore(app, backup, restore)` | Escolhe a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
+| `versions(app)` / `summary(app)` | As versões do app nesta máquina e a tabela para o resumo |
+| `configured()` / `settings()` / `save(...)` / `forget()` / `ensure_repository(valores)` | A ligação com o servidor; o `ensure_repository` cria o repositório na primeira vez e traduz os erros comuns |
+
+As senhas vão por variável de ambiente (`RESTIC_REST_PASSWORD`, `RESTIC_PASSWORD`), nunca em argumentos.
+
 ## mail
 
 Envio de e-mails pelos apps, pelo Worker do app `mail` (nesta ou em outra máquina). A máquina fica ligada ao envio
