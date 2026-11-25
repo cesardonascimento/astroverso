@@ -102,9 +102,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   pelo `~<domínio>`; o roteador entrega aos aparelhos o AdGuard **e um DNS secundário** (nunca sem DNS).
 - Caddy: imagem local com o módulo da Cloudflare, cadeado curinga `*.<domínio>` por DNS-01; painéis web de
   aparelhos da rede entram como endereços (nome, IP, porta), nunca como rotas do Tailscale.
-- Os outros apps publicam endereços em `~/.astroverso/routes/<app>.json` (`[{"host", "target"}]`, pasta de nenhum
-  app); o Caddy do `network` os lê ao recarregar. O `kit.routes` e a recarga automática (unidade `.path`) entram com
-  o primeiro app que publicar um endereço.
+- Os outros apps publicam endereços pelo `kit.routes` (`~/.astroverso/routes/<app>.json`, pasta de nenhum app); a
+  unidade `astroverso-network-routes.path` recarrega o Caddy a cada mudança.
 
 ### Configurações do sistema
 

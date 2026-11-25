@@ -7,6 +7,7 @@ Cada pasta é um serviço autônomo do Astroverso, reconhecido pelo gerenciador 
 - Instala as próprias dependências pela camada `kit.distro`.
 - Guarda o que gera em `~/.astroverso/<app>`.
 - Containers pelo `kit.container` (Quadlet), na rede `astroverso`, com o nome `astroverso-<app>[-<parte>]`.
+- Endereço `https://<serviço>.<domínio>` pelo `kit.routes` (`publish` na instalação, `withdraw` no `remove`).
 
 Cada app tem um `README.md` com a tabela **Mudança | Por quê** de tudo que o instalador muda na máquina e dos
 passos fora dela, sempre atualizada junto com o instalador.

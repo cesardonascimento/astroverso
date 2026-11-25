@@ -158,6 +158,30 @@ Links para a documentação dos apps (os passos em plataformas de terceiros, em 
 
 O endereço do repositório nunca fica escrito no código: vem do clone.
 
+## routes
+
+Endereços que os apps publicam para o Caddy do `network` (o app não precisa saber se ele está instalado).
+
+| Nome | O que faz |
+|---|---|
+| `Route(host, target)` | Um endereço: `host` (ex.: `nuvem.<domínio>`) e `target` (ex.: `http://astroverso-nuvem:80`, `http://host.containers.internal:9090`) |
+| `publish(app, rotas)` | Grava `~/.astroverso/routes/<app>.json` de uma vez (rename atômico, com o temporário fora da pasta); não regrava se nada mudou |
+| `withdraw(app)` | Apaga o arquivo do app (no `remove` dele) |
+| `load()` | Todos os endereços publicados, com o app de origem; ignora arquivos inválidos com um aviso |
+
+Com o `network` instalado, a unidade `astroverso-network-routes.path` vê a mudança e recarrega o Caddy.
+
+## units
+
+Unidades do systemd do usuário (`~/.config/systemd/user/`) que não são containers: timers, `.path`, serviços
+oneshot.
+
+| Função | O que faz |
+|---|---|
+| `install({nome: conteúdo}, start=[...])` | Grava as que mudaram, `daemon-reload`, liga (`enable --now`) as de `start` que estão paradas e reinicia as que mudaram |
+| `remove(nomes)` | Desliga, apaga e faz `daemon-reload`; ignora as que não existem |
+| `active(nome)` | Se a unidade está ativa |
+
 ## logo
 
 Os pixels do símbolo (`SYMBOL`, convertido de `simbolo.png`: `#` lavanda, `o` arco em degradê do violeta ao

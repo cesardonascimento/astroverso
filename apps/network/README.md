@@ -54,6 +54,8 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/network/caddy/etc/Caddyfile` | A configuração do Caddy, gerada a partir dos endereços (nunca editada à mão) |
 | `~/.astroverso/network/caddy/data/` e `config/` | O cadeado do Let's Encrypt e o estado do Caddy (o cadeado renova sozinho) |
 | `~/.astroverso/network/caddy/devices.json` | Os endereços de aparelhos da rede (nome, IP, porta, HTTP ou HTTPS) |
+| Unidades do usuário `astroverso-network-routes.path` e `.service` em `~/.config/systemd/user/` | Quando um app publica ou retira um endereço em `~/.astroverso/routes/`, o Caddy recarrega sozinho, sem reiniciar (`astroverso network action reload`) |
+| Pasta `~/.astroverso/routes/` (`700`), se ainda não existir | Onde os apps publicam os endereços deles (`kit.routes`); não é de nenhum app e fica no `remove` |
 | Painel do AdGuard só por `https://adguard.<domínio>` (a porta 8080 não é aberta na rede) | Com login e cadeado; a 8080 só é alcançada pelo Caddy |
 
 ## Fora da máquina (passos seus)
@@ -80,11 +82,11 @@ frase e o link para o doc no GitHub, para abrir no navegador.
 | Marcar o redirecionamento no roteador como feito | Para quando ele for feito depois da instalação |
 | Marcar o DNS no roteador como feito | Idem, para o DNS do roteador |
 | Endereços de aparelhos da rede | Lista, cria e remove endereços `https://<nome>.<domínio>` para painéis de aparelhos da casa (IP, porta, HTTP ou HTTPS); o Caddy recarrega sem reiniciar |
-| Recarregar os endereços do Caddy | Regera o Caddyfile (inclusive com os endereços publicados por outros apps em `~/.astroverso/routes/`) e recarrega |
+| Recarregar os endereços do Caddy | Regera o Caddyfile (inclusive com os endereços publicados por outros apps em `~/.astroverso/routes/`) e recarrega. Normalmente não é preciso: a unidade `astroverso-network-routes.path` faz isso sozinha |
 
 ## Remover
 
-Desfaz tudo da tabela de mudanças: remove os containers e as imagens do Caddy e do AdGuard, tira o ajuste de DNS
+Desfaz tudo da tabela de mudanças: remove as unidades da recarga automática, os containers e as imagens do Caddy e do AdGuard, tira o ajuste de DNS
 desta máquina, fecha as portas, apaga o ajuste de portas baixas, tira a máquina da conta do Tailscale
 (`tailscale logout`), desliga o serviço, desinstala o pacote e apaga `/var/lib/tailscale` e `~/.astroverso/network`.
 O Podman, o *linger* e o `astroverso.env` ficam (são de todos os apps). Os passos fora da máquina ficam: a

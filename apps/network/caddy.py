@@ -9,7 +9,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from kit import config, container, distro, docs, run, ui, validate
+from kit import config, container, distro, docs, routes as published, run, ui, units, validate
 
 from . import adguard
 
@@ -22,6 +22,7 @@ BASE = f"docker.io/library/caddy:{VERSION}-alpine"
 BUILDER = f"docker.io/library/caddy:{VERSION}-builder-alpine"
 CONTAINERFILE = Path(__file__).with_name("caddy.Containerfile")
 DOCS = Path(__file__).with_name("docs")
+WATCH = "astroverso-network-routes"
 API = "https://api.cloudflare.com/client/v4"
 HOST = "host.containers.internal"
 PORTS = ["http", "https", "443/udp"]
@@ -43,8 +44,32 @@ def devices_file() -> Path:
     return folder() / "devices.json"
 
 
-def routes_folder() -> Path:
-    return config.home() / "routes"
+def watch_units() -> dict[str, str]:
+    command = Path(__file__).resolve().parents[2] / "astroverso"
+    return {
+        f"{WATCH}.path": "\n".join([
+            "[Unit]",
+            "Description=Astroverso network: recarrega o Caddy quando um app publica ou retira um endereço",
+            "",
+            "[Path]",
+            f"PathChanged={published.folder()}",
+            "MakeDirectory=yes",
+            "DirectoryMode=0700",
+            "",
+            "[Install]",
+            "WantedBy=default.target",
+            "",
+        ]),
+        f"{WATCH}.service": "\n".join([
+            "[Unit]",
+            "Description=Astroverso network: recarrega os endereços do Caddy",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            f"ExecStart={command} network action reload",
+            "",
+        ]),
+    }
 
 
 def spec() -> container.Container:
@@ -133,19 +158,7 @@ def _device_target(item: dict) -> str:
 
 
 def app_routes() -> list[tuple[str, str, str]]:
-    found: list[tuple[str, str, str]] = []
-    if not routes_folder().is_dir():
-        return found
-    for path in sorted(routes_folder().glob("*.json")):
-        try:
-            items = json.loads(path.read_text())
-        except ValueError:
-            ui.warn(f"rotas ignoradas, arquivo inválido: {path}")
-            continue
-        for item in items if isinstance(items, list) else []:
-            if isinstance(item, dict) and item.get("host") and item.get("target"):
-                found.append((str(item["host"]), str(item["target"]), f"app {path.stem}"))
-    return found
+    return [(route.host, route.target, f"app {route.app}") for route in published.load()]
 
 
 def routes(domain: str) -> list[tuple[str, str, str]]:
@@ -280,6 +293,7 @@ def install(reuse: bool) -> None:
     container.remove_image(BUILDER)
     _write_caddyfile(domain)
     container.start(spec())
+    units.install(watch_units(), [f"{WATCH}.path"])
     reload()
     _wait_certificate(domain)
     for host, _, _ in routes(domain):
@@ -338,6 +352,7 @@ def manage_devices(apply: bool = True) -> None:
 def remove() -> None:
     ui.step("Caddy")
     run.sudo_prepare("fechar as portas 80 e 443 no firewall")
+    units.remove([f"{WATCH}.path", f"{WATCH}.service"])
     container.remove(NAME, IMAGE)
     container.remove_image(BASE)
     container.remove_image(BUILDER)
@@ -352,6 +367,7 @@ def summary() -> None:
         ["Caddy", ui.good("no ar") if installed() else ui.bad("parado")],
         ["Cadeado", ui.good(f"*.{domain} válido até {expires}") if expires else ui.pending("ainda não emitido")],
         ["Token da Cloudflare", ui.good("guardado") if saved_token() else ui.pending("falta")],
+        ["Recarga automática", ui.good("ligada") if units.active(f"{WATCH}.path") else ui.pending("desligada")],
     ])
     ui.section("Endereços")
     ui.table(

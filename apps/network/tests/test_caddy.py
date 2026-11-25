@@ -10,7 +10,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "packages"))
 
-from kit import config, container, ui
+from kit import config, container, routes, ui
 from kit.testing import run_in_pty
 from manager.apps import load
 
@@ -72,6 +72,20 @@ class FakeHost:
         return ""
 
 
+class FakeUnits:
+    def __init__(self, host: FakeHost) -> None:
+        self.host = host
+
+    def install(self, units, start):
+        self.host.record("units", sorted(units), list(start))
+
+    def remove(self, names):
+        self.host.record("units_remove", list(names))
+
+    def active(self, name):
+        return self.host.started
+
+
 def answers(good: str):
     def api(token, path):
         if token != good:
@@ -101,6 +115,7 @@ class CaddyTest(unittest.TestCase):
             mock.patch.object(caddy, "container", host),
             mock.patch.object(caddy, "distro", host),
             mock.patch.object(caddy, "run", host),
+            mock.patch.object(caddy, "units", FakeUnits(host)),
             mock.patch.object(caddy, "_api", side_effect=answers("bom")),
             mock.patch.object(caddy, "certificate", return_value=certificate),
             mock.patch.object(caddy.time, "sleep"),
@@ -123,11 +138,9 @@ class CaddyTest(unittest.TestCase):
             {"name": "roteador", "ip": "192.168.0.1", "port": 443, "https": True},
             {"name": "n8n", "ip": "192.168.0.20", "port": 5678, "https": False},
         ])
-        caddy.routes_folder().mkdir()
-        (caddy.routes_folder() / "nuvem.json").write_text(json.dumps([
-            {"host": "nuvem.casa.com", "target": "http://astroverso-nuvem:80"},
-            {"host": "fotos.outro.com", "target": "http://astroverso-nuvem:80"},
-        ]))
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            routes.publish("nuvem", [routes.Route("nuvem.casa.com", "http://astroverso-nuvem:80"),
+                                     routes.Route("fotos.outro.com", "http://astroverso-nuvem:80")])
         text = caddy.render("casa.com")
         self.assertTrue(text.startswith("{\n\tacme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}\n}\n\n*.casa.com {\n"))
         self.assertIn("\t@route1 host adguard.casa.com\n\thandle @route1 {\n\t\treverse_proxy http://host.containers.internal:8080\n\t}\n", text)
@@ -151,6 +164,8 @@ class CaddyTest(unittest.TestCase):
         self.assertEqual(calls[3][:2], ("build", caddy.IMAGE))
         self.assertIn(("remove_image", caddy.BUILDER), calls)
         self.assertIn(("start", caddy.NAME, str(caddy.env_file())), calls)
+        watch = [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]
+        self.assertIn(("units", watch, [f"{caddy.WATCH}.path"]), calls)
         self.assertEqual(caddy.env_file().read_text(), "CLOUDFLARE_API_TOKEN=bom\n")
         self.assertEqual(caddy.env_file().stat().st_mode & 0o777, 0o600)
         self.assertIn("adguard.casa.com", caddy.caddyfile().read_text())
@@ -182,12 +197,20 @@ class CaddyTest(unittest.TestCase):
                       outcome.result)
         self.assertIn("roteador.casa.com", caddy.caddyfile().read_text())
 
+    def test_watch_units(self) -> None:
+        units = caddy.watch_units()
+        path = units[f"{caddy.WATCH}.path"]
+        self.assertIn(f"PathChanged={self.home}/.astroverso/routes\n", path)
+        self.assertIn("MakeDirectory=yes", path)
+        self.assertIn(f"ExecStart={ROOT}/astroverso network action reload\n", units[f"{caddy.WATCH}.service"])
+
     def test_remove(self) -> None:
         host = self.use(FakeHost())
         with mock.patch.object(sys, "stdout", io.StringIO()):
             caddy.remove()
         self.assertEqual(host.calls, [
-            ("sudo",), ("remove", caddy.NAME, caddy.IMAGE), ("remove_image", caddy.BASE),
+            ("sudo",), ("units_remove", [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]),
+            ("remove", caddy.NAME, caddy.IMAGE), ("remove_image", caddy.BASE),
             ("remove_image", caddy.BUILDER), ("close", "http", "https", "443/udp"),
         ])
 
