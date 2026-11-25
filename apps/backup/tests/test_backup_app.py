@@ -58,6 +58,8 @@ class FakeRun:
         name = Path((env or {}).get("RESTIC_REPOSITORY", "")).name
         if args[:2] == ["restic", "snapshots"]:
             return 0, json.dumps(self.snapshots.get(name, []))
+        if args[:3] == ["restic", "cat", "config"]:
+            return (0, "") if (env or {}).get("RESTIC_PASSWORD") == "antiga" else (1, "wrong password")
         return 0, ""
 
 
@@ -159,7 +161,7 @@ class BackupAppTest(unittest.TestCase):
         with mock.patch.object(sys, "stdout", io.StringIO()):
             server.add("servidor")
         self.box.running = True
-        outcome = run_in_pty(lambda: (app.add_machine(), self.box.calls)[1], [b"servidor\n", b"notebook\n"], columns=400)
+        outcome = run_in_pty(lambda: (app.add_machine(), self.box.calls)[1], [b"servidor\n", b"notebook\n", b"\r"], columns=400)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("a máquina servidor já está cadastrada", outcome.screen)
         self.assertEqual(sorted(server.clients()), ["notebook", "servidor"])
@@ -168,6 +170,28 @@ class BackupAppTest(unittest.TestCase):
         self.assertIn("usuário: notebook", outcome.screen)
         code = next(line for line in outcome.screen.splitlines() if "código de ligação" in line).split(": ", 1)[1].strip()
         self.assertEqual(kit_backup.read_code(code)[1], "notebook")
+
+    def test_returning_machine_keeps_old_password(self) -> None:
+        item = self.destination(self.home / "Backups")
+        config.save("backup", {"MODE": "server"})
+        server.repository(item, "notebook").mkdir(parents=True)
+        (server.repository(item, "notebook") / "config").write_text("x")
+        keys = [b"notebook\n", b"\x1b[B", b"\r", b"errada\n", b"antiga\n"]
+        outcome = run_in_pty(app.add_machine, keys, columns=400)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("essa senha não abre os backups de notebook", outcome.screen)
+        self.assertEqual(server.clients()["notebook"]["REPO_PASSWORD"], "antiga")
+        self.assertNotIn("errada", outcome.screen)
+
+    def test_server_reinstall_reuses_old_password(self) -> None:
+        item = self.destination(self.home / "Backups")
+        config.save("backup", {"MODE": "server", "KEEP_DAILY": "30", "KEEP_MONTHLY": "12"})
+        server.repository(item, "servidor").mkdir(parents=True)
+        (server.repository(item, "servidor") / "config").write_text("x")
+        outcome = run_in_pty(lambda: app._server(True), [b"antiga\n"], columns=400)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertEqual(server.clients()["servidor"]["REPO_PASSWORD"], "antiga")
+        self.assertEqual(kit_backup.settings()["BACKUP_REPO_PASSWORD"], "antiga")
 
     def test_collect(self) -> None:
         item = self.destination(self.home / "Backups")

@@ -26,7 +26,7 @@ qualquer máquina                                          máquina do servidor
 
 | Modo | O que faz |
 |---|---|
-| **Servidor** (uma máquina) | Pergunta a regra das versões e as pastas de destino (pelo menos uma), sobe o container, publica `backup.<domínio>`, cadastra esta máquina e liga o envio dela |
+| **Servidor** (uma máquina) | Pergunta a regra das versões e as pastas de destino (pelo menos uma), sobe o container, publica `backup.<domínio>`, cadastra esta máquina e liga o envio dela. Se as pastas já têm backups desta máquina (reinstalação), pede a senha do repositório antiga em vez de gerar outra |
 | **Cliente** (as outras) | Pede o código de ligação (endereço, usuário e pastas de destino, sem segredos) e as duas senhas, da ação **Adicionar uma máquina** do servidor; confere e cria os repositórios |
 
 Nos dois modos, a máquina fica ligada ao servidor por `~/.astroverso/backup.env` (`600`) e
@@ -75,7 +75,7 @@ Sem a máquina ligada a um servidor, ligar o backup só avisa: ele fica para dep
 |---|---|
 | Resumo dos backups | Servidor, regra, pastas de destino com o espaço e a marca ☁, e o último backup de cada app de cada máquina em cada pasta. Também no Discord |
 | Pastas de destino (servidor) | Adicionar (pelo seletor de pastas) e tirar pastas de destino. Os backups de uma pasta tirada ficam nela |
-| Adicionar uma máquina / Mostrar os dados de uma máquina / Descadastrar máquinas (servidor) | Os dados de acesso e o código de ligação de cada máquina (os repositórios de quem sai ficam nas pastas) |
+| Adicionar uma máquina / Mostrar os dados de uma máquina / Descadastrar máquinas (servidor) | Os dados de acesso e o código de ligação de cada máquina (os repositórios de quem sai ficam nas pastas). Máquina que está voltando: usa a senha do repositório antiga, conferida nos backups que já existem; só a senha de acesso é nova |
 | Atualizar as pastas de destino (cliente) | Cola o código de ligação novo depois de uma mudança nas pastas do servidor |
 | Manutenção dos repositórios agora | A manutenção semanal na hora (também no Discord, com confirmação) |
 | Fazer backup agora / Restaurar uma versão | Do próprio app backup |

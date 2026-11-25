@@ -61,7 +61,11 @@ def _server(reuse: bool) -> None:
     distro.install(["restic"])
     local = net.hostname()
     if local not in server.clients():
-        server.add(local)
+        old = ""
+        if server.existing(local):
+            ui.note(f"As pastas de destino já têm backups de {local}. Para continuar com eles, use a senha do repositório antiga (do gerenciador de senhas).")
+            old = _old_password(local)
+        server.add(local, old)
         ui.ok(f"máquina {local} cadastrada no servidor")
     server.start()
     values = server.clients()[local]
@@ -173,10 +177,30 @@ def restore(folder: Path) -> None:
     ui.info("as senhas das máquinas não entram no backup: cadastre de novo (ação Adicionar uma máquina) ou use as do gerenciador de senhas")
 
 
+def _old_password(name: str) -> str:
+    for _ in range(3):
+        password = ui.secret(f"senha do repositório antiga de {name}", confirm=False)
+        problem = server.check_password(name, password)
+        if not problem:
+            ui.ok("a senha abre os backups que já existem")
+            return password
+        ui.warn(problem)
+    ui.fail("a senha não abriu os backups: confira no gerenciador de senhas e tente de novo")
+
+
 def add_machine() -> None:
     ui.note("Cada máquina que manda backups tem um usuário e duas senhas próprios. Use o nome da máquina.")
     name = ui.ask("nome da máquina", validate=server.validate_new)
-    values = server.add(name)
+    old = ""
+    ui.note(
+        "Uma máquina que está voltando (formatada, ou descadastrada antes) continua com os backups antigos se usar a "
+        "senha do repositório antiga. A senha de acesso é sempre nova: ela não criptografa nada."
+    )
+    if ui.menu("Essa máquina", ["É nova (gera as duas senhas)", "Está voltando (usa a senha do repositório antiga)"]) == 1:
+        if not server.existing(name):
+            ui.warn(f"não há backups de {name} nas pastas de destino: confira o nome (a senha antiga só é conferida se houver)")
+        old = _old_password(name)
+    values = server.add(name, old)
     server.restart()
     ui.ok(f"máquina {name} cadastrada")
     _show(name, values)

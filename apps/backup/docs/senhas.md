@@ -29,13 +29,17 @@ Em qualquer app, **Gerenciar → <app> → Restaurar uma versão**:
 Uma máquina nova (ou formatada), com o mesmo nome da antiga:
 
 1. Instale o Astroverso (clone o repositório e rode `./astroverso`).
-2. Instale o app **backup** e escolha **Só manda os backups dos apps dela para o servidor de outra máquina**. Cole o
-   código de ligação (de **Mostrar os dados de uma máquina** no servidor) e as duas senhas do gerenciador de senhas.
-3. Para cada app que existia na máquina: instale o app e use **Restaurar uma versão**.
+2. No servidor, se a máquina continua cadastrada, use **Mostrar os dados de uma máquina**. Se foi descadastrada, use
+   **Adicionar uma máquina** com o mesmo nome, escolha **Está voltando** e digite a senha do repositório antiga: o
+   servidor confere que ela abre os backups que já existem e só gera uma senha de acesso nova.
+3. Na máquina, instale o app **backup** e escolha **Só manda os backups dos apps dela para o servidor de outra
+   máquina**. Cole o código de ligação, a senha de acesso e a senha do repositório antiga.
+4. Para cada app que existia na máquina: instale o app e use **Restaurar uma versão**.
 
-Se a máquina perdida era a do **servidor**, restaure primeiro o app `backup` no modo servidor com as mesmas pastas de
-destino e cadastre as máquinas de novo com **Adicionar uma máquina**. Os
-repositórios continuam lá; as senhas novas de acesso não mudam as senhas dos repositórios, que vêm do gerenciador.
+Se a máquina perdida era a do **servidor**, instale o app `backup` no modo servidor com as mesmas pastas de destino:
+ao achar backups da própria máquina nelas, ele pede a senha do repositório antiga em vez de gerar outra. Depois,
+cadastre as outras máquinas com **Adicionar uma máquina → Está voltando**, cada uma com a senha antiga dela. Sem a
+senha antiga, a máquina recomeça do zero (os backups antigos ficam na pasta, mas ninguém os abre).
 
 ## Abrir um backup à mão (sem o Astroverso)
 

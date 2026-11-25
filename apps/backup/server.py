@@ -116,9 +116,9 @@ def _write_htpasswd() -> None:
     htpasswd().chmod(0o644)
 
 
-def add(name: str) -> dict[str, str]:
+def add(name: str, repo_password: str = "") -> dict[str, str]:
     clients_folder().mkdir(mode=0o700, exist_ok=True)
-    values = {"PASSWORD": secrets.token_urlsafe(24), "REPO_PASSWORD": secrets.token_urlsafe(32)}
+    values = {"PASSWORD": secrets.token_urlsafe(24), "REPO_PASSWORD": repo_password or secrets.token_urlsafe(32)}
     config.write_env(clients_folder() / f"{name}.env", values)
     _write_htpasswd()
     return values
@@ -362,5 +362,18 @@ def ago(moment: datetime) -> str:
 def validate_new(value: str) -> str:
     value = validate.name(value)
     if value in clients():
-        raise ValueError(f"a máquina {value} já está cadastrada")
+        raise ValueError(f"a máquina {value} já está cadastrada (os dados dela estão em Mostrar os dados de uma máquina)")
     return value
+
+
+def existing(name: str) -> list[Path]:
+    return [repository(item, name) for item in destinations()
+            if reachable(item) and (repository(item, name) / "config").exists()]
+
+
+def check_password(name: str, password: str) -> str:
+    for path in existing(name):
+        code, _ = run.output(["restic", "cat", "config", "--no-lock"], env={"RESTIC_REPOSITORY": str(path), "RESTIC_PASSWORD": password}, timeout=60)
+        if code:
+            return f"essa senha não abre os backups de {name} em {path.parent}"
+    return ""
