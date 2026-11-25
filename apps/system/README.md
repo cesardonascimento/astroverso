@@ -31,6 +31,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | `~/.ssh/authorized_keys` gerado a partir de `~/.astroverso/system/ssh-keys.json` | Só os PCs da lista entram sem senha; a lista tem um nome por chave | |
 | `~/.ssh/id_ed25519` (só se você pedir a chave para o GitHub) | A chave desta máquina para baixar e atualizar repositórios por SSH | |
 | `~/.astroverso/system/.env` (`CHANGE_<ID>=yes/no`) | As respostas da instalação, para o Reinstalar | |
+| Unidades do usuário `astroverso-system-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
 
 ## Fora da máquina (passos seus)
 
@@ -46,6 +47,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | Mudanças no sistema | Checklist com as mudanças aplicadas marcadas; marcar aplica, desmarcar desfaz (as ⚠ pedem confirmação) |
 | Chaves SSH autorizadas | Lista, adiciona (cole a chave pública do PC) e remove chaves |
 | Chave desta máquina para o GitHub | Cria a chave (se faltar), mostra a parte pública e confere o acesso |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
 
 ## Remover
 

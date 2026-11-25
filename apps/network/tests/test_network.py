@@ -124,6 +124,7 @@ class NetworkTest(unittest.TestCase):
             mock.patch.object(tailscale, "net", fake_net),
             mock.patch.object(network, "net", fake_net),
             mock.patch.object(network.watch, "install"),
+            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(network.watch, "remove"),
             mock.patch.object(network.watch, "summary"),
             mock.patch.object(tailscale.time, "sleep"),
@@ -145,7 +146,7 @@ class NetworkTest(unittest.TestCase):
 
     def test_fresh_install(self) -> None:
         system = self.use(FakeSystem(approve_after=4))
-        outcome = run_in_pty(lambda: (network.install(), system.calls)[1], [b"\n", b"\n", b"n\n"], columns=120)
+        outcome = run_in_pty(lambda: (network.install(), system.calls)[1], [b"\n", b"\n", b"n\n", b"\n"], columns=120)
         calls = [tuple(call) for call in outcome.result]
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertEqual(calls[:4], [("sudo_prepare",), ("install", "tailscale"), ("enable", "tailscaled"), ("open", "41641/udp")])
@@ -164,14 +165,14 @@ class NetworkTest(unittest.TestCase):
         self.assertIn("pc está por relay", screen)
         self.assertNotIn("celular está por relay", screen)
         self.assertIn("celular", screen)
-        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "CHANGE_TAILSCALE_PORT": "yes", "ROUTER_FORWARD": "no"})
+        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "CHANGE_TAILSCALE_PORT": "yes", "ROUTER_FORWARD": "no", "CHANGE_BACKUP": "yes"})
         self.assertIn("Liberar a porta 41641/udp do Tailscale no firewall? [S/n]", screen)
         self.assertIn("Verificação de hora em hora", screen)
 
     def test_already_connected_and_reuse(self) -> None:
         system = self.use(FakeSystem(installed=True, running=True, approve_after=0))
         system.prefs = {"AdvertiseRoutes": ["192.168.0.10/32"], "RouteAll": True, "OperatorUser": "dono"}
-        config.save("network", {"ROUTER_FORWARD": "yes", "CHANGE_TAILSCALE_PORT": "yes"})
+        config.save("network", {"ROUTER_FORWARD": "yes", "CHANGE_TAILSCALE_PORT": "yes", "CHANGE_BACKUP": "yes"})
         outcome = run_in_pty(lambda: (network.install(reuse=True), system.calls)[1], [], columns=120)
         calls = [tuple(call) for call in outcome.result]
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -182,11 +183,11 @@ class NetworkTest(unittest.TestCase):
 
     def test_approval_left_pending(self) -> None:
         self.use(FakeSystem(approve_after=99))
-        outcome = run_in_pty(lambda: network.install(reuse=False), [b"\n", b"n\n", b"s\n"], columns=120)
+        outcome = run_in_pty(lambda: network.install(reuse=False), [b"\n", b"n\n", b"s\n", b"\n"], columns=120)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("aprovação pendente", outcome.screen)
         self.assertIn("falta aprovar no painel", outcome.screen)
-        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "CHANGE_TAILSCALE_PORT": "yes", "ROUTER_FORWARD": "yes"})
+        self.assertEqual(config.load("network"), {"SERVER_IP": "192.168.0.10", "CHANGE_TAILSCALE_PORT": "yes", "ROUTER_FORWARD": "yes", "CHANGE_BACKUP": "yes"})
 
     def test_remove(self) -> None:
         system = self.use(FakeSystem(installed=True, running=True))
@@ -225,7 +226,7 @@ class NetworkTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.use(FakeSystem(installed=True, running=True))
-        self.assertEqual([action.id for action in network.actions()], ["summary", "changes", "reconnect", "router", "devices", "reload", "router-dns", "watch"])
+        self.assertEqual([action.id for action in network.actions()], ["summary", "changes", "reconnect", "router", "devices", "reload", "router-dns", "watch", "backup-now", "restore-version"])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             tailscale.mark_router()
         self.assertEqual(config.load("network"), {"ROUTER_FORWARD": "yes"})

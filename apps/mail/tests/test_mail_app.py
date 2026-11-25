@@ -154,6 +154,7 @@ class MailAppTest(unittest.TestCase):
             mock.patch.object(mailbox, "container", self.box),
             mock.patch.object(mailbox, "run", fake_run),
             mock.patch.object(app, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change("watch", a[1], a[2], lambda: False, lambda: None, lambda: None)),
             mock.patch.object(mailbox.time, "sleep"),
         ):
@@ -162,7 +163,7 @@ class MailAppTest(unittest.TestCase):
 
     def test_server_install(self) -> None:
         self.cf.kv = {"inbox.1764000000000.abc-1": b"Subject: Ola\r\n\r\ncorpo\xe7\r\n", "quarentena.1764000000001.abc-2": b"Subject: spam\r\n\r\nx\r\n", "campainha": b"1"}
-        keys = [b"\r", b"\n", b"gmail.com, @Empresa.com.br\n", b"token-ruim\n", b"token-bom\n", b"\n", b"\n", b"n\n"]
+        keys = [b"\r", b"\n", b"gmail.com, @Empresa.com.br\n", b"token-ruim\n", b"token-bom\n", b"\n", b"\n", b"\n", b"n\n"]
         outcome = run_in_pty(lambda: (app.install(reuse=False), self.cf.calls, [list(args) for args, _ in self.box.saved], sorted(self.cf.kv))[1:], keys, columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls, saved, left = outcome.result

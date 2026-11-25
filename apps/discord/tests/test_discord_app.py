@@ -116,6 +116,7 @@ class DiscordAppTest(unittest.TestCase):
             mock.patch.object(server, "health", return_value={"ok": True, "clientes": {"servidor": {"visto_ha_s": 30}}}),
             mock.patch.object(server.time, "sleep"),
             mock.patch.object(app.agent, "install"),
+            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.agent, "remove"),
             mock.patch.object(client.units, "active", return_value=True),
             mock.patch.object(discord, "whoami", side_effect=self.whoami),
@@ -134,7 +135,7 @@ class DiscordAppTest(unittest.TestCase):
 
     def test_server_install(self) -> None:
         host = self.use(FakeHost())
-        keys = [b"\r", b"token-ruim\n", b"token-bom\n", b"\n", b"\n"]
+        keys = [b"\r", b"token-ruim\n", b"token-bom\n", b"\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(), host.calls, self.sent)[1:], keys, columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls, sent = outcome.result
@@ -164,7 +165,7 @@ class DiscordAppTest(unittest.TestCase):
 
     def test_reuse_asks_nothing(self) -> None:
         host = self.use(FakeHost())
-        config.save("discord", {"MODE": "server", "DISCORD_TOKEN": "token-bom", "DISCORD_GUILD": GUILD, "DISCORD_USERS": OWNER})
+        config.save("discord", {"MODE": "server", "DISCORD_TOKEN": "token-bom", "DISCORD_GUILD": GUILD, "DISCORD_USERS": OWNER, "CHANGE_BACKUP": "yes"})
         server._discord.guild_checks = 5
         outcome = run_in_pty(lambda: app.install(reuse=True), [], columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -175,23 +176,23 @@ class DiscordAppTest(unittest.TestCase):
 
     def test_client_install(self) -> None:
         self.use(FakeHost())
-        keys = [b"\x1b[B", b"\r", b"\n", b"chave-ruim\n", b"\n", b"chave-boa\n"]
+        keys = [b"\x1b[B", b"\r", b"\n", b"chave-ruim\n", b"\n", b"chave-boa\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(), self.sent)[1], keys, columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertEqual(config.load("discord"), {"MODE": "client"})
+        self.assertEqual(config.load("discord"), {"MODE": "client", "CHANGE_BACKUP": "yes"})
         self.assertEqual(discord.settings(), {"DISCORD_URL": "https://discord.casa.com", "DISCORD_KEY": "chave-boa"})
         self.assertIn("o bot não aceitou: 401 chave inválida", outcome.screen)
         self.assertIn("ligada ao bot como servidor", outcome.screen)
         self.assertEqual(outcome.result[0][:2], ["discord", "sucesso"])
         self.assertNotIn("chave-boa", outcome.screen)
-        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent"])
+        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent", "backup-now", "restore-version"])
 
     def test_add_client_and_actions(self) -> None:
         host = self.use(FakeHost())
         config.save("discord", {"MODE": "server"})
         with mock.patch.object(sys, "stdout", io.StringIO()):
             server._ensure_keys(["servidor"])
-        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent", "key", "add-client"])
+        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent", "backup-now", "restore-version", "key", "add-client"])
         outcome = run_in_pty(lambda: (server.add_client(), host.calls)[1], [b"servidor\n", b"studio\n"], columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("o cliente servidor já existe", outcome.screen)

@@ -129,6 +129,7 @@ class SystemTest(unittest.TestCase):
             mock.patch.object(ssh.run, "output", side_effect=output),
             mock.patch.object(ssh.run, "succeeds", return_value=True),
             mock.patch.object(ssh.getpass, "getuser", return_value="dono"),
+            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)
@@ -195,7 +196,7 @@ class SystemTest(unittest.TestCase):
             return self.system.calls
 
         self.github = True
-        keys = [b"\n"] * 9
+        keys = [b"\n"] * 10
         with mock.patch.object(ssh, "_import"), mock.patch.object(ssh.run, "cmd", side_effect=lambda args, **_: self._keygen(args)):
             outcome = run_in_pty(scenario, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -206,7 +207,7 @@ class SystemTest(unittest.TestCase):
         saved = config.load("system")
         self.assertEqual({key: value for key, value in saved.items() if key.startswith("CHANGE_")}, {
             "CHANGE_POWER_SLEEP": "yes", "CHANGE_POWER_LID": "yes", "CHANGE_POWER_KEYS": "yes", "CHANGE_POWER_BLANK": "yes",
-            "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes",
+            "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes", "CHANGE_BACKUP": "yes",
         })
 
     def _keygen(self, args) -> None:
@@ -237,7 +238,7 @@ class SystemTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("keys", False), ("github", False)])
+                         [("summary", True), ("changes", False), ("keys", False), ("github", False), ("backup-now", True), ("restore-version", False)])
 
 
 if __name__ == "__main__":

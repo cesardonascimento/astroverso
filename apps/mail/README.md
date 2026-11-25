@@ -81,6 +81,7 @@ No modo **só envio**, pergunta o endereço e a chave de envio e os confere no W
 | `~/.astroverso/mail.env` (`600`, `MAIL_URL`, `MAIL_KEY`) | Liga esta máquina ao envio: é o que o `kit.mail` usa |
 | ⚠ Unidades do usuário `astroverso-mail-fetch.timer` e `.service` (perguntada) | A busca dos e-mails; sem ela, eles ficam na Cloudflare |
 | Unidades do usuário `astroverso-mail-watch.timer` e `.service` (perguntada) | A verificação de hora em hora |
+| Unidades do usuário `astroverso-mail-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` |
 
 Na Cloudflare (pela API, com o seu token): o Email Routing do domínio (MX e SPF), o KV e o Worker `astroverso-mail`,
 o subdomínio `workers.dev` da conta (se faltava) e a regra do endereço.
@@ -106,6 +107,7 @@ o subdomínio `workers.dev` da conta (se faltava) e a regra do endereço.
 | Limpar Workers e KV antigos da Cloudflare | Lista os da conta, menos os deste app, e apaga os marcados |
 | Enviar um e-mail de teste | Pelo `kit.mail`, para um destinatário confirmado (em qualquer modo) |
 | Mudanças no sistema / Verificar agora | Como nos outros apps |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
 

@@ -113,6 +113,7 @@ class NextcloudTest(unittest.TestCase):
             mock.patch.object(nextcloud, "DEFAULT_FILES", self.home / "Nextcloud"),
             mock.patch.object(nextcloud.time, "sleep"),
             mock.patch.object(app.accounts, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change(
                 "watch", a[1], a[2], lambda: False, lambda: self.host.record("watch_on"), lambda: self.host.record("watch_off"))),
         ):
@@ -120,7 +121,7 @@ class NextcloudTest(unittest.TestCase):
             self.addCleanup(patch.stop)
 
     def test_fresh_install(self) -> None:
-        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n"]
+        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(reuse=False), self.host.calls)[1], keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]
@@ -144,7 +145,7 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual((nextcloud.secrets_folder() / "db_password").stat().st_mode & 0o777, 0o644)
 
     def test_reinstall_asks_nothing(self) -> None:
-        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes"})
+        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes", "CHANGE_BACKUP": "yes"})
         (nextcloud.html() / "config").mkdir(parents=True)
         (nextcloud.html() / "config" / "config.php").write_text("<?php")
         outcome = run_in_pty(lambda: (app.install(reuse=True), self.host.calls)[1], [], columns=160)
@@ -229,7 +230,7 @@ class NextcloudTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True)])
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True), ("backup-now", True), ("restore-version", False)])
 
 
 if __name__ == "__main__":

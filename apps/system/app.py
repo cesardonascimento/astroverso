@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from kit import backup as kit_backup
 from kit import changes, config, ui
 from kit.app import Action
 
@@ -13,7 +14,7 @@ DESCRIPTION = "Configurações da máquina: sempre ligada (energia) e acesso rem
 
 
 def items() -> list[changes.Change]:
-    return power.items() + ssh.items()
+    return power.items() + ssh.items() + [kit_backup.change(APP)]
 
 
 def status() -> bool:
@@ -31,6 +32,7 @@ def install(reuse: bool | None = None) -> None:
     ui.step("SSH: acesso remoto")
     changes.install(APP, ssh.items(), again)
     ssh.install(again)
+    changes.install(APP, [kit_backup.change(APP)], again)
     summary()
 
 
@@ -76,4 +78,6 @@ def actions() -> list[Action]:
         Action("changes", "Mudanças no sistema", manage),
         Action("keys", "Chaves SSH autorizadas", ssh.manage_keys),
         Action("github", "Chave desta máquina para o GitHub", ssh.github),
+        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
     ]

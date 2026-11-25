@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from kit import backup as kit_backup
 from kit import changes, config, container, docs, routes, ui, validate, watch
 from kit.app import Action
 
@@ -26,6 +27,7 @@ def items() -> list[changes.Change]:
             "arquivos, e avisa no Discord quando algo quebra e quando volta ao normal.",
             "o Nextcloud",
         ),
+        kit_backup.change(APP),
     ]
 
 
@@ -181,4 +183,6 @@ def actions() -> list[Action]:
         Action("repair", "Reparar o Nextcloud", repair, remote=True, confirm=True),
         Action("mailboxes", "Atualizar as contas de e-mail", accounts.sync, remote=True),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
+        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
     ]

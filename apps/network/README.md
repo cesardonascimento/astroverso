@@ -59,6 +59,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/network/watch.json` | Os avisos em aberto, para não repetir o mesmo aviso a cada hora |
 | Pasta `~/.astroverso/routes/` (`700`), se ainda não existir | Onde os apps publicam os endereços deles (`kit.routes`); não é de nenhum app e fica no `remove` |
 | Painel do AdGuard só por `https://adguard.<domínio>` (a porta 8080 não é aberta na rede) | Com login e cadeado; a 8080 só é alcançada pelo Caddy |
+| Unidades do usuário `astroverso-network-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` |
 
 ### Mudanças perguntadas
 
@@ -103,6 +104,7 @@ frase e o link para o doc no GitHub, para abrir no navegador.
 | Endereços de aparelhos da rede | Lista, cria e remove endereços `https://<nome>.<domínio>` para painéis de aparelhos da casa (IP, porta, HTTP ou HTTPS); o Caddy recarrega sem reiniciar |
 | Verificar a rede agora (e avisar no Discord) | Roda na hora a verificação de hora em hora (abaixo) |
 | Recarregar os endereços do Caddy | Regera o Caddyfile (inclusive com os endereços publicados por outros apps em `~/.astroverso/routes/`) e recarrega. Normalmente não é preciso: a unidade `astroverso-network-routes.path` faz isso sozinha |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
 
