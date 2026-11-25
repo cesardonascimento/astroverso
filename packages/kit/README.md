@@ -74,8 +74,8 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 | Serviços do sistema | `service_active(nome)`, `service_enable(nome)` (agora e no boot), `service_disable(nome)` |
 | Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_allowed(item)` (liberado, inclusive dentro de uma faixa; verdadeiro sem firewall), `firewall_masquerade(ligado)` |
 | sysctl | `sysctl_set(nome, valores)` (`/etc/sysctl.d/99-astroverso-<nome>.conf`, aplicado na hora), `sysctl_remove(nome)` |
-| Arquivos do sistema | `file_put(caminho, conteúdo)` (com `sudo`, só se mudou; devolve se mudou), `file_drop(caminho)` |
-| systemd | `units_mask(nomes)`, `units_unmask(nomes)`, `units_masked(nomes)`; `unit_install(nome, conteúdo)` (em `/etc/systemd/system`, liga e reinicia), `unit_remove(nome)`, `unit_enabled(nome)`; `reload_service(nome)` (`reload`, ou `HUP`) |
+| Arquivos do sistema | `file_put(caminho, conteúdo, mode=)` (com `sudo`, só se mudou; devolve se mudou; `mode` acerta a permissão), `file_drop(caminho)` |
+| systemd | `units_mask(nomes)`, `units_unmask(nomes)`, `units_masked(nomes)`; `unit_install(nome, conteúdo)` (em `/etc/systemd/system`, liga e reinicia), `unit_remove(nome)`, `unit_enabled(nome)`; `daemon_reload()`; `reload_service(nome)` (`reload`, ou `HUP`) |
 | Firewall por origem | `firewall_limit(serviço, origens)` (regras ricas só das origens, e tira o serviço aberto para todos; as regras entram antes), `firewall_unlimit(serviço, origens)`, `firewall_limited(serviço, origens)` |
 
 - Tudo é idempotente: só age, e só mostra um ✔, quando algo muda.
@@ -86,6 +86,20 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
   parte uma faixa.
 - `sysctl_remove` apaga o arquivo e reaplica os outros; o valor em uso só volta ao padrão por completo depois de
   reiniciar.
+
+## disks
+
+Os discos de dados da máquina, montados pelo app `disks` em `/srv/<nome>`. Só leitura: a fonte é o próprio
+`/etc/fstab` (as linhas depois de `# astroverso <uuid>`, reconhecidas também quando o udisks as separa da marca), não
+a pasta de um app.
+
+| Função | O que faz |
+|---|---|
+| `mounts()` | Os discos cadastrados: `Disk(uuid, path, fstype, line)`, com `name` (o nome da pasta) |
+| `mounted(caminho)` | Se há algo montado nesse caminho (`findmnt`) |
+| `responds(caminho)` | Montado, com o aparelho por baixo presente e a pasta lida em até 20 s (pega o disco preso depois de uma queda da conexão) |
+| `containing(caminho)` / `available(caminho)` | O disco onde fica uma pasta; se ela está num disco que responde (verdadeiro fora dos discos) |
+| `usage(caminho)` | `(usado, total)` em bytes |
 
 ## config
 

@@ -211,7 +211,7 @@ def sysctl_remove(name: str) -> None:
     ui.ok(f"ajuste do sistema {path.name} removido (volta ao padrão por completo depois de reiniciar)")
 
 
-def file_put(path: Path, content: str) -> bool:
+def file_put(path: Path, content: str, mode: int | None = None) -> bool:
     try:
         if path.read_text() == content:
             return False
@@ -219,6 +219,8 @@ def file_put(path: Path, content: str) -> bool:
         pass
     run.cmd(["mkdir", "-p", str(path.parent)], sudo=True)
     _write(path, content)
+    if mode is not None:
+        run.cmd(["chmod", f"{mode:o}", str(path)], sudo=True)
     return True
 
 
@@ -264,6 +266,10 @@ def unit_remove(name: str) -> None:
 
 def unit_enabled(name: str) -> bool:
     return (SYSTEMD / name).exists() and _service_enabled(name)
+
+
+def daemon_reload() -> None:
+    run.cmd(["systemctl", "daemon-reload"], sudo=True)
 
 
 def reload_service(name: str) -> None:

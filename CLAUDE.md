@@ -131,7 +131,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   máquina, endereço pelo `kit.routes`. Sem tema do Astroverso (decisão do usuário: o logo fica só no projeto por
   enquanto).
 - Pasta dos arquivos padrão `~/Nextcloud`, do `www-data` do container (`podman unshare chown 33:33`). Os discos da
-  máquina entram depois, pelo `kit.disks`, como armazenamento externo.
+  máquina (app `disks`) entram depois, pelo `kit.disks`, como armazenamento externo.
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
 - `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.backup`.
@@ -157,8 +157,33 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   são os próprios apps (decisão do usuário: "cada app manda a própria config").
 - A senha do repositório de cada máquina vai para o gerenciador de senhas do usuário; o backup do próprio app não
   leva as senhas.
-- Os outros trabalhos do rclone antigo (espelho dos discos, sincronização com a nuvem, cópia do Windows) ficam para
-  outra conversa.
+- Próximos passos combinados com o usuário:
+  - **Backup dos dados** no app `backup`, pelo mesmo restic (substitui o espelho antigo): ação "Pastas e discos",
+    todo dia, tag `dados:<nome>`, trava pelo `kit.disks.available`, `podman unshare` para os arquivos de containers,
+    mesma regra de versões das configurações. Cada item tem "também fora de casa" (configurações: sim; dados:
+    perguntado, padrão não); no domingo, depois da manutenção, o servidor faz `restic copy` só das versões marcadas
+    para `<pasta dos backups>/fora-de-casa/<máquina>`, uma pasta que o usuário põe onde quiser (ex.: numa pasta
+    sincronizada com a nuvem).
+  - **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo
+    cliente. Windows: script PowerShell (Instalar e Remover) gerado pela ação "Preparar um PC sem Astroverso", com o
+    restic nativo, `--use-fs-snapshot` (VSS), tarefa agendada e o passo a passo em `docs/windows.md`; quem avisa no
+    `#backup` é o servidor. A cópia antiga do `V:` do Windows vira isso.
+  - **App `cloud`** (rclone): sincronizações de duas vias (`bisync`) e envios de uma via, cadastrados pelo
+    gerenciador. O destino é escolha do usuário, sem regra automática; os seletores de pasta só marcam as pastas
+    ligadas a uma nuvem (o `cloud` publica as dele numa pasta de contrato).
+- Sem prioridade mínima (`Nice`, `ionice`) nos backups e sincronizações: a máquina não divide mais o hardware.
+
+### App `disks`
+
+- Monta os discos de dados em `/srv/<nome>` pelo `fstab`/`crypttab` (linhas depois de `# astroverso <uuid>`), sempre
+  só do usuário (decisão do usuário: sem o modo compartilhado do antigo, que existia para o usuário dos jogos).
+  Formatar disco fica no Cockpit.
+- **Nada pode pedir senha no boot**: LUKS só pelo TPM (PCR 7), com a senha digitada uma vez; sem TPM, o disco fica
+  de fora.
+- Cada disco cadastrado (`~/.astroverso/disks/disks.json`) é uma Change ⚠: desfazer só desmonta e tira as linhas;
+  descadastrar em "Discos da máquina" também descadastra o TPM.
+- Os outros apps leem pelo `kit.disks` (o `fstab` é o contrato): `mounts()`, `available(pasta)`.
+- Verificação de hora em hora: não montado, preso (não responde) e 90% ocupado.
 
 ### Mudanças no sistema
 
@@ -175,8 +200,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado
   for perdido). O `remove` não desliga o `sshd` nem apaga o `authorized_keys`.
 - `~/.ssh/authorized_keys` é gerado a partir de `~/.astroverso/system/ssh-keys.json` (nome do PC + chave).
-- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura, Wake-on-LAN,
-  discos) ficam para depois do refactor, para o usuário revisar com calma.
+- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura, Wake-on-LAN)
+  ficam para depois do refactor, para o usuário revisar com calma.
 
 ### Pacotes previstos
 
@@ -186,6 +211,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   `astroverso <app> <comando>`. Contrato do `app.py` em `apps/README.md`.
 - `kit.backup`: o backup de cada app no servidor do app `backup` (restic), com avisos no `#backup`.
 - `kit.discord`: avisos dos apps no Discord (o bot é o app `discord`).
+- `kit.disks`: os discos de dados montados pelo app `disks` (só leitura, a partir do `fstab`).
 
 Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 
@@ -222,5 +248,23 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - A imagem do Nextcloud pede `StopSignal=SIGWINCH` (do Apache); o container do cron (`crond`) ignora e é morto em
   10 s, marcando a unidade como falha: o cron usa `stop_signal="SIGTERM"`.
 - Duas unidades que usam a mesma imagem: remover todos os containers antes das imagens.
+- Discos (trazido do antigo):
+  - Com Secure Boot, o IMA registra no TPM cada módulo carregado no boot, e o desbloqueio pelo TPM recebe
+    `TPM_RC_PCR_CHANGED` até o boot acalmar (~1 min): a montagem LUKS espera o `systemd-cryptsetup@` (5 min) em vez
+    de 10 s pelo dispositivo.
+  - Propagação `rslave` não leva para dentro do container uma montagem feita depois que ele subiu: o disco monta
+    antes do `user@<uid>.service`.
+  - `nofail` tira a ordem do disco antes do `local-fs.target`; `x-systemd.wanted-by=` anula o `nofail`. Para remontar
+    ao religar, links em `/etc/systemd/system/<dispositivo>.device.wants/` (no LUKS, a montagem fica no `.wants` do
+    `systemd-cryptsetup@`).
+  - O rótulo de um LUKS fica dentro da criptografia: o app o copia para o cabeçalho LUKS2.
+  - O udisks (Cockpit) regrava as linhas que edita e pode separá-las da marca: as linhas são reconhecidas pela
+    assinatura (`x-udisks-auth` + `container_file_t` em `/srv/`; `luks-*` com `headless=true`) e emparelhadas pelo UUID.
+  - Um LUKS em uso que desconecta e volta (gaveta USB) fica preso ao aparelho que sumiu: a pasta continua montada,
+    mas toda leitura dá `Input/output error` até reiniciar. O `kit.disks.responds` detecta.
+  - Sem o disco montado, `/srv/<nome>` é uma pasta vazia e imutável, sem erro: quem grava ou faz backup confere antes.
+  - O `ntfs3` usa a permissão gravada no disco; um NTFS desligado sem fechar (inicialização rápida do Windows) não
+    monta até `ntfsfix -d`.
+  - Com ACL, o `chmod` mexe na máscara: pasta com ACL usa `770`.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.

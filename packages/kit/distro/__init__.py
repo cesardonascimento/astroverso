@@ -105,8 +105,8 @@ def sysctl_remove(name: str) -> None:
     backend().sysctl_remove(name)
 
 
-def file_put(path: Path, content: str) -> bool:
-    return bool(backend().file_put(path, content))
+def file_put(path: Path, content: str, mode: int | None = None) -> bool:
+    return bool(backend().file_put(path, content, mode))
 
 
 def file_drop(path: Path) -> bool:
@@ -135,6 +135,10 @@ def unit_remove(name: str) -> None:
 
 def unit_enabled(name: str) -> bool:
     return bool(backend().unit_enabled(name))
+
+
+def daemon_reload() -> None:
+    backend().daemon_reload()
 
 
 def reload_service(name: str) -> None:
