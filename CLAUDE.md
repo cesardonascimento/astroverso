@@ -121,12 +121,13 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 
 ## Nada pessoal no código nem na documentação
 
-- Domínio, IPs, nomes de máquina, fuso, contas e e-mails **não podem aparecer** no código, nos READMEs nem neste
-  arquivo. Vêm das perguntas da instalação (gravadas em `~/.astroverso/`) ou são detectados.
+- O repositório será público. Domínio, IPs, nomes das máquinas da casa, fuso, contas e e-mails **não podem
+  aparecer** no código, nos testes, nos READMEs, nas mensagens de commit nem neste arquivo, nem como exemplo.
+  Vêm das perguntas da instalação (gravadas em `~/.astroverso/`) ou são detectados.
 - Exemplos usam marcadores: `<seu-domínio>`, `<domínio>`, `<ip>`, `<rede>`, `<nome-da-máquina>`.
 - Valores padrão neutros quando nada é detectado (ex.: fuso `UTC`).
-- Antes de cada commit, conferir com `git grep -nE '<domínio real>|<IP real>|<nome da máquina>'` usando os
-  valores do `CLAUDE.local.md`.
+- Antes de cada commit, conferir com `git grep -nE '<domínio real>|<IP real>|<nomes das máquinas>'` usando os
+  valores do `CLAUDE.local.md` (o nome de todas as máquinas citadas lá), e reler a mensagem do commit.
 
 ## Regras de segurança ao testar
 
