@@ -134,6 +134,18 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
 - `backup`/`restore` implementados (dump SQL + `config/`), sem a rotina de backup ainda.
 
+### App `mail`
+
+- Caixa só de entrada para automações (Cloudflare Email Routing → Worker `astroverso-mail` → KV → busca de 5 em 5 min
+  com "campainha" → Dovecot `astroverso-mail`) e envio agnóstico pelo mesmo Worker (`kit.mail.send`, de qualquer
+  máquina com o endereço e a chave; só para destinatários confirmados na conta da Cloudflare).
+- Modos: caixa (uma máquina) e só envio. Token próprio da Cloudflare com sete permissões (`docs/cloudflare.md`).
+- A caixa é publicada em `~/.astroverso/mailboxes/` (`kit.mailboxes`); o Nextcloud cria a conta no Mail sozinho
+  (decisão do usuário: apps separados, ligados pelo contrato, como o Caddy e os endereços).
+- O Remover não apaga os e-mails da caixa sem confirmação (padrão não).
+- Recursos antigos da Cloudflare não têm nome no código: a ação "Limpar Workers e KV antigos" lista os da conta e
+  apaga os marcados.
+
 ### Mudanças no sistema
 
 - Toda mudança de um app no sistema, por menor que seja, é um `kit.changes.Change`: perguntada na instalação (padrão
