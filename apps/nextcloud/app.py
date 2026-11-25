@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
 from kit import backup as kit_backup
-from kit import changes, config, container, docs, folders, routes, ui, validate, watch
+from kit import changes, config, container, disks, docs, folders, routes, ui, validate, watch
 from kit.app import Action
 
 from . import accounts
@@ -84,6 +85,8 @@ def install(reuse: bool | None = None) -> None:
     )
     first = not nextcloud.created()
     password = _ask(again)
+    if disks.containing(nextcloud.files()) and not disks.available(nextcloud.files()):
+        ui.fail(f"o disco da pasta dos arquivos ({nextcloud.files()}) não está montado ou não responde: confira no app disks")
     container.prepare()
     nextcloud.prepare_secrets()
     nextcloud.prepare_files(nextcloud.files())
@@ -124,6 +127,47 @@ def restore(folder: Path) -> None:
     nextcloud.occ("maintenance:data-fingerprint")
 
 
+def _origin(value: str) -> str:
+    path = Path(value.strip()).expanduser()
+    if not path.is_dir():
+        raise ValueError("essa pasta não existe")
+    data = nextcloud.files().resolve()
+    real = path.resolve()
+    if real in (Path.home().resolve(), Path("/")) or real == data or data in real.parents or real in data.parents:
+        raise ValueError("escolha uma pasta fora da pasta dos arquivos do Nextcloud (e que não a contenha)")
+    return str(path)
+
+
+def _name(value: str) -> str:
+    value = value.strip()
+    if not value or "/" in value or value in (".", ".."):
+        raise ValueError("um nome de pasta, sem /")
+    return value
+
+
+def bring_folder() -> None:
+    if not nextcloud.installed():
+        ui.fail("o Nextcloud precisa estar no ar")
+    ui.note(
+        "Move uma pasta da máquina para dentro dos arquivos de um usuário do Nextcloud (ex.: o conteúdo de um disco que você "
+        "só vai usar pelo Nextcloud). A pasta sai de onde está: depois, ela só é usada pelo Nextcloud, com lixeira e versões."
+    )
+    source = Path(folders.pick("pasta para trazer", validate=_origin))
+    user = ui.ask("para o usuário", default=nextcloud.admin(), validate=validate.name)
+    if not nextcloud.user_exists(user):
+        ui.fail(f"o Nextcloud não tem o usuário {user}")
+    name = ui.ask("nome da pasta no Nextcloud", default=source.name, validate=_name)
+    target = nextcloud.files() / user / "files" / name
+    if os.path.lexists(target):
+        ui.fail(f"o usuário {user} já tem uma pasta {name}: escolha outro nome")
+    if os.stat(source).st_dev != os.stat(nextcloud.files()).st_dev:
+        ui.warn("a pasta está em outro disco: ela é copiada e depois apagada da origem, o que pode demorar")
+    if not ui.confirm(f"Mover {source} para o Nextcloud de {user}, em /{name}?", default=False):
+        return
+    nextcloud.bring(source, user, name)
+    ui.ok(f"{source} agora é /{name} no Nextcloud de {user}")
+
+
 def summary() -> None:
     ui.step("Resumo do Nextcloud")
     state = nextcloud.status() if nextcloud.installed() else {}
@@ -154,6 +198,10 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
     stopped = [spec.name for spec in nextcloud.specs() if not container.active(spec.name)]
     if stopped:
         found["containers"] = watch.Problem("erro", "Nextcloud parado", f"Containers parados: {', '.join(stopped)}.")
+        return found
+    if not disks.available(nextcloud.files()):
+        found["disk"] = watch.Problem("erro", "Disco dos arquivos do Nextcloud indisponível",
+                                      f"{nextcloud.files()} está num disco desligado ou travado: o Nextcloud não abre os arquivos até ele voltar.")
         return found
     state = nextcloud.status()
     if state.get("maintenance"):
@@ -197,6 +245,7 @@ def actions() -> list[Action]:
         Action("password", "Trocar a senha do administrador", password),
         Action("repair", "Reparar o Nextcloud", repair, remote=True, confirm=True),
         Action("mailboxes", "Atualizar as contas de e-mail", accounts.sync, remote=True),
+        Action("bring", "Trazer uma pasta para o Nextcloud", bring_folder),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),

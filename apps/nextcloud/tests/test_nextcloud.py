@@ -186,6 +186,24 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual(sorted(found), ["check:Cron", "maintenance"])
         self.assertEqual(found["check:Cron"].text, "Cron parado")
 
+    def test_bring_folder(self) -> None:
+        config.save("nextcloud", {"FILES": str(self.home / "Nextcloud"), "ADMIN_USER": "dono"})
+        (self.home / "Nextcloud").mkdir()
+        source = self.home / "disco" / "proton"
+        source.mkdir(parents=True)
+        moved: list = []
+        with mock.patch.object(nextcloud, "installed", return_value=True), mock.patch.object(nextcloud, "user_exists", return_value=True), \
+                mock.patch.object(app.disks, "mounts", return_value=[]), \
+                mock.patch.object(nextcloud, "bring", side_effect=lambda src, user, name: moved.append([str(src), user, name])):
+            outcome = run_in_pty(lambda: (app.bring_folder(), moved)[1], [b"\x1b[B", b"\r", f"{self.home / 'Nextcloud'}\n".encode(), f"{source}\n".encode(), b"\n", b"Proton\n", b"s\n"], columns=200)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("escolha uma pasta fora da pasta dos arquivos do Nextcloud", outcome.screen)
+        self.assertEqual(outcome.result, [[str(source), "dono", "Proton"]])
+
+    def test_collect_disk_missing(self) -> None:
+        with mock.patch.object(app.container, "active", return_value=True), mock.patch.object(app.disks, "available", return_value=False):
+            self.assertEqual(list(app.collect({})), ["disk"])
+
     def test_validate_folder(self) -> None:
         with self.assertRaises(ValueError):
             nextcloud.validate_folder("relativa")
@@ -231,7 +249,7 @@ class NextcloudTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("watch", True), ("backup-now", True), ("restore-version", False),
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("bring", False), ("watch", True), ("backup-now", True), ("restore-version", False),
                           ("backup-files", True), ("restore-files", False)])
         self.assertEqual([item.id for item in app.items()][-2:], ["backup", "backup-files"])
 

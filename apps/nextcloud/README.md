@@ -23,7 +23,7 @@ systemd), e o cron depois do Nextcloud.
 | Endereço do Nextcloud | `nextcloud.<domínio>` |
 | Usuário administrador (só na primeira vez) | `astroverso` |
 | Senha do administrador (só na primeira vez) | sem padrão; se o Nextcloud recusar (curta, comum ou vazada), pede de novo |
-| Pasta dos arquivos (só na primeira vez) | `~/Nextcloud`; vazia ou a de um Nextcloud anterior. Escolhida pelo seletor de pastas (`kit.folders`): os discos do app `disks` com o espaço livre e a marca ☁ das pastas ligadas a uma nuvem |
+| Pasta dos arquivos (só na primeira vez) | `~/Nextcloud`; vazia ou a de um Nextcloud anterior. Escolhida pelo seletor de pastas (`kit.folders`): os discos do app `disks` com o espaço livre e a marca ☁ das pastas ligadas a uma nuvem. Para guardar tudo num disco de dados, escolha uma pasta nele (ex.: `/srv/<disco>/nextcloud`) |
 
 1. Gera a senha do banco e uma senha inicial do administrador em `~/.astroverso/nextcloud/secrets/`, lidas pelos
    containers por arquivo (`*_FILE`): nunca vão para o `.env` nem para argumentos de comando.
@@ -43,6 +43,21 @@ systemd), e o cron depois do Nextcloud.
    app `mail`), liga o app Mail do Nextcloud (instala se faltar) e cria ou atualiza no Mail do administrador a conta
    `Astroverso <Nome>`. A senha vai por variável de ambiente para um script PHP pela entrada padrão (o `occ` só aceita
    senha como argumento). Contas `Astroverso ...` cujas caixas sumiram são apagadas.
+
+## Os arquivos num disco
+
+Os arquivos ficam **dentro** do Nextcloud (a pasta dos arquivos, `<pasta>/<usuário>/files/...`), não num armazenamento
+externo: tudo passa por ele, que vê cada mudança na hora, com lixeira e versões, sem briga de donos e permissões.
+Continuam sendo arquivos normais no disco: num outro Linux, com a senha do LUKS e `sudo`, dá para abri-los sem o
+Nextcloud.
+
+- Com a pasta num disco do app `disks`, a instalação para se o disco não estiver montado, e a verificação de hora em
+  hora avisa quando ele some (o Nextcloud não abre os arquivos, mas não apaga nada).
+- **Trazer uma pasta para o Nextcloud** (ação) move uma pasta da máquina (ex.: o conteúdo de um disco) para dentro dos
+  arquivos de um usuário: `podman unshare mv` (instantâneo no mesmo disco), dono passado para o `www-data` do container
+  e `occ files:scan` só daquela pasta. Depois, ela só é usada pelo Nextcloud.
+- Sincronizar uma pasta do Nextcloud com uma nuvem (ex.: Proton Drive) é pelo app `cloud`, com o Nextcloud como conta
+  (WebDAV), nunca gravando direto na pasta dos arquivos.
 
 ## Mudanças na máquina
 
@@ -74,6 +89,7 @@ systemd), e o cron depois do Nextcloud.
 | Trocar a senha do administrador | Pede a nova senha e a aplica (pede de novo se o Nextcloud recusar) |
 | Reparar o Nextcloud | Índices do banco, reparos e a reverificação dos arquivos (`occ files:scan --all`), útil depois de copiar arquivos por fora. Também no Discord, com confirmação |
 | Verificar agora | Roda a verificação de hora em hora na hora |
+| Trazer uma pasta para o Nextcloud | Move uma pasta da máquina para os arquivos de um usuário e a cataloga (veja "Os arquivos num disco") |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
 | Fazer backup dos arquivos agora / Restaurar os arquivos de uma versão | Backup da pasta dos arquivos na hora (também no Discord) e restauração de uma versão numa pasta nova, sem mexer na pasta do Nextcloud (depois, copie dela o que precisar e rode Reparar o Nextcloud) |
 
@@ -88,6 +104,7 @@ Nextcloud** e **Verificar de novo**:
 | Nextcloud em manutenção | aviso |
 | Erro na verificação do próprio Nextcloud (`occ setupchecks`) | aviso, um por erro |
 | Pasta dos arquivos com menos de 10% livre | aviso |
+| Disco da pasta dos arquivos desligado ou travado (`kit.disks`) | erro |
 
 ## Backup
 

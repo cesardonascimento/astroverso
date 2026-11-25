@@ -13,10 +13,10 @@ from pathlib import Path
 
 from kit import clouds, config, disks, ui
 
-from . import proton, rclone
+from . import nextcloud, proton, rclone
 
 APP = "cloud"
-PROVIDERS = {proton.NAME: proton}
+PROVIDERS = {proton.NAME: proton, nextcloud.NAME: nextcloud}
 KINDS = {"sync": "duas vias", "send": "envio"}
 RESYNC = ("must run --resync", "cannot find prior Path1 or Path2 listings", "--resync")
 TOO_MANY = ("too many deletes", "max-delete", "--max-delete")
@@ -43,6 +43,14 @@ class Job:
 
     def target(self) -> str:
         return f"{self.account}:{self.remote}"
+
+    @property
+    def remote_source(self) -> bool:
+        return not self.local.startswith("/")
+
+    @property
+    def source_account(self) -> str:
+        return self.local.split(":", 1)[0] if self.remote_source else ""
 
     def arrow(self) -> str:
         return "⇄" if self.kind == "sync" else "⇒"
@@ -102,6 +110,8 @@ def new_job_id(kind: str, local: str, target: str) -> str:
 def publish() -> None:
     linked = []
     for job in jobs():
+        if job.remote_source:
+            continue
         owner = account(job.account)
         provider = PROVIDERS[owner.provider].LABEL if owner and owner.provider in PROVIDERS else job.account
         linked.append(clouds.Linked(Path(job.local), f"{provider} ({KINDS[job.kind]})"))
@@ -150,16 +160,25 @@ def locked(wait: bool) -> Iterator[bool]:
 
 
 def _options(job: Job) -> list[str]:
-    owner = account(job.account)
-    return list(PROVIDERS[owner.provider].OPTIONS) if owner and owner.provider in PROVIDERS else []
+    found: list[str] = []
+    for id in (job.account, job.source_account):
+        owner = account(id) if id else None
+        options = list(PROVIDERS[owner.provider].OPTIONS) if owner and owner.provider in PROVIDERS else []
+        for flag, value in zip(options[::2], options[1::2]):
+            if flag not in found:
+                found += [flag, value]
+    return found
 
 
 def _ready(job: Job) -> str:
-    path = Path(job.local)
-    if not disks.available(path) or not path.is_dir():
-        return f"{job.local} indisponível (disco desligado, travado ou pasta apagada): nada foi feito"
-    if job.account not in rclone.sections():
-        return f"a conta {job.account} não está conectada: entre de novo em Contas na nuvem"
+    if not job.remote_source:
+        path = Path(job.local)
+        if not disks.available(path) or not path.is_dir():
+            return f"{job.local} indisponível (disco desligado, travado ou pasta apagada): nada foi feito"
+    sections = rclone.sections()
+    for id in (job.account, job.source_account):
+        if id and id not in sections:
+            return f"a conta {id} não está conectada: entre de novo em Contas na nuvem"
     return ""
 
 
@@ -187,7 +206,8 @@ def count_files(path: Path) -> int:
 def send_args(job: Job, force: bool = False, dry: bool = False) -> list[str]:
     args = ["sync", job.local, job.target(), "--exclude", "*.partial", *_options(job)]
     if not force:
-        args += ["--max-delete", str(max(10, count_files(Path(job.local)) * 5 // 100))]
+        limit = 50 if job.remote_source else max(10, count_files(Path(job.local)) * 5 // 100)
+        args += ["--max-delete", str(limit)]
     if dry:
         args.append("--dry-run")
     return args
@@ -207,12 +227,12 @@ def run_job(job: Job, force: bool = False) -> bool:
     ui.info(f"{job.local} {job.arrow()} {job.target()}...")
     if job.kind == "sync":
         first = "ok" not in states().get(job.id, {})
-        code, output = rclone.call(sync_args(job, resync=first, force=force), unshare=True)
+        code, output = rclone.call(sync_args(job, resync=first, force=force), unshare=not job.remote_source)
         if code and not first and any(item in output.lower() for item in RESYNC) and not _blocked(output):
             ui.info("o estado da sincronização se perdeu: juntando os dois lados sem apagar nada (--resync)")
-            code, output = rclone.call(sync_args(job, resync=True), unshare=True)
+            code, output = rclone.call(sync_args(job, resync=True), unshare=not job.remote_source)
     else:
-        code, output = rclone.call(send_args(job, force=force), unshare=True)
+        code, output = rclone.call(send_args(job, force=force), unshare=not job.remote_source)
     if code == 0:
         record(job)
         ui.ok(f"{job.local} {job.arrow()} {job.target()} em dia")
@@ -241,5 +261,5 @@ def run_kind(kind: str, wait: bool) -> bool:
 
 def preview(job: Job) -> list[str]:
     args = sync_args(job, force=True, dry=True) if job.kind == "sync" else send_args(job, force=True, dry=True)
-    _, output = rclone.call(args, unshare=True)
+    _, output = rclone.call(args, unshare=not job.remote_source)
     return [line.strip() for line in output.splitlines() if re.search(r"delet", line, re.IGNORECASE)]

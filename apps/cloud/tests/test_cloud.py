@@ -128,6 +128,43 @@ class CloudAppTest(unittest.TestCase):
         jobs.save_jobs([job])
         self.assertEqual(app.collect({})["j2"].kind, "late")
 
+    def test_sync_between_two_accounts(self) -> None:
+        self.connect()
+        rclone.set_section("nextcloud-1", {"type": "webdav", "vendor": "nextcloud"})
+        jobs.save_accounts(jobs.accounts() + [jobs.Account("nextcloud-1", "nextcloud", "eu")])
+        keys = [b"\x1b[B", b"\r", b"\r", b"\r", b"\x1b[B", b"\r", b"\r"]
+        self.fake.calls.clear()
+        outcome = run_in_pty(lambda: app.add_job("sync"), keys, columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        [job] = jobs.jobs()
+        self.assertEqual((job.local, job.account, job.remote, job.remote_source, job.source_account), ("proton-1:Backups", "nextcloud-1", "", True, "proton-1"))
+        self.assertIsNone(clouds.mark(Path("/proton-1:Backups")) or None)
+        self.assertEqual(clouds.load(), [])
+        job = jobs.Job("j9", "sync", "nextcloud-1:Proton", "proton-1", "")
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            self.assertTrue(jobs.run_job(job))
+        args = self.fake.calls[-1]
+        self.assertEqual(args[:3], ["bisync", "nextcloud-1:Proton", "proton-1:"])
+        self.assertNotIn("<unshare>", args)
+        self.assertEqual(args[args.index("--transfers") + 1], "2")
+        rclone.drop_section("nextcloud-1")
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            self.assertFalse(jobs.run_job(job))
+        self.assertIn("nextcloud-1 não está conectada", jobs.states()["j9"]["error"])
+
+    def test_nextcloud_login(self) -> None:
+        (config.home()).mkdir(exist_ok=True)
+        (config.home() / "astroverso.env").write_text("DOMAIN=casa.com\n")
+        self.fake.replies = [(0, "[]")]
+        outcome = run_in_pty(lambda: app.jobs.nextcloud.login("nextcloud-1"), [b"\n", b"eu\n", b"senha-de-app\n"], columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertEqual(outcome.result, "eu")
+        text = rclone.conf().read_text()
+        self.assertIn("url = https://nextcloud.casa.com/remote.php/dav/files/eu", text)
+        self.assertIn("vendor = nextcloud", text)
+        self.assertIn("pass = obscuro(12)", text)
+        self.assertNotIn("senha-de-app", outcome.screen)
+
     def test_install_without_account(self) -> None:
         installed: list[str] = []
         fake_units = mock.Mock(active=mock.Mock(return_value=False), install=lambda texts, start: installed.extend(start))

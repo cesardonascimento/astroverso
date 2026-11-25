@@ -1,16 +1,19 @@
 # cloud
 
-Liga pastas da máquina a uma conta na nuvem pelo [rclone](https://rclone.org): **sincronizações de duas vias** (as
-duas pontas ficam iguais) e **envios de uma via** (a nuvem vira um espelho da pasta). Você escolhe as pastas e para
-onde elas vão: o Astroverso não decide o que vai para a nuvem. Por enquanto, a nuvem é o Proton Drive
-(`proton.py`; outro provedor entra como outro módulo).
+Liga pastas a contas na nuvem pelo [rclone](https://rclone.org): **sincronizações de duas vias** (as duas pontas
+ficam iguais) e **envios de uma via** (o destino vira um espelho da origem). A origem é uma pasta da máquina ou uma pasta
+de outra conta (ex.: uma pasta do Nextcloud ⇄ o Proton Drive). Você escolhe as pastas e para onde elas vão: o
+Astroverso não decide o que vai para a nuvem. Provedores: Proton Drive (`proton.py`) e Nextcloud pelo WebDAV
+(`nextcloud.py`); outro provedor entra como outro módulo.
 
 ## O que a instalação faz
 
 1. Instala o `rclone` (pacote da distribuição, sem container).
-2. **Contas na nuvem:** conecta uma conta (o login é testado na hora). Passo a passo: [proton.md](docs/proton.md).
-3. **Sincronizações e envios:** cada um é uma pasta da máquina (pelo seletor de pastas, `kit.folders`) e uma pasta da
-   conta (num menu que navega pelas pastas da nuvem, com "Criar uma pasta aqui").
+2. **Contas na nuvem:** conecta uma conta (o login é testado na hora). Passo a passo: [proton.md](docs/proton.md) e
+   [nextcloud.md](docs/nextcloud.md) (com uma senha de app).
+3. **Sincronizações e envios:** cada um liga uma origem (uma pasta da máquina, pelo seletor de pastas `kit.folders`, ou
+   uma pasta de outra conta) a uma pasta de uma conta (num menu que navega pelas pastas da nuvem, com "Criar uma pasta
+   aqui").
 4. Publica as pastas ligadas pelo `kit.clouds` (`~/.astroverso/clouds/cloud.json`): é a marca ☁ nos seletores dos
    outros apps (ex.: "Proton Drive (duas vias)").
 5. Pergunta as mudanças no sistema e mostra o Resumo da nuvem.
@@ -38,6 +41,9 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 
 ## Nas duas
 
+- **Pasta do Nextcloud com uma nuvem:** use o Nextcloud como conta (WebDAV), e não a pasta dos arquivos dele no disco.
+  Tudo passa pelo Nextcloud: ele fica em dia sem varredura, os arquivos ficam com o dono certo, e o que a nuvem apagar
+  vai para a lixeira e as versões dele. Entre duas contas, o rclone roda sem `podman unshare`.
 - Pasta num disco desligado ou travado (`kit.disks.available`): a rodada não roda (uma pasta vazia pareceria "tudo
   apagado") e fica como falha.
 - O rclone roda por `podman unshare`, para mexer também nos arquivos gravados por containers (ex.: o Nextcloud).
@@ -62,6 +68,7 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | Passo | Por quê | Como fazer |
 |---|---|---|
 | Entrar uma vez pelo site do Proton Drive | O rclone não conclui o primeiro acesso de uma conta nova | [proton.md](docs/proton.md#antes-de-começar) |
+| Criar uma senha de app no Nextcloud (para usá-lo como conta) | O app cloud não usa a sua senha de login | [nextcloud.md](docs/nextcloud.md#criar-a-senha-de-app) |
 
 ## Ações
 

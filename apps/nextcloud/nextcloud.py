@@ -157,6 +157,23 @@ def prepare_files(path: Path) -> None:
         ui.ok(f"pasta dos arquivos liberada para o Nextcloud: {path}")
 
 
+def user_exists(user: str) -> bool:
+    return occ_output("user:info", user)[0] == 0
+
+
+def bring(source: Path, user: str, name: str) -> Path:
+    base = files() / user / "files"
+    target = base / name
+    run.cmd(["podman", "unshare", "mkdir", "-p", str(base)])
+    run.cmd(["podman", "unshare", "mv", "--", str(source), str(target)])
+    ui.info("passando os arquivos para o Nextcloud (dono e permissões)...")
+    run.cmd(["podman", "unshare", "chown", f"{WWW}:{WWW}", str(files() / user), str(base)])
+    run.cmd(["podman", "unshare", "chown", "-R", f"{WWW}:{WWW}", str(target)])
+    ui.info("catalogando os arquivos no Nextcloud (pode demorar com muitos arquivos)...")
+    run.cmd(["podman", "exec", "-u", "www-data", NAME, "php", "occ", "files:scan", f"--path=/{user}/files/{name}"])
+    return target
+
+
 def render_site(address: str) -> None:
     text = string.Template(SITE.read_text()).substitute(HOST=address)
     if not site_file().exists() or site_file().read_text() != text:

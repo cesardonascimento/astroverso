@@ -133,8 +133,11 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Quatro containers por Quadlet (Nextcloud apache, Postgres, Valkey sem disco, cron com `/cron.sh`), sem porta na
   máquina, endereço pelo `kit.routes`. Sem tema do Astroverso (decisão do usuário: o logo fica só no projeto por
   enquanto).
-- Pasta dos arquivos padrão `~/Nextcloud`, do `www-data` do container (`podman unshare chown 33:33`). Os discos da
-  máquina (app `disks`) entram depois, pelo `kit.disks`, como armazenamento externo.
+- Pasta dos arquivos padrão `~/Nextcloud`, do `www-data` do container (`podman unshare chown 33:33`), escolhida pelo
+  `kit.folders`. **Os arquivos ficam dentro do Nextcloud, num disco de dados se preciso (ex.: `/srv/<disco>/nextcloud`),
+  sem armazenamento externo** (decisão do usuário: os discos não são mais acessados por fora). A ação "Trazer uma pasta
+  para o Nextcloud" move uma pasta para os arquivos de um usuário e roda o `files:scan` só dela. A instalação para
+  sem o disco, e a verificação avisa quando ele some.
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
 - `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.backup`.
@@ -186,6 +189,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   roda com `--force`.
 - O destino é escolha do usuário, sem regra nem validação. O `cloud` publica as pastas ligadas pelo `kit.clouds` só
   para a marca ☁ nos seletores.
+- A origem pode ser outra conta: o Nextcloud entra como conta (WebDAV, senha de app), e uma pasta do Nextcloud
+  sincroniza com o Proton pelo Nextcloud, nunca gravando na pasta dos arquivos dele (o Nextcloud não veria as mudanças
+  e os donos ficariam errados).
 - Roda por `podman unshare` (arquivos de containers), com trava entre rodadas e sem rodar com o disco indisponível.
 - O backup do app não leva as senhas: na restauração, cada conta pede o login de novo.
 

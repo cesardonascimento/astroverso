@@ -13,7 +13,7 @@ from . import jobs, rclone
 from .jobs import Job
 
 APP = "cloud"
-DESCRIPTION = "Pastas da máquina sincronizadas com a nuvem (Proton Drive) pelo rclone: duas vias e envios"
+DESCRIPTION = "Pastas sincronizadas com a nuvem pelo rclone (Proton Drive, Nextcloud): duas vias e envios"
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
 BUTTONS = (("Resumo da nuvem", "cloud:summary"), ("Sincronizar agora", "cloud:sync"))
 TIMERS = {
@@ -101,7 +101,7 @@ def manage_accounts() -> None:
             continue
         if choice.startswith("Entrar"):
             relogin(found[index])
-        elif any(job.account == found[index].id for job in jobs.jobs()):
+        elif any(found[index].id in (job.account, job.source_account) for job in jobs.jobs()):
             ui.warn("essa conta tem sincronizações ou envios: tire-os antes, em Sincronizações e envios")
         elif ui.confirm(f"Remover a conta {found[index].label()} desta máquina? (nada é apagado na nuvem)", default=False):
             rclone.drop_section(found[index].id)
@@ -148,19 +148,39 @@ def _local(value: str) -> str:
     return str(path)
 
 
+def _pick_account(question: str, found: list[jobs.Account]) -> jobs.Account:
+    return found[0] if len(found) == 1 else found[ui.menu(question, [item.label() for item in found])]
+
+
+def _source(found: list[jobs.Account]) -> tuple[str, str] | None:
+    if len(found) > 1 and ui.menu("De onde vem a pasta?", ["Uma pasta da máquina", "Uma pasta de uma conta (ex.: o Nextcloud)"]) == 1:
+        owner = _pick_account("Qual conta?", found)
+        path = pick_remote(owner.id)
+        return None if path is None else (f"{owner.id}:{path}", owner.id)
+    local = folders.pick("pasta da máquina", validate=_local)
+    Path(local).mkdir(parents=True, exist_ok=True)
+    return local, ""
+
+
 def add_job(kind: str) -> None:
     found = [item for item in jobs.accounts() if item.id in rclone.sections()]
     if not found:
         ui.warn("nenhuma conta conectada: adicione uma em Contas na nuvem")
         return
     if kind == "sync":
-        ui.note("Duas vias: o que muda na pasta da máquina vai para a nuvem e o que muda na nuvem vem para a pasta, de hora em hora.")
+        ui.note("Duas vias: o que muda de um lado vai para o outro, de hora em hora.")
     else:
-        ui.note("Uma via: a pasta da nuvem vira um espelho da pasta da máquina, todo dia às 05:00 (o que sai daqui sai de lá).")
-    index = 0 if len(found) == 1 else ui.menu("Qual conta?", [item.label() for item in found])
-    owner = found[index]
-    local = folders.pick("pasta da máquina", validate=_local)
-    Path(local).mkdir(parents=True, exist_ok=True)
+        ui.note("Uma via: a pasta de destino vira um espelho da de origem, todo dia às 05:00 (o que sai da origem sai do destino).")
+    source = _source(found)
+    if source is None:
+        ui.info("nada mudou")
+        return
+    local, used = source
+    others = [item for item in found if item.id != used]
+    if not others:
+        ui.warn("falta outra conta para o outro lado: adicione uma em Contas na nuvem")
+        return
+    owner = _pick_account("Para qual conta?", others)
     remote = pick_remote(owner.id)
     if remote is None:
         ui.info("nada mudou")
@@ -170,9 +190,16 @@ def add_job(kind: str) -> None:
         ui.warn("isso já está cadastrado")
         return
     jobs.save_jobs(jobs.jobs() + [job])
-    ui.ok(f"{local} {job.arrow()} {owner.label()}:/{remote}")
+    ui.ok(f"{_side(job)} {job.arrow()} {owner.label()}:/{remote}")
     if kind == "sync":
         ui.info("a primeira rodada junta os dois lados sem apagar nada; ela roda no próximo horário ou em Sincronizar agora")
+
+
+def _side(job: Job) -> str:
+    if not job.remote_source:
+        return job.local
+    owner = jobs.account(job.source_account)
+    return f"{owner.label() if owner else job.source_account}:/{job.local.split(':', 1)[1]}"
 
 
 def _job_rows() -> list[list[str | ui.Cell]]:
@@ -180,7 +207,7 @@ def _job_rows() -> list[list[str | ui.Cell]]:
     rows: list[list[str | ui.Cell]] = []
     for job in jobs.jobs():
         owner = jobs.account(job.account)
-        rows.append([jobs.KINDS[job.kind], job.local, job.arrow(), f"{owner.label() if owner else job.account}:/{job.remote}", _situation(saved.get(job.id, {}))])
+        rows.append([jobs.KINDS[job.kind], _side(job), job.arrow(), f"{owner.label() if owner else job.account}:/{job.remote}", _situation(saved.get(job.id, {}))])
     return rows
 
 
@@ -198,7 +225,7 @@ def manage_jobs() -> None:
     while True:
         current = jobs.jobs()
         if current:
-            ui.table(_job_rows(), ["Tipo", "Pasta da máquina", "", "Na nuvem", "Última rodada"])
+            ui.table(_job_rows(), ["Tipo", "Origem", "", "Destino", "Última rodada"])
         options = ["Adicionar uma sincronização (duas vias)", "Adicionar um envio (uma via)"] + (["Tirar"] if current else []) + ["Pronto"]
         choice = options[ui.menu("Sincronizações e envios", options)]
         if choice == "Pronto":
@@ -291,7 +318,7 @@ def summary() -> None:
     ui.table([[item.label(), ui.good("conectada") if item.id in rclone.sections() else ui.pending("entre de novo")] for item in jobs.accounts()]
              or [[ui.off("nenhuma"), "-"]], ["Conta", "Situação"])
     ui.section("Sincronizações e envios")
-    ui.table(_job_rows() or [[ui.off("nenhum"), "-", "", "-", "-"]], ["Tipo", "Pasta da máquina", "", "Na nuvem", "Última rodada"])
+    ui.table(_job_rows() or [[ui.off("nenhum"), "-", "", "-", "-"]], ["Tipo", "Origem", "", "Destino", "Última rodada"])
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     watch.summary(APP)
