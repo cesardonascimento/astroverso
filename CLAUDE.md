@@ -84,8 +84,10 @@ backup/           código antigo, só referência
   roteador, outro computador) tem o passo a passo em `apps/<app>/docs/<plataforma>.md`; o instalador mostra só uma
   frase com os valores desta máquina e o link (`ui.link` + `kit.docs.link`). Explicações do próprio Astroverso
   continuam como `ui.note`.
-- **Backup das configurações.** Cada app implementa `backup(pasta)` e `restore(pasta)`. Se o pacote `backup`
-  estiver instalado, o app entra na rotina sozinho; se não, a instalação avisa e segue.
+- **Backup das configurações: cada app manda o seu.** Cada app implementa `backup(pasta)` e `restore(pasta)` e usa o
+  `kit.backup`: a mudança perguntada `kit.backup.change(APP)` (timer diário próprio) e as ações "Fazer backup agora"
+  (`run_backup`) e "Restaurar uma versão" (`restore`). Nenhum app varre os outros. Sem o servidor de backup ligado na
+  máquina, o backup só avisa e segue.
 
 ### App `network`
 
@@ -132,7 +134,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   máquina entram depois, pelo `kit.disks`, como armazenamento externo.
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
-- `backup`/`restore` implementados (dump SQL + `config/`), sem a rotina de backup ainda.
+- `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.backup`.
 
 ### App `mail`
 
@@ -145,6 +147,18 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - O Remover não apaga os e-mails da caixa sem confirmação (padrão não).
 - Recursos antigos da Cloudflare não têm nome no código: a ação "Limpar Workers e KV antigos" lista os da conta e
   apaga os marcados.
+
+### App `backup`
+
+- Servidor (uma máquina): container `rclone serve restic --append-only --private-repos` publicado em
+  `backup.<domínio>`, um repositório restic por máquina numa pasta (depois, um disco de backup), manutenção semanal
+  (`forget --prune` + `check`) só no servidor, verificação de hora em hora (36 h sem backup).
+- Cliente (todas as máquinas, inclusive a do servidor): só grava `~/.astroverso/backup.env`; quem manda os backups
+  são os próprios apps (decisão do usuário: "cada app manda a própria config").
+- A senha do repositório de cada máquina vai para o gerenciador de senhas do usuário; o backup do próprio app não
+  leva as senhas.
+- Os outros trabalhos do rclone antigo (espelho dos discos, sincronização com a nuvem, cópia do Windows) ficam para
+  outra conversa.
 
 ### Mudanças no sistema
 
@@ -170,7 +184,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   (`kit.testing`), configuração (`.env`, validadores), camada `distro`, domínio padrão.
 - `manager`: o gerenciador (`./astroverso`): menu de instalar e gerenciar, e o uso direto
   `astroverso <app> <comando>`. Contrato do `app.py` em `apps/README.md`.
-- `backup`: rotina de backup das configurações; instalado uma vez, descobre os apps instalados.
+- `kit.backup`: o backup de cada app no servidor do app `backup` (restic), com avisos no `#backup`.
 - `kit.discord`: avisos dos apps no Discord (o bot é o app `discord`).
 
 Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.

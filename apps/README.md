@@ -18,6 +18,10 @@ unidades do systemd, ajustes do kernel...), por menor que seja, é um `kit.chang
 para o app funcionar levam `danger=True` e aparecem em vermelho com ⚠. Os componentes do próprio app (os containers,
 o estado em `~/.astroverso/<app>`) não são mudanças: são o app.
 
+**Backup: cada app manda o seu.** Todo app põe `kit.backup.change(APP)` nas mudanças perguntadas e ganha as ações
+`Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True)` e
+`Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore))`.
+
 **Passos em plataformas de terceiros** (Tailscale, Cloudflare, Discord, roteador, firewall de outro computador)
 ficam em `apps/<app>/docs/<plataforma>.md`, com o passo a passo completo, e uma seção para cada passo. Na etapa
 que precisa de um deles, o instalador mostra só uma frase curta (o que fazer, com os valores desta máquina) e o
@@ -43,7 +47,7 @@ Funções simples no módulo (o `Protocol` `kit.app.App` documenta os tipos):
 | `status() -> bool` | sim | Diz se o app está instalado |
 | `install()` | sim | Pergunta, instala e sobe o app; também é o "Reinstalar" |
 | `remove()` | sim | Desfaz tudo o que o app criou, sem falhar no que já não existe |
-| `backup(pasta)` / `restore(pasta)` | sim | Copia a configuração para a pasta e a traz de volta (usados pelo pacote `backup`) |
+| `backup(pasta)` / `restore(pasta)` | sim | Copia a configuração para a pasta e a traz de volta (mandados ao servidor pelo `kit.backup`) |
 | `actions() -> list[Action]` | não | Ações de pós-configuração: `Action(id, rótulo, função, remote=, confirm=, menu=)` do `kit.app` |
 
 **Ações pelo Discord.** Uma ação com `remote=True` vira o comando `/astro <app>:<id>` no Discord (com `confirm=True`,
