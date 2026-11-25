@@ -184,14 +184,14 @@ class DiscordAppTest(unittest.TestCase):
         self.assertIn("ligada ao bot como servidor", outcome.screen)
         self.assertEqual(outcome.result[0][:2], ["discord", "sucesso"])
         self.assertNotIn("chave-boa", outcome.screen)
-        self.assertEqual([action.id for action in app.actions()], ["summary", "test", "agent"])
+        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent"])
 
     def test_add_client_and_actions(self) -> None:
         host = self.use(FakeHost())
         config.save("discord", {"MODE": "server"})
         with mock.patch.object(sys, "stdout", io.StringIO()):
             server._ensure_keys(["servidor"])
-        self.assertEqual([action.id for action in app.actions()], ["summary", "test", "agent", "key", "add-client"])
+        self.assertEqual([action.id for action in app.actions()], ["summary", "changes", "test", "agent", "key", "add-client"])
         outcome = run_in_pty(lambda: (server.add_client(), host.calls)[1], [b"servidor\n", b"studio\n"], columns=200)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("o cliente servidor já existe", outcome.screen)

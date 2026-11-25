@@ -188,6 +188,20 @@ def sysctl_set(name: str, values: Mapping[str, str]) -> None:
     ui.ok(f"ajuste do sistema aplicado: {', '.join(f'{key} = {value}' for key, value in values.items())}")
 
 
+def sysctl_has(name: str, values: Mapping[str, str]) -> bool:
+    try:
+        return _sysctl_path(name).read_text() == "".join(f"{key} = {value}\n" for key, value in values.items())
+    except OSError:
+        return False
+
+
+def resolver_route_has(name: str, domain: str, server: str) -> bool:
+    try:
+        return _resolver_path(name).read_text() == f"[Resolve]\nDNS={server}\nDomains=~{domain}\n"
+    except OSError:
+        return False
+
+
 def sysctl_remove(name: str) -> None:
     path = _sysctl_path(name)
     if not path.exists():

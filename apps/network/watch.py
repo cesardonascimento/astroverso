@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import config, discord, docs, net, ui, units
+from kit import changes, config, discord, docs, net, ui, units
 
 from . import adguard, caddy, tailscale
 
@@ -196,14 +196,27 @@ def units_text() -> dict[str, str]:
     }
 
 
-def install() -> None:
-    units.install(units_text(), [f"{NAME}.timer"])
-    if not discord.configured():
-        ui.info("a verificação de hora em hora avisa no Discord quando o app discord estiver instalado")
+def items() -> list[changes.Change]:
+    return [
+        changes.Change(
+            "watch", "Verificar a rede de hora em hora e avisar no Discord",
+            f"Um timer do usuário ({NAME}.timer) confere a rede a cada hora (AdGuard e Caddy no ar, cadeado, token da "
+            "Cloudflare, Tailscale, IP) e avisa no Discord quando algo quebra e quando volta ao normal.",
+            active,
+            lambda: units.install(units_text(), [f"{NAME}.timer"]),
+            lambda: units.remove([f"{NAME}.timer", f"{NAME}.service"]),
+        ),
+    ]
+
+
+def install(reuse: bool) -> None:
+    changes.install(APP, items(), reuse)
+    if active() and not discord.configured():
+        ui.info("a verificação avisa no Discord quando o app discord estiver instalado nesta máquina")
 
 
 def remove() -> None:
-    units.remove([f"{NAME}.timer", f"{NAME}.service"])
+    changes.undo_all(items())
 
 
 def active() -> bool:

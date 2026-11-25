@@ -60,6 +60,22 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | Pasta `~/.astroverso/routes/` (`700`), se ainda não existir | Onde os apps publicam os endereços deles (`kit.routes`); não é de nenhum app e fica no `remove` |
 | Painel do AdGuard só por `https://adguard.<domínio>` (a porta 8080 não é aberta na rede) | Com login e cadeado; a 8080 só é alcançada pelo Caddy |
 
+### Mudanças perguntadas
+
+Estas mudanças no sistema são perguntadas na instalação (padrão sim) e podem ser desfeitas e refeitas em
+**Mudanças no sistema**. As marcadas com ⚠ são importantes para a rede funcionar. O Tailscale, os containers e o
+estado em `~/.astroverso/network` são o próprio app: entram com ele e saem no Remover.
+
+| Mudança | ⚠ |
+|---|---|
+| Liberar a porta `41641/udp` do Tailscale no firewall | |
+| Deixar os containers abrirem portas a partir da 53 (`sysctl`) | ⚠ |
+| Liberar o DNS (porta 53) no firewall | ⚠ |
+| Perguntar ao AdGuard pelos nomes do domínio nesta máquina (`systemd-resolved`) | |
+| Liberar HTTP e HTTPS (80, 443 e 443/udp) no firewall | ⚠ |
+| Recarregar o Caddy sozinho quando um app publica um endereço (`astroverso-network-routes.path`) | |
+| Verificar a rede de hora em hora e avisar no Discord (`astroverso-network-watch.timer`) | |
+
 ## Fora da máquina (passos seus)
 
 O passo a passo de cada um fica em [`docs/`](docs/). Na instalação, a etapa que precisa de um deles mostra só uma
@@ -79,6 +95,7 @@ frase e o link para o doc no GitHub, para abrir no navegador.
 
 | Ação | O que faz |
 |---|---|
+| Mudanças no sistema | Checklist das mudanças perguntadas (acima): marcar aplica, desmarcar desfaz; as ⚠ pedem confirmação |
 | Resumo da rede | Tabelas com esta máquina, a situação do Tailscale e do anúncio, os aparelhos (online, conexão direta ou por relay), o DNS (AdGuard no ar, reescrita, teste de nome, Split DNS, roteador, painel), o Caddy (no ar, validade do cadeado, token), todos os endereços com destino e origem, e as portas. Aponta quem está por relay |
 | Reconectar ao Tailscale | Novo login na conta (ex.: depois de a máquina sair da conta) |
 | Marcar o redirecionamento no roteador como feito | Para quando ele for feito depois da instalação |

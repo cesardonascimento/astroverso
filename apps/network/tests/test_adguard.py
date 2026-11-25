@@ -18,6 +18,9 @@ assert APP.module is not None, APP.problem
 adguard = APP.module.adguard
 
 
+ANSWERED = {"CHANGE_LOW_PORTS": "yes", "CHANGE_DNS_PORT": "yes", "CHANGE_DNS_LOCAL": "yes"}
+
+
 class FakeHost:
     Container = container.Container
     Volume = container.Volume
@@ -26,6 +29,7 @@ class FakeHost:
         self.calls: list[tuple] = []
         self.split = split
         self.started = False
+        self.applied = False
 
     def record(self, *call) -> None:
         self.calls.append(call)
@@ -63,7 +67,13 @@ class FakeHost:
         self.record("close", *items)
 
     def firewall_allowed(self, item):
-        return True
+        return self.applied
+
+    def sysctl_has(self, name, values):
+        return self.applied
+
+    def resolver_route_has(self, name, domain, server):
+        return self.applied
 
     def resolver_route(self, name, domain, server):
         self.record("resolver", name, domain, server)
@@ -118,7 +128,7 @@ class AdGuardTest(unittest.TestCase):
 
     def test_fresh_install(self) -> None:
         host = self.use(FakeHost())
-        keys = [b"casa.com\n", b"\n", b"senha1\n", b"senha1\n", b"s\n"]
+        keys = [b"casa.com\n", b"\n", b"senha1\n", b"senha1\n", b"\n", b"\n", b"\n", b"s\n"]
         outcome = run_in_pty(lambda: (adguard.install(reuse=False), host.calls)[1], keys, columns=120)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]
@@ -132,8 +142,9 @@ class AdGuardTest(unittest.TestCase):
         self.assertIn(("resolver", "network", "casa.com", "127.0.0.1"), calls)
         self.assertEqual(config.saved_domain(), "casa.com")
         self.assertEqual(config.load("network"), {
-            "ADGUARD_USER": "astroverso", "ADGUARD_PASSWORD_HASH": "$2a$14$hashdeteste", "ROUTER_DNS": "yes",
+            "ADGUARD_USER": "astroverso", "ADGUARD_PASSWORD_HASH": "$2a$14$hashdeteste", **ANSWERED, "ROUTER_DNS": "yes",
         })
+        self.assertIn("Deixar os containers abrirem portas a partir da 53? [S/n]", outcome.screen)
         conf = adguard.conf_file().read_text()
         self.assertIn("password: '$2a$14$hashdeteste'", conf)
         self.assertIn("'*.casa.com', answer: '192.168.0.10'", conf)
@@ -147,7 +158,7 @@ class AdGuardTest(unittest.TestCase):
         host = self.use(FakeHost())
         config.home().mkdir()
         (config.home() / "astroverso.env").write_text("DOMAIN=casa.com\n")
-        config.save("network", {"ADGUARD_USER": "dono", "ADGUARD_PASSWORD_HASH": "$2a$h", "ROUTER_DNS": "no"})
+        config.save("network", {"ADGUARD_USER": "dono", "ADGUARD_PASSWORD_HASH": "$2a$h", "ROUTER_DNS": "no", **ANSWERED})
         adguard.conf_file().parent.mkdir(parents=True)
         adguard.conf_file().write_text("editado pelo painel")
         outcome = run_in_pty(lambda: (adguard.install(reuse=True), host.calls)[1], [], columns=120)
@@ -160,7 +171,7 @@ class AdGuardTest(unittest.TestCase):
         self.use(FakeHost(split="192.168.0.99"))
         config.home().mkdir()
         (config.home() / "astroverso.env").write_text("DOMAIN=casa.com\n")
-        config.save("network", {"ADGUARD_USER": "dono", "ADGUARD_PASSWORD_HASH": "$2a$h", "ROUTER_DNS": "yes"})
+        config.save("network", {"ADGUARD_USER": "dono", "ADGUARD_PASSWORD_HASH": "$2a$h", "ROUTER_DNS": "yes", **ANSWERED})
         outcome = run_in_pty(lambda: adguard.install(reuse=True), [b"s\n", b"n\n"], columns=120)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("ainda manda casa.com para 192.168.0.99", outcome.screen)
@@ -170,6 +181,7 @@ class AdGuardTest(unittest.TestCase):
 
     def test_remove(self) -> None:
         host = self.use(FakeHost())
+        host.applied = True
         with mock.patch.object(sys, "stdout", io.StringIO()):
             adguard.remove()
         self.assertEqual(host.calls, [

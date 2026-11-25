@@ -5,7 +5,7 @@ import re
 import threading
 import time
 
-from kit import discord, run, ui, units
+from kit import changes, discord, run, ui, units
 from manager.apps import ROOT, discover, installed
 
 NAME = "astroverso-discord-agent"
@@ -108,12 +108,26 @@ def unit_text() -> dict[str, str]:
     }
 
 
-def install() -> None:
-    service = f"{NAME}.service"
-    was_active = units.active(service)
-    units.install(unit_text(), [service])
-    if was_active:
-        units.restart(service)
+def _start() -> None:
+    units.install(unit_text(), [f"{NAME}.service"])
+
+
+def items() -> list[changes.Change]:
+    return [
+        changes.Change(
+            "agent", "Rodar o agente do /astro nesta máquina",
+            f"Um serviço do usuário ({NAME}) publica no bot as ações dos apps desta máquina e roda as que forem pedidas "
+            "no comando /astro do Discord. Sem ele, esta máquina só manda avisos.",
+            active, _start, remove,
+        ),
+    ]
+
+
+def install(reuse: bool) -> None:
+    was_active = active()
+    changes.install("discord", items(), reuse)
+    if was_active and active():
+        units.restart(f"{NAME}.service")
 
 
 def remove() -> None:

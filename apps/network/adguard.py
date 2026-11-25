@@ -5,7 +5,7 @@ import socket
 import string
 from pathlib import Path
 
-from kit import config, container, distro, docs, net, run, ui, validate
+from kit import changes, config, container, distro, docs, net, run, ui, validate
 
 from . import tailscale
 
@@ -94,18 +94,44 @@ def install(reuse: bool) -> None:
         config.save(APP, {"ADGUARD_USER": user, "ADGUARD_PASSWORD_HASH": password_hash})
         values = config.load(APP)
         regenerate = True
-    distro.sysctl_set(APP, {"net.ipv4.ip_unprivileged_port_start": "53"})
-    distro.firewall_open(["dns"])
+    changes.install(APP, items(domain), reuse)
     if regenerate:
         _write_conf(values["ADGUARD_USER"], values["ADGUARD_PASSWORD_HASH"], domain, address)
     container.start(spec())
-    distro.resolver_route(APP, domain, "127.0.0.1")
     if resolves(domain, address):
         ui.ok(f"*.{domain} responde {address}")
     else:
         ui.warn(f"*.{domain} ainda não responde {address}: confira em Resumo da rede")
     _split_dns(domain, address)
     _router(reuse, address)
+
+
+PORTS_SYSCTL = {"net.ipv4.ip_unprivileged_port_start": "53"}
+
+
+def items(domain: str) -> list[changes.Change]:
+    return [
+        changes.Change(
+            "low-ports", "Deixar os containers abrirem portas a partir da 53",
+            "Containers sem root só abrem portas a partir da 1024. O DNS usa a 53, e o Caddy, a 80 e a 443 "
+            f"(/etc/sysctl.d/99-astroverso-{APP}.conf).",
+            lambda: distro.sysctl_has(APP, PORTS_SYSCTL), lambda: distro.sysctl_set(APP, PORTS_SYSCTL), lambda: distro.sysctl_remove(APP),
+            danger=True,
+        ),
+        changes.Change(
+            "dns-port", "Liberar o DNS (porta 53) no firewall",
+            "Para os aparelhos da casa e do Tailscale perguntarem ao AdGuard.",
+            lambda: distro.firewall_allowed("dns"), lambda: distro.firewall_open(["dns"]), lambda: distro.firewall_close(["dns"]),
+            danger=True,
+        ),
+        changes.Change(
+            "dns-local", f"Perguntar ao AdGuard pelos nomes de {domain} nesta máquina",
+            f"Esta máquina pergunta ao AdGuard só pelos nomes de {domain} e usa o DNS do roteador para o resto: ela "
+            "nunca fica sem DNS, mesmo com o AdGuard parado (systemd-resolved).",
+            lambda: distro.resolver_route_has(APP, domain, "127.0.0.1"),
+            lambda: distro.resolver_route(APP, domain, "127.0.0.1"), lambda: distro.resolver_route_remove(APP),
+        ),
+    ]
 
 
 def _write_conf(user: str, password_hash: str, domain: str, address: str) -> None:
@@ -184,9 +210,7 @@ def remove() -> None:
     run.sudo_prepare("tirar o DNS do firewall e devolver o DNS desta máquina ao normal")
     container.remove(NAME, IMAGE)
     container.remove_image(HASHER)
-    distro.resolver_route_remove(APP)
-    distro.firewall_close(["dns"])
-    distro.sysctl_remove(APP)
+    changes.undo_all(items(config.saved_domain()))
 
 
 def summary() -> None:

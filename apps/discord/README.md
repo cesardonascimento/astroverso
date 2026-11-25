@@ -42,7 +42,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/discord/data/` | Os manifestos dos clientes e os IDs dos canais criados |
 | `~/.astroverso/discord.env` (`600`, `DISCORD_URL`, `DISCORD_KEY`) | Liga esta máquina ao bot: é o que o `kit.discord` de todos os apps usa para mandar avisos |
 | Foto do bot trocada pelo logo do Astroverso | Para os avisos aparecerem com a marca do projeto |
-| Unidade do usuário `astroverso-discord-agent.service` (em toda máquina com o app) | O agente: publica no bot os comandos desta máquina e roda os que forem pedidos no `/astro` (`astroverso discord action agent`) |
+| Unidade do usuário `astroverso-discord-agent.service` (em toda máquina com o app; perguntada, padrão sim, e reversível em Mudanças no sistema) | O agente: publica no bot os comandos desta máquina e roda os que forem pedidos no `/astro` (`astroverso discord action agent`) |
 
 ## Fora da máquina (passos seus)
 
@@ -58,6 +58,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | Ação | O que faz |
 |---|---|
 | Resumo do Discord | Container, conexão com o Discord, endereço da API, leitura de mensagens, usuários autorizados, clientes e quando cada um apareceu; e se esta máquina está ligada ao bot |
+| Mudanças no sistema | Liga ou desliga o agente do `/astro` nesta máquina |
 | Mensagem de teste | Manda um aviso de teste para `#discord` pelo `kit.discord` |
 | Mostrar a chave de um cliente | Endereço e chave, para colar na outra máquina (só na máquina do bot) |
 | Adicionar um cliente | Cria a chave de uma máquina ou projeto novo e reinicia o bot (só na máquina do bot) |

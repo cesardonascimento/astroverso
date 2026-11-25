@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import config, discord, net, ui
+from kit import changes, config, discord, net, ui
 from kit.app import Action
 
 from . import agent, client, server
@@ -40,7 +40,7 @@ def install(reuse: bool | None = None) -> None:
         server.install(again)
     else:
         client.install(again)
-    agent.install()
+    agent.install(again)
     summary()
 
 
@@ -95,9 +95,14 @@ def test() -> None:
         ui.ok("mensagem enviada ao canal #discord")
 
 
+def manage() -> None:
+    changes.manage(APP, agent.items())
+
+
 def actions() -> list[Action]:
     common = [
         Action("summary", "Resumo do Discord", summary, remote=True),
+        Action("changes", "Mudanças no sistema", manage),
         Action("test", "Mensagem de teste", test, remote=True),
         Action("agent", "Agente do Discord", agent.serve, menu=False),
     ]

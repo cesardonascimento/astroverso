@@ -9,7 +9,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import config, container, distro, docs, routes as published, run, ui, units, validate
+from kit import changes, config, container, distro, docs, routes as published, run, ui, units, validate
 
 from . import adguard
 
@@ -157,6 +157,25 @@ def _device_target(item: dict) -> str:
     return f"{'https+insecure' if item.get('https') else 'http'}://{item['ip']}:{item['port']}"
 
 
+def items() -> list[changes.Change]:
+    return [
+        changes.Change(
+            "web-ports", "Liberar HTTP e HTTPS (80, 443 e 443/udp) no firewall",
+            "Para os aparelhos abrirem os endereços do Astroverso. A 80 só redireciona para a 443; a 443/udp é o HTTP/3.",
+            lambda: all(distro.firewall_allowed(item) for item in PORTS),
+            lambda: distro.firewall_open(PORTS), lambda: distro.firewall_close(PORTS), danger=True,
+        ),
+        changes.Change(
+            "routes-reload", "Recarregar o Caddy sozinho quando um app publica um endereço",
+            f"Uma unidade do usuário ({WATCH}.path) vê as mudanças em ~/.astroverso/routes e recarrega o Caddy, sem "
+            "reiniciar. Sem ela, use a ação Recarregar os endereços do Caddy depois de instalar um app.",
+            lambda: units.active(f"{WATCH}.path"),
+            lambda: units.install(watch_units(), [f"{WATCH}.path"]),
+            lambda: units.remove([f"{WATCH}.path", f"{WATCH}.service"]),
+        ),
+    ]
+
+
 def app_routes() -> list[tuple[str, str, str]]:
     return [(route.host, route.target, f"app {route.app}") for route in published.load()]
 
@@ -293,12 +312,11 @@ def install(reuse: bool) -> None:
             manage_devices(apply=False)
     run.sudo_prepare("liberar as portas 80 e 443 no firewall")
     container.prepare()
-    distro.firewall_open(PORTS)
+    changes.install(APP, items(), reuse)
     container.build(IMAGE, CONTAINERFILE, {"CADDY_VERSION": VERSION, "CLOUDFLARE_VERSION": CLOUDFLARE_VERSION})
     container.remove_image(BUILDER)
     _write_caddyfile(domain)
     container.start(spec())
-    units.install(watch_units(), [f"{WATCH}.path"])
     reload()
     _wait_certificate(domain)
     for host, _, _ in routes(domain):
@@ -357,11 +375,10 @@ def manage_devices(apply: bool = True) -> None:
 def remove() -> None:
     ui.step("Caddy")
     run.sudo_prepare("fechar as portas 80 e 443 no firewall")
-    units.remove([f"{WATCH}.path", f"{WATCH}.service"])
     container.remove(NAME, IMAGE)
     container.remove_image(BASE)
     container.remove_image(BUILDER)
-    distro.firewall_close(PORTS)
+    changes.undo_all(items())
 
 
 def summary() -> None:

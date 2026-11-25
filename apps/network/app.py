@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import config, net, ui
+from kit import changes, config, net, ui
 from kit.app import Action
 
 from . import adguard, caddy, tailscale, watch
@@ -23,11 +23,7 @@ def install(reuse: bool | None = None) -> None:
     adguard.install(again)
     caddy.install(again)
     ui.step("Verificação de hora em hora")
-    ui.note(
-        "A cada hora, esta máquina confere a rede (AdGuard e Caddy no ar, cadeado, token da Cloudflare, Tailscale, IP) "
-        "e avisa no Discord quando algo quebra e quando volta ao normal, sem repetir o mesmo aviso."
-    )
-    watch.install()
+    watch.install(again)
     summary()
 
 
@@ -78,13 +74,24 @@ def summary() -> None:
     adguard.summary()
     caddy.summary()
     watch.summary()
+    ui.section("Mudanças no sistema")
+    ui.table(changes.rows(items()), ["Mudança", "Situação"])
     ui.section("Portas")
     ui.table(tailscale.port_rows() + adguard.port_rows() + caddy.port_rows(), ["Porta", "Para quê", "Firewall", "Roteador"])
+
+
+def items() -> list[changes.Change]:
+    return tailscale.items() + adguard.items(config.saved_domain()) + caddy.items() + watch.items()
+
+
+def manage() -> None:
+    changes.manage(APP, items())
 
 
 def actions() -> list[Action]:
     return [
         Action("summary", "Resumo da rede", summary, remote=True),
+        Action("changes", "Mudanças no sistema", manage),
         Action("reconnect", "Reconectar ao Tailscale", tailscale.reconnect),
         Action("router", "Marcar o redirecionamento no roteador como feito", tailscale.mark_router),
         Action("devices", "Endereços de aparelhos da rede", caddy.manage_devices),

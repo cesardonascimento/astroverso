@@ -101,6 +101,11 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(calls, [("PUT", "/v1/cliente"), ("GET", "/v1/eventos"), ("GET", "/v1/eventos")])
         handle.assert_called_once_with({"id": "e1", "tipo": "comando", "acao": "rede:summary"}, {"rede:summary"})
 
+    def test_change(self) -> None:
+        [change] = agent.items()
+        self.assertEqual((change.id, change.danger), ("agent", False))
+        self.assertEqual(change.label, "Rodar o agente do /astro nesta máquina")
+
     def test_unit(self) -> None:
         text = agent.unit_text()[f"{agent.NAME}.service"]
         self.assertIn(f"ExecStart={ROOT}/astroverso discord action agent\n", text)

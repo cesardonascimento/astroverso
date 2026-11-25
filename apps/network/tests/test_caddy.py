@@ -26,6 +26,7 @@ class FakeHost:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
         self.started = False
+        self.applied = False
 
     def record(self, *call) -> None:
         self.calls.append(call)
@@ -63,7 +64,7 @@ class FakeHost:
         self.record("close", *items)
 
     def firewall_allowed(self, item):
-        return True
+        return self.applied
 
     def sudo_prepare(self, reason):
         self.record("sudo")
@@ -156,16 +157,15 @@ class CaddyTest(unittest.TestCase):
 
     def test_fresh_install(self) -> None:
         host = self.use(FakeHost())
-        keys = [b"ruim\n", b"bom\n", b"\n"]
+        keys = [b"ruim\n", b"bom\n", b"\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (caddy.install(reuse=False), host.calls)[1], keys, columns=120)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]
-        self.assertEqual(calls[:3], [("sudo",), ("prepare",), ("open", "http", "https", "443/udp")])
-        self.assertEqual(calls[3][:2], ("build", caddy.IMAGE))
+        watch = [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]
+        self.assertEqual(calls[:4], [("sudo",), ("prepare",), ("open", "http", "https", "443/udp"), ("units", watch, [f"{caddy.WATCH}.path"])])
+        self.assertEqual(calls[4][:2], ("build", caddy.IMAGE))
         self.assertIn(("remove_image", caddy.BUILDER), calls)
         self.assertIn(("start", caddy.NAME, str(caddy.env_file())), calls)
-        watch = [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]
-        self.assertIn(("units", watch, [f"{caddy.WATCH}.path"]), calls)
         self.assertEqual(caddy.env_file().read_text(), "CLOUDFLARE_API_TOKEN=bom\n")
         self.assertEqual(caddy.env_file().stat().st_mode & 0o777, 0o600)
         self.assertIn("adguard.casa.com", caddy.caddyfile().read_text())
@@ -180,6 +180,7 @@ class CaddyTest(unittest.TestCase):
     def test_reuse_with_valid_token(self) -> None:
         self.use(FakeHost())
         caddy._save_token("bom")
+        config.save("network", {"CHANGE_WEB_PORTS": "yes", "CHANGE_ROUTES_RELOAD": "yes"})
         outcome = run_in_pty(lambda: caddy.install(reuse=True), [], columns=120)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("token da Cloudflare salvo continua válido", outcome.screen)
@@ -206,12 +207,13 @@ class CaddyTest(unittest.TestCase):
 
     def test_remove(self) -> None:
         host = self.use(FakeHost())
+        host.applied = True
+        host.started = True
         with mock.patch.object(sys, "stdout", io.StringIO()):
             caddy.remove()
         self.assertEqual(host.calls, [
-            ("sudo",), ("units_remove", [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]),
-            ("remove", caddy.NAME, caddy.IMAGE), ("remove_image", caddy.BASE),
-            ("remove_image", caddy.BUILDER), ("close", "http", "https", "443/udp"),
+            ("sudo",), ("remove", caddy.NAME, caddy.IMAGE), ("remove_image", caddy.BASE), ("remove_image", caddy.BUILDER),
+            ("units_remove", [f"{caddy.WATCH}.path", f"{caddy.WATCH}.service"]), ("close", "http", "https", "443/udp"),
         ])
 
     def test_summary(self) -> None:

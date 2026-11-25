@@ -151,3 +151,11 @@ def firewall_unlimit(service: str, sources: Sequence[str]) -> None:
 
 def firewall_limited(service: str, sources: Sequence[str]) -> bool:
     return bool(backend().firewall_limited(service, sources))
+
+
+def sysctl_has(name: str, values: Mapping[str, str]) -> bool:
+    return bool(backend().sysctl_has(name, values))
+
+
+def resolver_route_has(name: str, domain: str, server: str) -> bool:
+    return bool(backend().resolver_route_has(name, domain, server))

@@ -5,7 +5,7 @@ import json
 import time
 from pathlib import Path
 
-from kit import config, distro, docs, net, run, ui
+from kit import changes, config, distro, docs, net, run, ui
 
 APP = "network"
 PACKAGE = "tailscale"
@@ -62,7 +62,7 @@ def install(reuse: bool) -> None:
     run.sudo_prepare("instalar o Tailscale, ligar o serviço dele e liberar a porta dele no firewall")
     distro.install([PACKAGE])
     distro.service_enable(SERVICE)
-    distro.firewall_open([PORT])
+    changes.install(APP, items(), reuse)
     _login()
     _advertise()
     _router(reuse)
@@ -158,9 +158,20 @@ def remove() -> None:
         run.cmd(["tailscale", "logout"], sudo=True)
         ui.ok("esta máquina saiu da sua conta do Tailscale")
     distro.service_disable(SERVICE)
-    distro.firewall_close([PORT])
+    changes.undo_all(items())
     distro.uninstall([PACKAGE])
     run.cmd(["rm", "-rf", STATE_DIR], sudo=True)
+
+
+def items() -> list[changes.Change]:
+    return [
+        changes.Change(
+            "tailscale-port", f"Liberar a porta {PORT} do Tailscale no firewall",
+            f"Por essa porta os seus aparelhos se ligam direto a esta máquina. Fechada, a conexão passa por um "
+            "servidor intermediário do Tailscale (relay), bem mais lento.",
+            lambda: distro.firewall_allowed(PORT), lambda: distro.firewall_open([PORT]), lambda: distro.firewall_close([PORT]),
+        ),
+    ]
 
 
 def relayed(peer: dict) -> bool:
