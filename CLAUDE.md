@@ -105,6 +105,18 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Os outros apps publicam endereços pelo `kit.routes` (`~/.astroverso/routes/<app>.json`, pasta de nenhum app); a
   unidade `astroverso-network-routes.path` recarrega o Caddy a cada mudança.
 
+### App `discord`
+
+- Uma máquina roda o bot (container com `discord.py` e a API v1, em `discord.<domínio>` pelo `kit.routes`); as outras
+  instalam o mesmo app no modo cliente. Cliente = máquina (ou projeto de fora, como o studio), com chave própria.
+- O bot descobre o servidor em que foi convidado, cria a categoria **Astroverso** com `#astro`, `#sistema` e um canal
+  por app (no primeiro aviso). O dono do servidor é sempre autorizado.
+- Apps avisam pelo `kit.discord.notify(app, nível, título, ...)`: o padrão visual (nível, cor, menção no `erro`) é
+  do bot, igual para todas as máquinas. Sem Discord configurado, o aviso é ignorado.
+- A API v1 é contrato com projetos de fora: campos novos são opcionais; para quebrar, `/v2`.
+- Testar só com outro nome de container e sem o token real: dois processos com o mesmo token recebem os mesmos
+  cliques.
+
 ### Configurações do sistema
 
 Toda mudança que o Astroverso faz no sistema (energia, SSH, suspensão...) é um módulo que pode ser ligado e
@@ -118,7 +130,7 @@ Tailscale no firewall) fica nesse app e sai no `remove` dele. O desenho dele ter
 - `manager`: o gerenciador (`./astroverso`): menu de instalar e gerenciar, e o uso direto
   `astroverso <app> <comando>`. Contrato do `app.py` em `apps/README.md`.
 - `backup`: rotina de backup das configurações; instalado uma vez, descobre os apps instalados.
-- Cliente do Discord (avisos), quando chegar a vez. O servidor do bot fica no repositório `astroverso-discord`.
+- `kit.discord`: avisos dos apps no Discord (o bot é o app `discord`).
 
 Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 
