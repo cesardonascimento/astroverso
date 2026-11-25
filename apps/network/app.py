@@ -84,11 +84,11 @@ def summary() -> None:
 
 def actions() -> list[Action]:
     return [
-        Action("summary", "Resumo da rede", summary),
+        Action("summary", "Resumo da rede", summary, remote=True),
         Action("reconnect", "Reconectar ao Tailscale", tailscale.reconnect),
         Action("router", "Marcar o redirecionamento no roteador como feito", tailscale.mark_router),
         Action("devices", "Endereços de aparelhos da rede", caddy.manage_devices),
-        Action("reload", "Recarregar os endereços do Caddy", caddy.reload),
+        Action("reload", "Recarregar os endereços do Caddy", caddy.reload, remote=True),
         Action("router-dns", "Marcar o DNS no roteador como feito", adguard.mark_router),
-        Action("watch", "Verificar a rede agora (e avisar no Discord)", watch.check),
+        Action("watch", "Verificar a rede agora (e avisar no Discord)", watch.check, remote=True),
     ]

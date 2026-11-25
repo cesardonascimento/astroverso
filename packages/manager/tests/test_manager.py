@@ -45,7 +45,7 @@ def restore(folder):
 
 
 def actions():
-    return [Action("ping", "Responder pong", lambda: ui.ok("pong"))]
+    return [Action("ping", "Responder pong", lambda: ui.ok("pong")), Action("oculta", "Ação oculta", lambda: ui.ok("escondida"), menu=False)]
 '''
 
 
@@ -115,6 +115,7 @@ class ManagerTest(unittest.TestCase):
         code, out, _ = self.run_cli("bom", "action", "ping")
         self.assertEqual((code, "pong" in out), (0, True))
         self.assertEqual(self.run_cli("bom", "action", "nada")[0], 1)
+        self.assertIn("escondida", self.run_cli("bom", "action", "oculta")[1])
         self.assertEqual(self.run_cli("bom", "remove")[0], 0)
         self.assertFalse(state.exists())
 
@@ -152,6 +153,7 @@ class ManagerTest(unittest.TestCase):
         self.assertIn("instalados: primeiro", screen)
         self.assertIn("falharam: segundo", screen)
         self.assertIn("pong", screen)
+        self.assertNotIn("Ação oculta", screen)
         self.assertIn("primeiro removido", screen)
         self.assertFalse(first.exists())
         self.assertFalse(second.exists())

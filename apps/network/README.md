@@ -104,7 +104,8 @@ quando algo muda**: quando um problema aparece, quando ele piora (de aviso para 
 | Chave desta máquina no Tailscale vence em menos de 14 dias | aviso |
 | Aparelho com conexão ativa passando por relay | info |
 
-Cada aviso traz o link para o doc que resolve. Sem o Discord, a verificação só escreve no log
+Cada aviso traz o link para o doc que resolve e os botões **Resumo da rede** e **Verificar de novo**, que rodam
+essas ações pelo Discord. Sem o Discord, a verificação só escreve no log
 (`journalctl --user -u astroverso-network-watch`). Com esta máquina desligada ou sem internet, não há aviso.
 
 ## Remover

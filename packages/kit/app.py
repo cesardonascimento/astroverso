@@ -11,6 +11,9 @@ class Action:
     id: str
     label: str
     run: Callable[[], None]
+    remote: bool = False
+    confirm: bool = False
+    menu: bool = True
 
 
 class App(Protocol):

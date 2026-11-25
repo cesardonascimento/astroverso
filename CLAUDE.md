@@ -115,6 +115,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   por app (no primeiro aviso). O dono do servidor é sempre autorizado.
 - Apps avisam pelo `kit.discord.notify(app, nível, título, ...)`: o padrão visual (nível, cor, menção no `erro`) é
   do bot, igual para todas as máquinas. Sem Discord configurado, o aviso é ignorado.
+- Ações com `remote=True` viram comandos `/astro <app>:<id>`: o agente (`astroverso-discord-agent.service`, em toda
+  máquina com o app) publica o catálogo e roda `astroverso <app> action <id>` sem terminal. Ações remotas nunca
+  perguntam nada.
 - A API v1 é contrato com projetos de fora: campos novos são opcionais; para quebrar, `/v2`.
 - Testar só com outro nome de container e sem o token real: dois processos com o mesmo token recebem os mesmos
   cliques.

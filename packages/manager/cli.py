@@ -57,7 +57,7 @@ def _install(apps: list[LoadedApp]) -> None:
 def _manage_app(app: LoadedApp) -> None:
     while True:
         success, actions = call(app, app.actions)
-        actions = actions if success else []
+        actions = [action for action in actions if action.menu] if success else []
         labels = [action.label for action in actions] + ["Reinstalar", "Remover", "Voltar"]
         choice = ui.menu(f"Gerenciar {app.name}", labels)
         if choice < len(actions):

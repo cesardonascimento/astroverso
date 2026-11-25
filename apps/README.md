@@ -38,7 +38,13 @@ Funções simples no módulo (o `Protocol` `kit.app.App` documenta os tipos):
 | `install()` | sim | Pergunta, instala e sobe o app; também é o "Reinstalar" |
 | `remove()` | sim | Desfaz tudo o que o app criou, sem falhar no que já não existe |
 | `backup(pasta)` / `restore(pasta)` | sim | Copia a configuração para a pasta e a traz de volta (usados pelo pacote `backup`) |
-| `actions() -> list[Action]` | não | Ações de pós-configuração: `Action(id, rótulo, função)` do `kit.app` |
+| `actions() -> list[Action]` | não | Ações de pós-configuração: `Action(id, rótulo, função, remote=, confirm=, menu=)` do `kit.app` |
+
+**Ações pelo Discord.** Uma ação com `remote=True` vira o comando `/astro <app>:<id>` no Discord (com `confirm=True`,
+pede confirmação por botão antes). Ela roda sem terminal (`astroverso <app> action <id>`, pelo agente do app
+`discord`), então não pode perguntar nada; a saída vai para o Discord. `menu=False` esconde a ação do menu do
+gerenciador (ex.: o próprio agente). Os avisos do `kit.discord.notify(..., actions=[("Rótulo", "<app>:<id>")])`
+podem trazer botões que rodam essas ações.
 
 A pasta do app é carregada como pacote: o `app.py` pode importar os outros arquivos dela (`from . import tailscale`).
 Testes de um app: `python3 -m unittest discover -s apps/<app>/tests`.

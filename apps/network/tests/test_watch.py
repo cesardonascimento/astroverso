@@ -38,8 +38,9 @@ class World:
             me["KeyExpiry"] = self.key_expiry
         return {"BackendState": "Running" if self.connected else "Stopped", "Self": me, "Peer": self.peers}
 
-    def notify(self, app, level, title, text="", fields=None):
+    def notify(self, app, level, title, text="", fields=None, actions=()):
         self.sent.append((level, title))
+        self.actions = list(actions)
         return self.delivered
 
 
@@ -80,6 +81,7 @@ class WatchTest(unittest.TestCase):
     def test_problem_once_then_resolved(self) -> None:
         self.world.adguard = False
         self.assertEqual(self.run_check(), [("erro", "AdGuard parado")])
+        self.assertEqual(self.world.actions, [("Resumo da rede", "network:summary"), ("Verificar de novo", "network:watch")])
         self.assertEqual(self.run_check(), [])
         self.world.adguard = True
         self.assertEqual(self.run_check(), [("sucesso", "AdGuard parado: resolvido")])

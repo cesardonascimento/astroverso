@@ -6,7 +6,7 @@ from pathlib import Path
 from kit import config, discord, net, ui
 from kit.app import Action
 
-from . import client, server
+from . import agent, client, server
 
 APP = "discord"
 DESCRIPTION = "Bot do Discord do Astroverso: avisos dos apps em canais próprios e o comando /astro"
@@ -40,11 +40,13 @@ def install(reuse: bool | None = None) -> None:
         server.install(again)
     else:
         client.install(again)
+    agent.install()
     summary()
 
 
 def remove() -> None:
     ui.step("Discord")
+    agent.remove()
     if mode() == "server":
         server.remove()
     discord.forget()
@@ -94,7 +96,11 @@ def test() -> None:
 
 
 def actions() -> list[Action]:
-    common = [Action("summary", "Resumo do Discord", summary), Action("test", "Mensagem de teste", test)]
+    common = [
+        Action("summary", "Resumo do Discord", summary, remote=True),
+        Action("test", "Mensagem de teste", test, remote=True),
+        Action("agent", "Agente do Discord", agent.serve, menu=False),
+    ]
     if mode() != "server":
         return common
     return common + [

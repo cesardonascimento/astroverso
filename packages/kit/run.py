@@ -96,6 +96,20 @@ def capture(args: Sequence[str], sudo: bool = False, input: str | None = None, t
     return done.stdout.rstrip("\n")
 
 
+def output(args: Sequence[str], timeout: float | None = None, env: dict[str, str] | None = None) -> tuple[int, str]:
+    try:
+        done = subprocess.run(
+            list(args), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            timeout=timeout, env={**os.environ, **(env or {})},
+        )
+    except FileNotFoundError:
+        return 127, f"comando não encontrado: {args[0]}"
+    except subprocess.TimeoutExpired as problem:
+        text = problem.output.decode(errors="replace") if isinstance(problem.output, bytes) else (problem.output or "")
+        return 124, f"{text}\no comando passou de {timeout:g} s"
+    return done.returncode, done.stdout
+
+
 def succeeds(args: Sequence[str], sudo: bool = False, timeout: float | None = None) -> bool:
     try:
         done = subprocess.run(

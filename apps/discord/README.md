@@ -42,6 +42,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/discord/data/` | Os manifestos dos clientes e os IDs dos canais criados |
 | `~/.astroverso/discord.env` (`600`, `DISCORD_URL`, `DISCORD_KEY`) | Liga esta máquina ao bot: é o que o `kit.discord` de todos os apps usa para mandar avisos |
 | Foto do bot trocada pelo logo do Astroverso | Para os avisos aparecerem com a marca do projeto |
+| Unidade do usuário `astroverso-discord-agent.service` (em toda máquina com o app) | O agente: publica no bot os comandos desta máquina e roda os que forem pedidos no `/astro` (`astroverso discord action agent`) |
 
 ## Fora da máquina (passos seus)
 
@@ -61,6 +62,25 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | Mostrar a chave de um cliente | Endereço e chave, para colar na outra máquina (só na máquina do bot) |
 | Adicionar um cliente | Cria a chave de uma máquina ou projeto novo e reinicia o bot (só na máquina do bot) |
 
+## Comandos do `/astro`
+
+Toda máquina com o app (servidor ou cliente) roda o **agente**, que publica no bot as ações dos apps instalados
+marcadas com `remote=True` (veja `apps/README.md`) e roda as que forem pedidas. No Discord, elas aparecem como
+`/astro command:<app>:<ação>` (com autocompletar), no painel (`/astro command:panel`) e na ajuda
+(`/astro command:help`). Hoje:
+
+| Comando | O que faz |
+|---|---|
+| `network:summary` | Resumo da rede |
+| `network:watch` | Verifica a rede agora (e avisa no Discord) |
+| `network:reload` | Recarrega os endereços do Caddy |
+| `discord:summary` | Resumo do Discord |
+| `discord:test` | Mensagem de teste |
+
+O agente roda `astroverso <app> action <ação>` sem terminal, com até 13 minutos, e devolve a saída (sem cores) ao
+Discord, com ✅ ou ❌. Um app instalado em mais de uma máquina publica o mesmo comando em cada uma: ele fica com a
+primeira que publicou. O catálogo é atualizado a cada 5 minutos.
+
 ## Avisos dos apps (`kit.discord`)
 
 ```python
@@ -77,6 +97,8 @@ O aviso vai para o canal `#<app>` (criado no primeiro aviso), num quadro com o p
 | `sucesso` | ✅ verde | silenciosa |
 | `aviso` | ⚠️ âmbar | sim |
 | `erro` | ❌ vermelho | sim, com menção ao dono do servidor |
+
+Com `actions=[("Resumo da rede", "network:summary")]`, o aviso traz botões que rodam esses comandos.
 
 Sem o Discord configurado na máquina, o `notify` não faz nada e devolve `False`. Se o bot não responder, ele mostra
 um aviso na tela e segue: um aviso nunca derruba o app.
@@ -151,7 +173,7 @@ desconhecido, `#astro`. Um botão com `acao` roda aquele comando do `/astro`; um
 
 ## Remover
 
-Na máquina do bot: remove o container e as imagens, retira o endereço do Caddy e apaga `~/.astroverso/discord`
+Desliga e apaga o agente. Na máquina do bot: remove o container e as imagens, retira o endereço do Caddy e apaga `~/.astroverso/discord`
 (token, chaves, manifestos). Em qualquer máquina: apaga `~/.astroverso/discord.env`. O servidor do Discord, os
 canais e a aplicação no portal ficam: apague no Discord, se quiser.
 

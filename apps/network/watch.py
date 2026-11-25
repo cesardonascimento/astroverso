@@ -12,6 +12,7 @@ from . import adguard, caddy, tailscale
 APP = "network"
 NAME = "astroverso-network-watch"
 DOCS = Path(__file__).with_name("docs")
+BUTTONS = (("Resumo da rede", "network:summary"), ("Verificar de novo", "network:watch"))
 WARN_DAYS = 14
 CRITICAL_DAYS = 3
 
@@ -152,7 +153,7 @@ def check() -> None:
         before = previous.get(key)
         if before and before.get("level") == problem.level and (before.get("kind") or before.get("title")) == problem.identity:
             continue
-        if discord.notify(APP, problem.level, problem.title, problem.text):
+        if discord.notify(APP, problem.level, problem.title, problem.text, actions=BUTTONS):
             state[key] = {"level": problem.level, "title": problem.title, "text": problem.text, "kind": problem.kind}
             ui.warn(f"avisado no Discord: {problem.title}")
     for key, before in previous.items():

@@ -53,6 +53,7 @@ A única porta para comandos do sistema: os apps não chamam o `subprocess` dire
 | `cmd(args, sudo=, input=, quiet=, timeout=)` | Saída e erros, linha a linha, ao vivo, com o prefixo e em cinza | `ui.fail` com o comando e o código. Com `quiet=True`, a saída só aparece se der erro |
 | `capture(args, sudo=, input=, timeout=)` | Nada: devolve a saída padrão (sem o `\n` do fim) | `ui.fail`, mostrando a saída de erro |
 | `succeeds(args, sudo=, timeout=)` | Nada | Devolve `False` (também para comando inexistente ou tempo esgotado) |
+| `output(args, timeout=, env=)` | Nada: devolve `(código, saída)`, com a saída padrão e a de erro juntas | Não falha: código `127` (comando inexistente) ou `124` (tempo esgotado) |
 | `sudo_prepare(motivo)` | Explica o motivo e pede a senha uma vez (`sudo -v`), se ainda não houver permissão | Sem terminal: "rode num terminal" |
 
 - **Segredos** só por `input=` (entrada padrão), nunca nos argumentos.
@@ -156,7 +157,7 @@ ao bot por `~/.astroverso/discord.env` (`DISCORD_URL`, `DISCORD_KEY`, `600`), gr
 
 | Nome | O que faz |
 |---|---|
-| `notify(app, nível, título, texto="", campos=None)` | Manda um aviso para o canal `#<app>`, no padrão do Astroverso. `nível`: `info`, `sucesso`, `aviso` ou `erro` (veja o README do app `discord`). Sem configuração, não faz nada; se o bot não responder, mostra um aviso e segue. Devolve se o aviso foi entregue |
+| `notify(app, nível, título, texto="", campos=None, actions=())` | Manda um aviso para o canal `#<app>`, no padrão do Astroverso. `nível`: `info`, `sucesso`, `aviso` ou `erro` (veja o README do app `discord`). Sem configuração, não faz nada; se o bot não responder, mostra um aviso e segue. `actions`: botões `(rótulo, "<app>:<ação>")` que rodam ações remotas. Devolve se o aviso foi entregue |
 | `configured()` | Se esta máquina está ligada ao bot |
 | `settings()` / `save(url, chave)` / `forget()` | Lê, grava e apaga o `discord.env` |
 | `whoami(url=, key=)` | O nome do cliente da chave (`GET /v1/eu`); levanta `DiscordError` se o bot recusar ou não responder |
@@ -202,6 +203,7 @@ oneshot.
 |---|---|
 | `install({nome: conteúdo}, start=[...])` | Grava as que mudaram, `daemon-reload`, liga (`enable --now`) as de `start` que estão paradas e reinicia as que mudaram |
 | `remove(nomes)` | Desliga, apaga e faz `daemon-reload`; ignora as que não existem |
+| `restart(nome)` | Reinicia a unidade (ex.: um serviço de longa duração depois de atualizar o código) |
 | `active(nome)` | Se a unidade está ativa |
 
 ## logo
@@ -211,7 +213,7 @@ magenta) e a fonte do nome (`FONT`), desenhados pelo `ui.banner()` com meio-bloc
 
 ## app
 
-`Action(id, rótulo, função)`, o `Protocol` `App` e `REQUIRED`, os nomes obrigatórios do `app.py` (contrato em
+`Action(id, rótulo, função, remote=False, confirm=False, menu=True)`, o `Protocol` `App` e `REQUIRED`, os nomes obrigatórios do `app.py` (contrato em
 `apps/README.md`).
 
 ## testing

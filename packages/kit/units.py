@@ -39,6 +39,10 @@ def install(units: Mapping[str, str], start: Sequence[str]) -> None:
             run.cmd(["systemctl", "--user", "restart", name], quiet=True)
 
 
+def restart(name: str) -> None:
+    run.cmd(["systemctl", "--user", "restart", name], quiet=True)
+
+
 def remove(names: Sequence[str]) -> None:
     present = [name for name in names if (folder() / name).exists()]
     for name in present:

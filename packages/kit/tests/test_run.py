@@ -59,6 +59,15 @@ class RunTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             run.capture([PY, "-c", "import time; time.sleep(5)"], timeout=0.3)
 
+    def test_output(self) -> None:
+        code, text = run.output([PY, "-c", "import os, sys; print('saída', flush=True); print(os.environ['EXTRA'], file=sys.stderr); sys.exit(3)"],
+                                env={"EXTRA": "erro"})
+        self.assertEqual((code, text), (3, "saída\nerro\n"))
+        self.assertEqual(run.output(["comando-que-nao-existe"])[0], 127)
+        code, text = run.output([PY, "-c", "import time; print('antes', flush=True); time.sleep(5)"], timeout=0.5)
+        self.assertEqual(code, 124)
+        self.assertIn("passou de 0.5 s", text)
+
     def test_succeeds(self) -> None:
         self.assertTrue(run.succeeds([PY, "-c", "pass"]))
         self.assertFalse(run.succeeds([PY, "-c", "raise SystemExit(1)"]))

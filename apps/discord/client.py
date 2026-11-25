@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from kit import config, discord, net, ui
+from kit import config, discord, net, ui, units
 
 APP = "discord"
 
@@ -52,4 +52,5 @@ def summary() -> None:
     ui.table([
         ["Endereço do bot", values.get("DISCORD_URL") or ui.pending("não configurado")],
         ["Situação", state],
+        ["Comandos do /astro", ui.good("agente ligado") if units.active("astroverso-discord-agent.service") else ui.pending("agente desligado")],
     ])
