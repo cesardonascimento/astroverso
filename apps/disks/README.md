@@ -14,7 +14,7 @@ destravados pelo TPM, sem pedir senha. Os discos são **da máquina**, de nenhum
      (nada pode pedir senha no boot, porque a máquina reinicia de longe).
    - O nome vem do rótulo do disco (ou `disco-<uuid>`); no LUKS, o rótulo de dentro é copiado para o cabeçalho, para
      aparecer mesmo com o disco travado.
-3. Pergunta a verificação de hora em hora e o backup diário.
+3. Pergunta a verificação de hora em hora, o backup diário da configuração e o das pastas dos discos.
 4. Mostra o Resumo dos discos.
 
 Na reinstalação com a configuração salva, monta de novo os discos cadastrados, sem perguntar.
@@ -29,9 +29,10 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Por disco: links em `/etc/systemd/system/<dispositivo>.device.wants/` (e no `.wants` do `systemd-cryptsetup@`) | O disco monta de novo sozinho quando é religado (gaveta USB) | ⚠ |
 | `/srv/<nome>` (`770`, seu usuário; imutável quando desmontado) | O ponto de montagem; desmontado, ninguém grava no disco do sistema por engano | |
 | `/etc/fstab.astroverso-bak` e `/etc/crypttab.astroverso-bak` | Cópia de antes da primeira mudança | |
-| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `watch.json`) | A configuração | |
+| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `backups.json` com as pastas com backup e as pastas de destino de cada uma, `watch.json`) | A configuração | |
 | Unidades do usuário `astroverso-disks-watch.timer` e `.service` (perguntada, padrão sim) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
+| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim, com as pastas de destino) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
+| Unidades do usuário `astroverso-disks-backup-folders.timer` e `.service` (perguntada, padrão sim) | Backup diário das pastas escolhidas em **Backup das pastas dos discos**, cada uma nas próprias pastas de destino (`kit.backup.run_data`, marca `dados:<disco>/<pasta>`, por `podman unshare`). Disco desligado ou travado: aquela pasta fica de fora e avisa no `#backup` | |
 
 ## Ações
 
@@ -39,8 +40,10 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 |---|---|
 | Resumo dos discos | Cada disco (caminho, sistema de arquivos, situação, espaço usado), as mudanças e a verificação. Também no Discord: `/astro disks:summary` |
 | Discos da máquina | Checklist com os discos encontrados (e os cadastrados que estão desligados): marcar monta, desmarcar desmonta (com confirmação), tira do `fstab` e descadastra o TPM. Os dados continuam no disco |
-| Mudanças no sistema | Desmonta e monta de novo cada disco cadastrado (sem descadastrar o TPM), liga e desliga a verificação e o backup |
+| Mudanças no sistema | Desmonta e monta de novo cada disco cadastrado (sem descadastrar o TPM), liga e desliga a verificação e os backups |
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
+| Backup das pastas dos discos | Os dados que não são de nenhum app: adicionar uma pasta (ou o disco inteiro) pelo seletor de pastas e escolher as pastas de destino dela, trocar as pastas de destino, tirar pastas do backup (as versões guardadas continuam no servidor) |
+| Fazer backup das pastas agora / Restaurar uma pasta de uma versão | O backup das pastas na hora (também no Discord) e a restauração de uma versão numa pasta nova, sem mexer na original |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do servidor de backup. Numa máquina nova, o TPM pede a senha do LUKS de novo |
 
 ## Verificação de hora em hora

@@ -42,7 +42,7 @@ def items() -> list[changes.Change]:
 
 def backup_files() -> bool:
     return kit_backup.run_data(APP, FILES_DATA, nextcloud.files(), kit_backup.targets(APP, FILES_TO), "backup-files",
-                               unshare=True, key=FILES_TO, exclude=SKIP)
+                               unshare=True, missing=kit_backup.lost(APP, FILES_TO), exclude=SKIP)
 
 
 def status() -> bool:

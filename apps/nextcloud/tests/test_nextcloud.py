@@ -241,7 +241,7 @@ class NextcloudTest(unittest.TestCase):
             self.assertTrue(app.backup_files())
         args, kwargs = run_data.call_args
         self.assertEqual(args, ("nextcloud", "arquivos", nextcloud.files(), ["x"], "backup-files"))
-        self.assertEqual((kwargs["unshare"], kwargs["key"], kwargs["exclude"]), (True, "BACKUP_FILES_TO", ("appdata_*/preview",)))
+        self.assertEqual((kwargs["unshare"], kwargs["missing"], kwargs["exclude"]), (True, [], ("appdata_*/preview",)))
 
 
 if __name__ == "__main__":

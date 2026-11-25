@@ -11,6 +11,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "packages"))
 
+from kit import backup as kit_backup
 from kit import config, disks, ui
 from kit.testing import run_in_pty
 from manager.apps import load
@@ -139,12 +140,37 @@ class DisksAppTest(unittest.TestCase):
     def test_items_and_actions(self) -> None:
         app.save_registry([{"uuid": LUKS, "name": "dados"}])
         ids = [(item.id, item.danger) for item in app.items()]
-        self.assertEqual(ids, [("disk-1111aaaa", True), ("watch", False), ("backup", False)])
+        self.assertEqual(ids, [("disk-1111aaaa", True), ("watch", False), ("backup", False), ("backup-folders", False)])
         self.assertEqual(app.registry_file().stat().st_mode & 0o777, 0o600)
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("disks", False), ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
+                         [("summary", True), ("disks", False), ("changes", False), ("watch", True), ("backups", False),
+                          ("backup-folders", True), ("restore-folder", False), ("backup-now", True), ("restore-version", False)])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             self.assertFalse(app.status())
+
+    def test_folder_backups(self) -> None:
+        local = kit_backup.Destination("aaaa1111", "/srv/backup-1")
+        cloud = kit_backup.Destination("bbbb2222", "/srv/outro/Backups", "drive (duas vias)")
+        kit_backup.save("https://backup.casa.com", "servidor", "a", "r")
+        kit_backup.save_destinations([local, cloud])
+        disk = self.home / "dados"
+        (disk / "fotos").mkdir(parents=True)
+        found = [disks.Disk(LUKS, disk, "ext4", "")]
+        keys = [b"\r", b"\r", b"nada\n", b"fotos\n", b"\x1b[B", b" ", b"\r", b"4", b"\r"]
+        with mock.patch.object(disks, "mounts", return_value=found), mock.patch.object(disks, "ROOT", self.home), \
+                mock.patch.object(disks, "responds", return_value=True):
+            outcome = run_in_pty(lambda: (app.manage_backups(), app.backups())[1], keys, columns=160)
+            self.assertEqual(outcome.code, 0, outcome.screen)
+            self.assertIn("essa pasta não existe", outcome.screen)
+            self.assertEqual(outcome.result, [{"path": str(disk / "fotos"), "to": ["aaaa1111", "bbbb2222"]}])
+            self.assertIn("ligue em Mudanças no sistema", outcome.screen)
+            app.save_backups(outcome.result + [{"path": str(disk / "velha"), "to": ["sumiu"]}])
+            with mock.patch.object(kit_backup, "run_data", return_value=True) as run_data:
+                self.assertTrue(app.backup_folders())
+        first, second = run_data.call_args_list
+        self.assertEqual(first.args, ("disks", "dados/fotos", disk / "fotos", [local, cloud], "backup-folders"))
+        self.assertEqual((first.kwargs["unshare"], first.kwargs["missing"]), (True, []))
+        self.assertEqual((second.args[3], second.kwargs["missing"]), ([], ["sumiu"]))
 
 
 if __name__ == "__main__":

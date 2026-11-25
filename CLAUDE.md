@@ -189,6 +189,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   descadastrar em "Discos da máquina" também descadastra o TPM.
 - Os outros apps leem pelo `kit.disks` (o `fstab` é o contrato): `mounts()`, `available(pasta)`.
 - Verificação de hora em hora: não montado, preso (não responde) e 90% ocupado.
+- Backup das pastas dos discos (dados que não são de nenhum app): cada pasta com as próprias pastas de destino, em
+  `backups.json`.
 
 ### Mudanças no sistema
 

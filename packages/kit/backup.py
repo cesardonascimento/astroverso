@@ -275,8 +275,8 @@ def _report(app: str, what: str, problems: list[str], seconds: int, retry: str, 
     return True
 
 
-def _lost_problems(app: str, key: str) -> list[str]:
-    return [f"a pasta de destino {item} não existe mais no servidor: escolha de novo (desligue e ligue o backup)" for item in lost(app, key)]
+def _lost_problems(missing: Sequence[str]) -> list[str]:
+    return [f"a pasta de destino {item} não existe mais no servidor: escolha de novo" for item in missing]
 
 
 def run_backup(app: str, save_function: Callable[[Path], None], label: str = "", notify: bool = True) -> bool:
@@ -285,7 +285,7 @@ def run_backup(app: str, save_function: Callable[[Path], None], label: str = "",
         return False
     what = f"do {app}"
     chosen = targets(app)
-    problems = _lost_problems(app, TARGETS)
+    problems = _lost_problems(lost(app))
     if not chosen:
         return _report(app, what, problems or ["nenhuma pasta de destino escolhida: ligue o backup em Mudanças no sistema"],
                        0, "backup-now", notify, [])
@@ -311,12 +311,12 @@ def run_backup(app: str, save_function: Callable[[Path], None], label: str = "",
 
 
 def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], retry: str, unshare: bool = False,
-             key: str = "", exclude: Sequence[str] = (), notify: bool = True) -> bool:
+             missing: Sequence[str] = (), exclude: Sequence[str] = (), notify: bool = True) -> bool:
     if not configured():
         ui.info("esta máquina não está ligada a um servidor de backup (instale o app backup): nada a fazer")
         return False
     what = f"de {name} ({app})"
-    problems = _lost_problems(app, key) if key else []
+    problems = _lost_problems(missing)
     if not chosen:
         return _report(app, what, problems or ["nenhuma pasta de destino escolhida"], 0, retry, notify, [])
     if not path.is_dir() or not disks.available(path):
