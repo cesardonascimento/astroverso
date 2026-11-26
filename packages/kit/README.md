@@ -77,6 +77,7 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 | Arquivos do sistema | `file_put(caminho, conteúdo, mode=)` (com `sudo`, só se mudou; devolve se mudou; `mode` acerta a permissão), `file_drop(caminho)` |
 | systemd | `units_mask(nomes)`, `units_unmask(nomes)`, `units_masked(nomes)`; `unit_install(nome, conteúdo)` (em `/etc/systemd/system`, liga e reinicia), `unit_remove(nome)`, `unit_enabled(nome)`; `daemon_reload()`; `reload_service(nome)` (`reload`, ou `HUP`) |
 | Atualizações automáticas | `auto_updates_on()` / `auto_updates_off()` / `auto_updates_active()` (Fedora: `dnf5-plugin-automatic`, `/etc/dnf/automatic.conf` com `apply_updates = yes` e `reboot = never`, `dnf5-automatic.timer`), `auto_updates_last()` (resultado e início da última rodada), `reboot_pending()` (`dnf needs-restarting`, sem rede) |
+| Nome da máquina | `hostname_set(nome)` (Fedora: `hostnamectl set-hostname`); para ler, `kit.net.hostname()` |
 | Firewall por origem | `firewall_limit(serviço, origens)` (regras ricas só das origens, e tira o serviço aberto para todos; as regras entram antes), `firewall_unlimit(serviço, origens)`, `firewall_limited(serviço, origens)` |
 
 - Tudo é idempotente: só age, e só mostra um ✔, quando algo muda.

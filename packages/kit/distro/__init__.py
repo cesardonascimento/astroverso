@@ -181,5 +181,9 @@ def auto_updates_last() -> tuple[str, str]:
     return backend().auto_updates_last()
 
 
+def hostname_set(name: str) -> None:
+    backend().hostname_set(name)
+
+
 def reboot_pending() -> bool:
     return bool(backend().reboot_pending())

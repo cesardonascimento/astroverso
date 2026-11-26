@@ -7,10 +7,10 @@ from kit import backup as kit_backup
 from kit import changes, config, ui, watch
 from kit.app import Action
 
-from . import power, ssh, updates
+from . import hostname, power, ssh, updates
 
 APP = "system"
-DESCRIPTION = "Configurações da máquina: sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
+DESCRIPTION = "Configurações da máquina: nome, sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
 ORDER = 10
 BUTTONS = (("Resumo da máquina", "system:summary"), ("Verificar de novo", "system:watch"))
 
@@ -34,6 +34,8 @@ def status() -> bool:
 
 def install(reuse: bool | None = None) -> None:
     again = config.reuse(APP) if reuse is None else reuse
+    ui.step("Nome da máquina")
+    hostname.install(again)
     ui.step("Energia: sempre ligada")
     ui.note(
         "Estes ajustes garantem que a máquina fique sempre ligada e acessível, mesmo de tampa fechada. Cada um é "
@@ -76,6 +78,7 @@ def restore(folder: Path) -> None:
 
 def summary() -> None:
     ui.step("Resumo da máquina")
+    hostname.summary()
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     ssh.summary()

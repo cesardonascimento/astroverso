@@ -1,18 +1,21 @@
 # system
 
-Configurações da própria máquina, em módulos: **energia** (sempre ligada, mesmo de tampa fechada) e **SSH** (acesso
+Configurações da própria máquina, em módulos: **nome da máquina**, **energia** (sempre ligada, mesmo de tampa fechada) e **SSH** (acesso
 remoto, chaves autorizadas e a chave desta máquina para o GitHub). Cada mudança no sistema é perguntada na
 instalação (padrão sim) e pode ser desfeita e refeita em **Gerenciar → Mudanças no sistema**; as marcadas com ⚠ são
 importantes para a máquina continuar acessível.
 
 ## O que a instalação faz
 
-1. **Energia:** pergunta cada ajuste (tabela abaixo) e aplica os escolhidos.
-2. **SSH:** pergunta cada ajuste e aplica os escolhidos. Na primeira vez, as chaves que já estão em
+1. **Nome da máquina:** pergunta o nome (o atual como padrão; letras minúsculas, números e hífen) e aplica pelo
+   `hostnamectl`. Vem primeiro porque o Tailscale, o endereço do Cockpit e os backups usam o nome. Trocar depois
+   pede reinstalar os apps que já usavam o nome antigo. O nome não volta ao anterior no Remover (decisão do usuário).
+2. **Energia:** pergunta cada ajuste (tabela abaixo) e aplica os escolhidos.
+3. **SSH:** pergunta cada ajuste e aplica os escolhidos. Na primeira vez, as chaves que já estão em
    `~/.ssh/authorized_keys` aparecem num checklist (marcadas) para você confirmar e dar um nome a cada uma (o PC).
-3. Pergunta se deve preparar a chave desta máquina para o GitHub: cria `~/.ssh/id_ed25519` (se faltar), mostra a
+4. Pergunta se deve preparar a chave desta máquina para o GitHub: cria `~/.ssh/id_ed25519` (se faltar), mostra a
    chave pública e o link para o passo a passo, e confere quando você disser que cadastrou.
-4. Mostra o Resumo da máquina.
+5. Mostra o Resumo da máquina.
 
 O login por senha no SSH continua como na distribuição: as chaves só deixam os seus PCs entrarem sem senha. Se um
 PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave dele em **Chaves SSH autorizadas**.
@@ -21,6 +24,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 
 | Mudança | Por quê | ⚠ |
 |---|---|---|
+| Nome da máquina (`hostnamectl set-hostname`, gravado em `HOSTNAME` no `.env`) | Identifica a máquina na rede, no Tailscale, no endereço do Cockpit e nos backups; fica no Remover | |
 | Suspensão e hibernação mascaradas (`sleep`, `suspend`, `hibernate`, `hybrid-sleep`, `suspend-then-hibernate`) | Nada põe a máquina para dormir: ela fica acessível 24 horas | ⚠ |
 | `/etc/systemd/logind.conf.d/99-astroverso-lid.conf` (`HandleLidSwitch`, `HandleLidSwitchExternalPower`, `HandleLidSwitchDocked` = `ignore`) | O notebook fica de tampa fechada sem suspender | ⚠ |
 | `/etc/systemd/logind.conf.d/99-astroverso-keys.conf` (teclas de suspender e hibernar e `IdleAction` = `ignore`) | Uma tecla esbarrada não derruba o servidor; o botão de ligar segue normal | |
@@ -45,7 +49,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 
 | Ação | O que faz |
 |---|---|
-| Resumo da máquina | Cada mudança (aplicada ou desfeita), as chaves autorizadas (PC, tipo, impressão digital) e a chave do GitHub. Também no Discord: `/astro system:summary` |
+| Resumo da máquina | O nome da máquina, cada mudança (aplicada ou desfeita), as chaves autorizadas (PC, tipo, impressão digital) e a chave do GitHub. Também no Discord: `/astro system:summary` |
 | Mudanças no sistema | Checklist com as mudanças aplicadas marcadas; marcar aplica, desmarcar desfaz (as ⚠ pedem confirmação) |
 | Chaves SSH autorizadas | Lista, adiciona (cole a chave pública do PC) e remove chaves |
 | Chave desta máquina para o GitHub | Cria a chave (se faltar), mostra a parte pública e confere o acesso |

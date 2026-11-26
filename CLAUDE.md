@@ -264,8 +264,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 
 ### App `system`
 
-- Configurações da própria máquina, um arquivo por módulo: `power.py` (suspensão mascarada, tampa e teclas
-  ignoradas no `logind`, tela do console apagada) e `ssh.py` (`sshd`, SSH só da rede local e do Tailscale,
+- Configurações da própria máquina, um arquivo por módulo: `hostname.py` (primeira etapa: o nome da máquina pelo
+  `hostnamectl`, sem `Change` e sem voltar ao anterior no `remove`, por decisão do usuário), `power.py` (suspensão
+  mascarada, tampa e teclas ignoradas no `logind`, tela do console apagada) e `ssh.py` (`sshd`, SSH só da rede local e do Tailscale,
   `AllowUsers` + `PermitRootLogin no`, chaves autorizadas e a chave da máquina para o GitHub).
 - O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado
   for perdido). O `remove` não desliga o `sshd` nem apaga o `authorized_keys`.

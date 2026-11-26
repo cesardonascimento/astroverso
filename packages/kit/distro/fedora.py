@@ -278,6 +278,10 @@ def unit_enabled(name: str) -> bool:
     return (SYSTEMD / name).exists() and _service_enabled(name)
 
 
+def hostname_set(name: str) -> None:
+    run.cmd(["hostnamectl", "set-hostname", name], sudo=True)
+
+
 def daemon_reload() -> None:
     run.cmd(["systemctl", "daemon-reload"], sudo=True)
 

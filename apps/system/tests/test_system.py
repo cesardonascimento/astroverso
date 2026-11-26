@@ -20,6 +20,7 @@ assert APP.module is not None, APP.problem
 app = APP.module
 power = app.power
 ssh = app.ssh
+hostname = app.hostname
 
 
 def new_key(folder: Path, comment: str) -> str:
@@ -122,6 +123,9 @@ class FakeSystem:
     def firewall_limited(self, service, sources):
         return self.limited
 
+    def hostname_set(self, name):
+        self.record("hostname", name)
+
 
 class SystemTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -151,6 +155,8 @@ class SystemTest(unittest.TestCase):
             mock.patch.object(app.watch, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(ssh, "distro", self.system),
             mock.patch.object(ssh, "net", fake_net),
+            mock.patch.object(hostname, "net", fake_net),
+            mock.patch.object(hostname, "distro", self.system),
             mock.patch.object(ssh.run, "output", side_effect=output),
             mock.patch.object(ssh.run, "succeeds", return_value=True),
             mock.patch.object(ssh.getpass, "getuser", return_value="dono"),
@@ -221,7 +227,7 @@ class SystemTest(unittest.TestCase):
             return self.system.calls
 
         self.github = True
-        keys = [b"\n"] * 12
+        keys = [b"\n"] * 13
         with mock.patch.object(ssh, "_import"), mock.patch.object(ssh.run, "cmd", side_effect=lambda args, **_: self._keygen(args)):
             outcome = run_in_pty(scenario, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -230,12 +236,32 @@ class SystemTest(unittest.TestCase):
         self.assertIn("o GitHub aceitou a chave desta máquina", outcome.screen)
         self.assertIn("Atualizar o sistema sozinho, todo dia de madrugada (sem reiniciar)? [S/n]", outcome.screen)
         self.assertIn("⚠ Ignorar a tampa fechada", outcome.screen)
+        self.assertIn("nome da máquina: servidor", outcome.screen)
+        self.assertNotIn(["hostname", "servidor"], outcome.result)
         saved = config.load("system")
+        self.assertEqual(saved["HOSTNAME"], "servidor")
         self.assertEqual({key: value for key, value in saved.items() if key.startswith("CHANGE_")}, {
             "CHANGE_POWER_SLEEP": "yes", "CHANGE_POWER_LID": "yes", "CHANGE_POWER_KEYS": "yes", "CHANGE_POWER_BLANK": "yes",
             "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes", "CHANGE_UPDATES": "yes",
             "CHANGE_WATCH": "yes", "CHANGE_BACKUP": "yes",
         })
+
+    def test_hostname(self) -> None:
+        self.assertEqual(hostname.validate(" Casa-01 "), "casa-01")
+        for bad in ("-casa", "casa-", "casa.lan", "c" * 64, "", "casa_1"):
+            with self.assertRaises(ValueError):
+                hostname.validate(bad)
+        outcome = run_in_pty(lambda: (hostname.install(False), self.system.calls)[1], [b"-ruim\n", b"novo\n"], columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("? nome da máquina [servidor]", outcome.screen)
+        self.assertIn("sem hífen no começo nem no fim", outcome.screen)
+        self.assertIn(["hostname", "novo"], outcome.result)
+        self.assertIn("reinstale os apps", outcome.screen)
+        self.assertEqual(config.load("system")["HOSTNAME"], "novo")
+        self.system.calls.clear()
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            hostname.install(True)
+        self.assertEqual(self.system.calls, [("hostname", "novo")])
 
     def _keygen(self, args) -> None:
         if args[0] == "ssh-keygen":

@@ -162,6 +162,11 @@ class DistroTest(unittest.TestCase):
         self.assertTrue(all(sudo for _, sudo in reads), reads)
         self.assertIn("ler a configuração do firewall", recorder.prepared)
 
+    def test_hostname_set(self) -> None:
+        recorder = self.use(Recorder())
+        fedora.hostname_set("casa")
+        self.assertEqual(recorder.calls, [("cmd", ("hostnamectl", "set-hostname", "casa"), True, None)])
+
     def test_firewall_inactive(self) -> None:
         recorder = self.use(Recorder())
         fedora.firewall_open(["41641/udp"])
