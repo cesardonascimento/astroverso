@@ -62,7 +62,7 @@ externa) você cadastra no próprio n8n: o backup leva junto, criptografadas.
 | Mudança | Por quê |
 |---|---|
 | Podman e *linger*; os containers acima por Quadlet, na rede `astroverso`, sem porta na máquina | O n8n, o executor e os módulos; o Caddy chega no n8n pelo nome |
-| `~/.astroverso/n8n/` (`.env` com as respostas e a chave das chamadas, `n8n.env` e `runners.env` `600` com a chave de criptografia e o token, `owner_password_hash`, `data/` com o banco) | A configuração e as rotinas |
+| `~/.astroverso/n8n/` (`.env` com as respostas e a chave das chamadas, `commands.json` com os comandos do Discord, `n8n.env` e `runners.env` `600` com a chave de criptografia e o token, `owner_password_hash`, `data/` com o banco) | A configuração e as rotinas |
 | `~/.astroverso/routes/n8n.json` | O endereço publicado para o Caddy |
 | Unidades do usuário `astroverso-n8n-watch.timer` e `.service` (perguntada) | A verificação de hora em hora |
 | Unidades do usuário `astroverso-n8n-backup.timer` e `.service` (perguntada, com as pastas de destino) | O backup diário (abaixo) |
@@ -96,8 +96,23 @@ A restauração para os containers, apaga o banco e carrega a exportação **num
 | Atualizar as conexões do Astroverso | Regrava as credenciais das conexões (também no Discord) |
 | Trocar a senha do administrador | Novo hash e reinício do n8n |
 | Restaurar uma rotina / Restaurar uma versão | Veja "Versões das rotinas" |
+| Comandos do Discord | Cadastra comandos que chamam o webhook de uma rotina: nome, caminho do webhook e descrição (`commands.json`). Cada um vira `/astro n8n:<nome>` (veja abaixo) |
+| `<comando>` | Um por comando cadastrado, só no Discord: chama a rotina e mostra a mensagem dela |
 | Importar rotinas (arquivos JSON) | Traz rotinas de uma pasta (exportadas de outro n8n ou do backup), desligadas; a de mesmo `id` é substituída. Antes, avisa as credenciais que ainda não existem (a importação liga cada nó pelo `id` ou pelo nome e tipo) |
 | Mudanças no sistema / Verificar agora / Fazer backup agora | Como nos outros apps |
+
+## Comandos do Discord
+
+Um comando chama o webhook de uma rotina **de dentro do container do n8n** (`127.0.0.1:5678/webhook/<caminho>`, sem
+passar pelo Caddy), com a chave das chamadas do Astroverso no cabeçalho `X-Astroverso-Chave` (pela entrada padrão, nunca
+em argumento) e corpo `{}`. A rotina precisa de:
+
+- um nó **Webhook** com método POST, autenticação **Header Auth** com a credencial "Astroverso: chamadas do Astroverso"
+  e resposta pelo último nó (`responseMode: lastNode`);
+- um último nó que sempre devolva um item, com o texto para o Discord no campo `mensagem`.
+
+As ações não recebem argumento: a rotina é chamada sem parâmetros (ex.: o e-mail das contas usa o mês atual). Erros
+comuns aparecem traduzidos: 404 (rotina desligada ou caminho errado) e 401/403 (webhook sem a credencial certa).
 
 ## Verificação de hora em hora
 

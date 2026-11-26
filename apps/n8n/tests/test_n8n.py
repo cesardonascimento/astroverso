@@ -232,6 +232,34 @@ class N8nTest(unittest.TestCase):
         self.assertIn("credenciais que ainda não existem no n8n: Astroverso: Nextcloud (nextCloudApi)", outcome.screen)
         self.assertEqual(outcome.result, ["Avisos", "Contas"])
 
+    def test_commands_become_remote_actions(self) -> None:
+        commands = app.commands
+        keys = [b"\r", b"summary\n", b"contas-email\n", b"/webhook/astroverso-contas-email\n", b"Manda o e-mail das contas\n", b"\x1b[B\x1b[B\x1b[B", b"\r"]
+        outcome = run_in_pty(lambda: (app.manage_commands(), commands.commands())[1], keys, columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("o nome summary já está em uso", outcome.screen)
+        self.assertEqual(outcome.result, [{"name": "contas-email", "path": "astroverso-contas-email", "description": "Manda o e-mail das contas"}])
+        action = next(a for a in app.actions() if a.id == "contas-email")
+        self.assertEqual((action.remote, action.menu, action.label), (True, False, "Manda o e-mail das contas"))
+        config.save("n8n", {"HOOK_KEY": "segredo-xyz"})
+        calls: list = []
+
+        def exec_output(name, args, user="", env=None, input=None, timeout=None):
+            calls.append((args, input))
+            return 0, 'log do n8n\n{"status": 200, "corpo": "{\\"mensagem\\": \\"enviado\\"}"}'
+
+        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(commands.container, "exec_output", side_effect=exec_output), \
+                mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            action.run()
+        self.assertEqual((calls[0][0][-1], calls[0][1]), ("astroverso-contas-email", "segredo-xyz"))
+        self.assertNotIn("segredo-xyz", " ".join(calls[0][0]))
+        self.assertIn("enviado", out.getvalue())
+        self.assertEqual(commands.answer(404, ""), (False, "o n8n não achou o webhook: a rotina está desligada ou o caminho mudou"))
+        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(commands.container, "exec_output", return_value=(0, '{"status": 500, "corpo": "erro"}')), \
+                mock.patch.object(sys, "stderr", io.StringIO()), mock.patch.object(sys, "stdout", io.StringIO()):
+            with self.assertRaises(SystemExit):
+                action.run()
+
     def test_collect(self) -> None:
         make_module(self.modules, "contas")
         with mock.patch.object(container, "active", return_value=False):
@@ -245,7 +273,7 @@ class N8nTest(unittest.TestCase):
         self.assertEqual([item.id for item in app.items()], ["watch", "backup"])
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
                          [("summary", True), ("connections", True), ("password", False), ("restore-workflow", False),
-                          ("import-workflows", False), ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
+                          ("import-workflows", False), ("commands", False), ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
 
 
 if __name__ == "__main__":

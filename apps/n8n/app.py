@@ -9,12 +9,12 @@ from kit import changes, config, container, routes, ui, validate, watch
 from kit.app import Action
 from kit.watch import Problem
 
-from . import connections, modules, n8n
+from . import commands, connections, modules, n8n
 
 APP = "n8n"
 DESCRIPTION = "Rotinas automáticas montadas pelo navegador (n8n) em https://n8n.<domínio>, com módulos do Astroverso"
 BUTTONS = (("Resumo do n8n", "n8n:summary"), ("Verificar de novo", "n8n:watch"))
-FILES = (".env", "n8n.env", "owner_password_hash")
+FILES = (".env", "n8n.env", "owner_password_hash", "commands.json")
 
 
 def items() -> list[changes.Change]:
@@ -249,13 +249,28 @@ def manage() -> None:
     changes.manage(APP, items())
 
 
+def _remote(item: dict[str, str]) -> None:
+    if not commands.call(item):
+        raise SystemExit(1)
+
+
+def manage_commands() -> None:
+    commands.manage({action.id for action in base_actions()})
+
+
 def actions() -> list[Action]:
+    return base_actions() + [Action(item["name"], item.get("description") or f"Rotina {item['path']}", lambda item=item: _remote(item),
+                                    remote=True, menu=False) for item in commands.commands()]
+
+
+def base_actions() -> list[Action]:
     return [
         Action("summary", "Resumo do n8n", summary, remote=True),
         Action("connections", "Atualizar as conexões do Astroverso", connections.sync, remote=True),
         Action("password", "Trocar a senha do administrador", password),
         Action("restore-workflow", "Restaurar uma rotina", restore_workflow),
         Action("import-workflows", "Importar rotinas (arquivos JSON)", import_workflows),
+        Action("commands", "Comandos do Discord", manage_commands),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),

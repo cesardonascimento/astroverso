@@ -226,7 +226,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   bibliotecas do executor antigo: os nós Code chamam o módulo por `this.helpers.httpRequest` (testado no executor
   externo), e o runners fica na imagem oficial. As rotinas de contas foram migradas fora do repositório (dados
   pessoais) e entram pela ação "Importar rotinas".
-- Comandos do Discord para rotinas (como o antigo `contas:email`): ainda a desenhar.
+- Comandos do Discord para rotinas: cadastrados pelo usuário (`commands.json`: nome, caminho do webhook, descrição),
+  um por ação remota (`n8n:<nome>`, como no `wol`). A chamada sai de dentro do container (`node` com `fetch` em
+  `127.0.0.1:5678`), com a chave das chamadas pela entrada padrão, e devolve o campo `mensagem`.
 
 ### App `cockpit`
 
