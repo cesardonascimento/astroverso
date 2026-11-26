@@ -121,6 +121,7 @@ class NetworkTest(unittest.TestCase):
         for patch in (
             mock.patch.object(tailscale, "run", system),
             mock.patch.object(tailscale, "distro", system),
+            mock.patch.object(network.adguard.distro, "firewall_allowed", system.firewall_allowed),
             mock.patch.object(tailscale, "net", fake_net),
             mock.patch.object(network, "net", fake_net),
             mock.patch.object(network.watch, "install"),

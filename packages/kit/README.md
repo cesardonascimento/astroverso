@@ -72,7 +72,7 @@ pelo gerenciador antes de tudo, menos no `status`) termina com "distribuição n
 |---|---|
 | Pacotes | `installed(pacote)`, `install(pacotes)`, `uninstall(pacotes)`, `add_repo(nome, url)`, `remove_repo(nome)` |
 | Serviços do sistema | `service_active(nome)`, `service_enable(nome)` (agora e no boot), `service_disable(nome)` |
-| Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_allowed(item)` (liberado, inclusive dentro de uma faixa; verdadeiro sem firewall), `firewall_masquerade(ligado)` |
+| Firewall | `firewall_open(itens)`, `firewall_close(itens)` (portas `N/proto` ou serviços), `firewall_allowed(item)` (liberado, inclusive dentro de uma faixa; verdadeiro sem firewall), `firewall_masquerade(ligado)`. Ler também pede `sudo`: a política de servidor do firewalld exige administrador até para consultar |
 | sysctl | `sysctl_set(nome, valores)` (`/etc/sysctl.d/99-astroverso-<nome>.conf`, aplicado na hora), `sysctl_remove(nome)` |
 | Arquivos do sistema | `file_put(caminho, conteúdo, mode=)` (com `sudo`, só se mudou; devolve se mudou; `mode` acerta a permissão), `file_drop(caminho)` |
 | systemd | `units_mask(nomes)`, `units_unmask(nomes)`, `units_masked(nomes)`; `unit_install(nome, conteúdo)` (em `/etc/systemd/system`, liga e reinicia), `unit_remove(nome)`, `unit_enabled(nome)`; `daemon_reload()`; `reload_service(nome)` (`reload`, ou `HUP`) |

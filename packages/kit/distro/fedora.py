@@ -90,8 +90,18 @@ def _kind(item: str) -> str:
     return "port" if PORT.match(item) else "service"
 
 
+def _firewall_read() -> None:
+    run.sudo_prepare("ler a configuração do firewall")
+
+
 def _listed(kind: str) -> set[str]:
-    return set(run.capture(["firewall-cmd", f"--list-{kind}s"]).split())
+    _firewall_read()
+    return set(run.capture(["firewall-cmd", f"--list-{kind}s"], sudo=True).split())
+
+
+def _query(*args: str) -> bool:
+    _firewall_read()
+    return run.succeeds(["firewall-cmd", "-q", *args], sudo=True)
 
 
 def _firewall_change(items: Sequence[str], add: bool) -> list[str]:
@@ -137,7 +147,7 @@ def firewall_allowed(item: str) -> bool:
 
 
 def firewall_masquerade(enabled: bool) -> None:
-    if not _firewalld() or run.succeeds(["firewall-cmd", "-q", "--query-masquerade"]) == enabled:
+    if not _firewalld() or _query("--query-masquerade") == enabled:
         return
     run.cmd(["firewall-cmd", "-q", "--permanent", f"--{'add' if enabled else 'remove'}-masquerade"], sudo=True)
     run.cmd(["firewall-cmd", "-q", "--reload"], sudo=True)
@@ -285,7 +295,7 @@ def firewall_limit(service: str, sources: Sequence[str]) -> None:
     if not _firewalld():
         return
     for source in sources:
-        if not run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]):
+        if not _query("--query-rich-rule", _rich(source, service)):
             run.cmd(["firewall-cmd", "-q", "--permanent", "--add-rich-rule", _rich(source, service)], sudo=True)
     if service in _listed("service"):
         run.cmd(["firewall-cmd", "-q", "--permanent", "--remove-service", service], sudo=True)
@@ -299,7 +309,7 @@ def firewall_unlimit(service: str, sources: Sequence[str]) -> None:
     if service not in _listed("service"):
         run.cmd(["firewall-cmd", "-q", "--permanent", "--add-service", service], sudo=True)
     for source in sources:
-        if run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]):
+        if _query("--query-rich-rule", _rich(source, service)):
             run.cmd(["firewall-cmd", "-q", "--permanent", "--remove-rich-rule", _rich(source, service)], sudo=True)
     run.cmd(["firewall-cmd", "-q", "--reload"], sudo=True)
     ui.ok(f"{service} liberado no firewall para qualquer origem")
@@ -309,7 +319,7 @@ def firewall_limited(service: str, sources: Sequence[str]) -> bool:
     if not _firewalld():
         return False
     return service not in _listed("service") and all(
-        run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]) for source in sources
+        _query("--query-rich-rule", _rich(source, service)) for source in sources
     )
 
 

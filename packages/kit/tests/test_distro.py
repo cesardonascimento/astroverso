@@ -16,14 +16,21 @@ class Recorder:
         self.calls: list[tuple[str, tuple[str, ...], bool, str | None]] = []
         self.answers = succeeds or {}
         self.captures = captures or {}
+        self.reads: list[tuple[tuple[str, ...], bool]] = []
+        self.prepared: list[str] = []
+
+    def sudo_prepare(self, reason):
+        self.prepared.append(reason)
 
     def cmd(self, args, sudo=False, input=None, quiet=False, timeout=None):
         self.calls.append(("cmd", tuple(args), sudo, input))
 
     def capture(self, args, sudo=False, input=None, timeout=None):
+        self.reads.append((tuple(args), sudo))
         return self.captures.get(tuple(args), "")
 
     def succeeds(self, args, sudo=False, timeout=None):
+        self.reads.append((tuple(args), sudo))
         return self.answers.get(tuple(args), False)
 
     def commands(self) -> list[tuple[str, ...]]:
@@ -144,6 +151,16 @@ class DistroTest(unittest.TestCase):
         self.assertFalse(fedora.firewall_allowed("41641/tcp"))
         self.assertTrue(fedora.firewall_allowed("ssh"))
         self.assertFalse(fedora.firewall_allowed("samba"))
+
+    def test_firewall_reads_with_sudo(self) -> None:
+        recorder = self.use(Recorder({("systemctl", "is-active", "-q", "firewalld"): True}))
+        fedora.firewall_allowed("80/tcp")
+        fedora.firewall_masquerade(False)
+        fedora.firewall_limited("ssh", ["10.0.0.0/8"])
+        reads = [(args, sudo) for args, sudo in recorder.reads if args[0] == "firewall-cmd"]
+        self.assertTrue(reads)
+        self.assertTrue(all(sudo for _, sudo in reads), reads)
+        self.assertIn("ler a configuração do firewall", recorder.prepared)
 
     def test_firewall_inactive(self) -> None:
         recorder = self.use(Recorder())
