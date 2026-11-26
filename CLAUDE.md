@@ -237,6 +237,15 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   Os pacotes ficam no `remove`. Sem verificação de hora em hora (sobe sob demanda).
 - Montar disco é pelo app `disks`; o Armazenamento do Cockpit fica para formatar e consultar.
 
+### App `wol`
+
+- Wake-on-LAN: máquinas cadastradas por nome e IP (o MAC lido pelo `ip neigh` com a máquina ligada, ou digitado), em
+  `~/.astroverso/wol/machines.json`. Ligar manda o pacote mágico (UDP 9, broadcast geral e da rede local) a cada 4 s
+  até a máquina responder ao ping, por até 3 min.
+- Discord: uma ação remota por máquina (`wol:ligar-<nome>`, `menu=False`), porque as ações não recebem argumento; o
+  agente atualiza o catálogo sozinho.
+- Sem mudança no sistema além do backup: o pacote só sai pela rede local.
+
 ### Fora do refactor
 
 - **samba** e **sunshine** não voltam (decisão do usuário): nada de pasta na rede nem de acesso remoto por Moonlight.
@@ -256,8 +265,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado
   for perdido). O `remove` não desliga o `sshd` nem apaga o `authorized_keys`.
 - `~/.ssh/authorized_keys` é gerado a partir de `~/.astroverso/system/ssh-keys.json` (nome do PC + chave).
-- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura, Wake-on-LAN)
-  ficam para depois do refactor, para o usuário revisar com calma.
+- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura) ficam para
+  depois do refactor, para o usuário revisar com calma. O Wake-on-LAN virou o app `wol`.
 
 ### Pacotes previstos
 
