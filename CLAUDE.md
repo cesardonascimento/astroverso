@@ -237,14 +237,6 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   Os pacotes ficam no `remove`. Sem verificação de hora em hora (sobe sob demanda).
 - Montar disco é pelo app `disks`; o Armazenamento do Cockpit fica para formatar e consultar.
 
-### App `devenv`
-
-- Só clona e roda dois repositórios do usuário (endereços perguntados, nunca no código): o `linux/install.sh` do
-  astroverso-devenv (os programas; o mesmo script monta a imagem do WSL) e o `install.sh` do astroverso-dotfiles (as
-  configurações). Nada além disso (decisão do usuário): a lista de programas e as configurações são dos repositórios.
-- Confere, sem ligar nada, o que o `dotfiles-update` precisa: o timer, o linger e o acesso ao repositório sem o agente
-  (a chave da máquina, do app `system`).
-
 ### Fora do refactor
 
 - **samba** e **sunshine** não voltam (decisão do usuário): nada de pasta na rede nem de acesso remoto por Moonlight.
