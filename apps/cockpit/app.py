@@ -9,6 +9,7 @@ from kit.app import Action
 
 APP = "cockpit"
 DESCRIPTION = "Painel web da máquina e dos containers (Cockpit) em https://<nome-da-máquina>.<domínio>"
+ORDER = 60
 PACKAGES = ["cockpit", "cockpit-podman", "cockpit-storaged", "cockpit-files"]
 SOCKET = "cockpit.socket"
 CONF = Path("/etc/cockpit/cockpit.conf")

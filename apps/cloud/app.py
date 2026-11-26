@@ -14,6 +14,7 @@ from .jobs import Job
 
 APP = "cloud"
 DESCRIPTION = "Pastas sincronizadas com a nuvem pelo rclone (Proton Drive, Nextcloud): duas vias e envios"
+ORDER = 100
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
 BUTTONS = (("Resumo da nuvem", "cloud:summary"), ("Sincronizar agora", "cloud:sync"))
 TIMERS = {

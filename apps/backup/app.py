@@ -13,6 +13,7 @@ from . import server
 
 APP = "backup"
 DESCRIPTION = "Servidor de backup da casa (restic): guarda, criptografados, os backups que os apps de todas as máquinas mandam"
+ORDER = 40
 DOCS = Path(__file__).with_name("docs")
 MODES = ("server", "client")
 BUTTONS = (("Resumo dos backups", "backup:summary"),)

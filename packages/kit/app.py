@@ -18,6 +18,7 @@ class Action:
 
 class App(Protocol):
     DESCRIPTION: str
+    ORDER: int
 
     def status(self) -> bool: ...
 

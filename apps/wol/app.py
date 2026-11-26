@@ -14,6 +14,7 @@ from kit.app import Action
 
 APP = "wol"
 DESCRIPTION = "Wake-on-LAN: liga as máquinas da rede pelo gerenciador e pelo Discord"
+ORDER = 110
 DOCS = Path(__file__).with_name("docs")
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 PORT = 9

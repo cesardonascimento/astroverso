@@ -11,6 +11,7 @@ from . import power, ssh, updates
 
 APP = "system"
 DESCRIPTION = "Configurações da máquina: sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
+ORDER = 10
 BUTTONS = (("Resumo da máquina", "system:summary"), ("Verificar de novo", "system:watch"))
 
 

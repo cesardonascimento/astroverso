@@ -14,6 +14,7 @@ from . import nextcloud
 
 APP = "nextcloud"
 DESCRIPTION = "Nuvem própria: arquivos, fotos, agenda e contatos em https://nextcloud.<domínio>"
+ORDER = 80
 DOCS = Path(__file__).with_name("docs")
 BUTTONS = (("Resumo do Nextcloud", "nextcloud:summary"), ("Verificar de novo", "nextcloud:watch"))
 FILES_TO = "BACKUP_FILES_TO"

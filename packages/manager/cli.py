@@ -37,7 +37,7 @@ def _install(apps: list[LoadedApp]) -> None:
         ui.ok("todos os apps já estão instalados")
         return
     chosen = ui.checklist(
-        "Quais apps instalar?", [app.name for app in pending], cancel=True, details=[app.description for app in pending]
+        "Quais apps instalar?", [app.name for app in pending], all_option=True, cancel=True, details=[app.description for app in pending]
     )
     if not chosen:
         return

@@ -87,6 +87,12 @@ class ManagerTest(unittest.TestCase):
         self.assertEqual(apps["quebrado"].problem, "falta install, remove, backup, restore")
         self.assertIn("falhou", apps["erro"].problem)
 
+    def test_discover_order(self) -> None:
+        for name, order in (("alfa", None), ("beta", 20), ("gama", 10), ("delta", None), ("eta", "x")):
+            source = APP.format(state=str(self.root / name), name=name, install="pass")
+            self.app(name, source=source + (f"\nORDER = {order!r}\n" if order is not None else ""))
+        self.assertEqual([app.name for app in discover(self.apps)], ["gama", "beta", "alfa", "delta", "eta"])
+
     def test_app_with_modules(self) -> None:
         state = self.root / "pacote.state"
         source = APP.format(state=str(state), name="pacote", install="pass").replace(
@@ -142,13 +148,14 @@ class ManagerTest(unittest.TestCase):
         first = self.app("primeiro")
         second = self.app("segundo", install="ui.fail('sem rede')")
         keys = [
-            b"\r", b" ", b"\x1b[B", b" ", b"\r",
+            b"\r", b" ", b"\r",
             b"\x1b[B", b"\r", b"\r", b"\r", b"\x1b[B", b"\x1b[B", b"\r", b"s\n",
             b"\x1b",
         ]
         outcome = run_in_pty(lambda: cli.main([], self.apps), keys)
         screen = outcome.screen
         self.assertEqual(outcome.code, 0, screen)
+        self.assertIn("Todos", screen)
         self.assertIn("App de teste primeiro", screen)
         self.assertIn("instalados: primeiro", screen)
         self.assertIn("falharam: segundo", screen)

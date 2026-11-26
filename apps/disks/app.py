@@ -14,6 +14,7 @@ from . import mount
 
 APP = "disks"
 DESCRIPTION = "Discos de dados da máquina: montados em /srv/<nome> no boot, os criptografados destravados pelo TPM"
+ORDER = 20
 PACKAGES = ["cryptsetup", "tpm2-tss"]
 BUTTONS = (("Resumo dos discos", "disks:summary"), ("Verificar de novo", "disks:watch"))
 FULL = 90

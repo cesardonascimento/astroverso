@@ -44,6 +44,7 @@ Funções simples no módulo (o `Protocol` `kit.app.App` documenta os tipos):
 | Nome | Obrigatório | O que faz |
 |---|---|---|
 | `DESCRIPTION` | sim | Uma linha, mostrada ao lado do nome nos menus |
+| `ORDER` | não | Posição na ordem recomendada de instalação (menor primeiro; sem ela, no fim): só uma dica do menu, o app continua instalando sozinho em qualquer ordem |
 | `status() -> bool` | sim | Diz se o app está instalado |
 | `install()` | sim | Pergunta, instala e sobe o app; também é o "Reinstalar" |
 | `remove()` | sim | Desfaz tudo o que o app criou, sem falhar no que já não existe |

@@ -25,6 +25,11 @@ class LoadedApp:
     def description(self) -> str:
         return str(getattr(self.module, "DESCRIPTION", ""))
 
+    @property
+    def order(self) -> tuple[int, str]:
+        value = getattr(self.module, "ORDER", None)
+        return (value if isinstance(value, int) and not isinstance(value, bool) else sys.maxsize, self.name)
+
     def actions(self) -> list[Action]:
         actions = getattr(self.module, "actions", None)
         return list(actions()) if callable(actions) else []
@@ -57,11 +62,12 @@ def load(folder: Path) -> LoadedApp:
 def discover(folder: Path = APPS) -> list[LoadedApp]:
     if not folder.is_dir():
         return []
-    return [
+    apps = [
         load(path)
-        for path in sorted(folder.iterdir())
+        for path in folder.iterdir()
         if path.is_dir() and not path.name.startswith((".", "_")) and (path / "app.py").is_file()
     ]
+    return sorted(apps, key=lambda app: app.order)
 
 
 def call(app: LoadedApp, function: Callable[..., object], *args: object) -> tuple[bool, object]:

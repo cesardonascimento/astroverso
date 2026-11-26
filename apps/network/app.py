@@ -11,6 +11,7 @@ from . import adguard, caddy, tailscale, watch
 
 APP = "network"
 DESCRIPTION = "Rede da casa: acesso de fora (Tailscale), DNS com bloqueio (AdGuard) e endereços com HTTPS (Caddy)"
+ORDER = 30
 
 
 def status() -> bool:
