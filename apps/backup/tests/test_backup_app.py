@@ -46,6 +46,9 @@ class FakeContainer:
     def remove(self, name, image=None):
         self.calls.append(("remove", name))
 
+    def unit(self, name):
+        return f"{name}.service"
+
 
 class FakeRun:
     def __init__(self, snapshots: dict[str, list[dict]]) -> None:
@@ -131,14 +134,46 @@ class BackupAppTest(unittest.TestCase):
 
     def test_volumes_per_machine_and_destination(self) -> None:
         item = self.destination(self.home / "Backups")
+        (self.home / "Backups").mkdir()
         with mock.patch.object(sys, "stdout", io.StringIO()):
             server.add("servidor")
             server.add("notebook")
         text = container.render(server.spec())
+        self.assertIn("ReadOnly=true", text)
         self.assertIn(f"Volume={self.home}/Backups/notebook:/data/notebook/{item.id}:Z", text)
         self.assertIn(f"Volume={self.home}/Backups/servidor:/data/servidor/{item.id}:Z", text)
-        with mock.patch.object(disks, "containing", return_value=disks.Disk("u", self.home, "ext4", "")):
+        with mock.patch.object(disks, "containing", return_value=disks.Disk("u", self.home, "ext4", "")), \
+                mock.patch.object(disks, "available", return_value=True):
             self.assertIn(f"/data/notebook/{item.id}:rw", container.render(server.spec()))
+
+    def test_missing_destination_stays_out_and_heals(self) -> None:
+        here = self.home / "Backups"
+        gone = self.home / "disco-usb" / "backups"
+        here.mkdir()
+        config.state("backup")
+        items = [kit_backup.Destination("aaaa1111", str(here)), kit_backup.Destination("bbbb2222", str(gone))]
+        server.save_destinations(items)
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            server.add("servidor")
+        with mock.patch.object(disks, "available", side_effect=lambda path: "disco-usb" not in str(path)):
+            self.assertEqual([item.id for item in server.available()], ["aaaa1111"])
+            text = container.render(server.spec())
+            self.assertIn("/data/servidor/aaaa1111", text)
+            self.assertNotIn("bbbb2222", text)
+            with mock.patch.object(sys, "stdout", io.StringIO()):
+                server.heal()
+        self.assertEqual(self.box.calls[-1][0], "start")
+        gone.mkdir(parents=True)
+        with mock.patch.object(sys, "stdout", io.StringIO()):
+            server.heal()
+        self.assertTrue((gone / "servidor").is_dir())
+        self.assertIn("/data/servidor/bbbb2222", container.render(server.spec()))
+        self.box.running = True
+        with mock.patch.object(server, "available", return_value=[]), mock.patch.object(server.run, "succeeds", create=True) as stop, \
+                mock.patch.object(sys, "stdout", io.StringIO()), mock.patch.object(sys, "stderr", io.StringIO()):
+            server.heal()
+        stop.assert_called_once()
+        self.assertTrue(server.htpasswd().exists())
 
     def test_client_install(self) -> None:
         code = kit_backup.link_code("https://backup.casa.com", "notebook", [kit_backup.Destination("aaaa1111", "/srv/b")])

@@ -172,7 +172,8 @@ container.remove(spec.name, spec.image)
 
 Outros campos do `Container`: `ports`, `environment`, `command`, `env_file`, `requires` (outros containers que
 sobem antes: `Requires` e `After` do systemd), `entrypoint`, `health_start` (tempo de partida do teste de saúde,
-padrão `30s`) e `stop_signal` (ex.: `SIGTERM` quando a imagem pede um sinal que o processo não atende). O volume
+padrão `30s`), `stop_signal` (ex.: `SIGTERM` quando a imagem pede um sinal que o processo não atende) e `read_only`
+(`ReadOnly=true`: só os volumes aceitam escrita, e o `/tmp` fica em memória). O volume
 leva `Z` por padrão (só daquele container); use `z` para uma pasta montada em mais de um container.
 
 | Função | O que faz |

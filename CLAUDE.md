@@ -164,6 +164,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   escolhe uma pasta ligada à nuvem se quiser que vá para a nuvem. Sem validação nem regra automática de destino.
 - Um repositório por máquina em cada pasta (`<pasta>/<máquina>`), montado no container em `/<máquina>/<id>` (o
   `--private-repos` continua separando as máquinas). Os apps da máquina dividem o repositório, separados por marca.
+- Pasta de destino indisponível (disco ausente) fica fora do container, e o servidor sobe com as outras (um volume
+  sem origem impede o container inteiro de subir); a verificação de hora em hora refaz o container quando o conjunto
+  muda (`server.heal`). O container é `ReadOnly`: backup para pasta ausente falha, em vez de gravar no container.
 - **Quem decide para onde vai o backup é cada app** (decisão do usuário), não o app `backup`: a mudança do
   `kit.backup` pergunta as pastas ao ligar e guarda no `.env` do app; trocar = desligar e ligar.
 - Cliente (todas as máquinas, inclusive a do servidor): `~/.astroverso/backup.env` + `backup-destinations.json`,

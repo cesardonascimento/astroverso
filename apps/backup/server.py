@@ -68,6 +68,10 @@ def repository(destination: kit_backup.Destination, name: str) -> Path:
     return Path(destination.path) / name
 
 
+def available() -> list[kit_backup.Destination]:
+    return [item for item in destinations() if reachable(item)]
+
+
 def reachable(destination: kit_backup.Destination) -> bool:
     path = Path(destination.path)
     return disks.available(path) and path.is_dir()
@@ -84,13 +88,14 @@ def spec() -> container.Container:
         description="Astroverso backup: servidor dos repositórios (rclone serve restic)",
         volumes=[*_volumes(), container.Volume(htpasswd(), "/config/htpasswd", "ro,Z")],
         command=["serve", "restic", "/data", "--addr", f":{PORT}", "--append-only", "--private-repos", "--htpasswd", "/config/htpasswd"],
+        read_only=True,
     )
 
 
 def _volumes() -> list[container.Volume]:
     found = []
     for name in clients():
-        for item in destinations():
+        for item in available():
             options = "rw" if disks.containing(Path(item.path)) else "Z"
             found.append(container.Volume(repository(item, name), f"/data/{name}/{item.id}", options))
     return found
@@ -231,9 +236,23 @@ def start() -> None:
     prepare_folders()
     if not htpasswd().exists():
         _write_htpasswd()
+    routes.publish(APP, [routes.Route(address(), f"http://{NAME}:{PORT}")])
+    if not available():
+        ui.warn("nenhuma pasta de destino disponível (discos desligados?): o servidor de backup fica parado até uma voltar")
+        return
     container.prepare()
     container.start(spec())
-    routes.publish(APP, [routes.Route(address(), f"http://{NAME}:{PORT}")])
+
+
+def heal() -> None:
+    if not htpasswd().exists():
+        return
+    prepare_folders()
+    if available():
+        container.start(spec())
+    elif installed():
+        run.succeeds(["systemctl", "--user", "stop", container.unit(NAME)])
+        ui.warn("nenhuma pasta de destino disponível: servidor de backup parado até uma voltar")
 
 
 def restart() -> None:

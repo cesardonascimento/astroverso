@@ -20,6 +20,11 @@ qualquer máquina                                          máquina do servidor
 - **Só acréscimos:** com `--append-only`, uma máquina grava versões novas mas não apaga nada; com `--private-repos`,
   só enxerga o próprio repositório. Só o servidor apaga as versões antigas, pela regra (padrão: 30 diárias e 12
   mensais), na manutenção semanal.
+- **Pasta de destino num disco ausente** (desligado, desconectado) fica fora do container, e o servidor sobe com as
+  outras. A verificação de hora em hora (que também roda 10 min depois de a máquina ligar) refaz o container quando o
+  conjunto de pastas disponíveis muda: tira a que sumiu e devolve a que voltou. Sem nenhuma pasta disponível, o
+  servidor fica parado até uma voltar. O container é somente leitura: um backup para uma pasta ausente falha com erro,
+  em vez de ser gravado num lugar temporário que some ao reiniciar.
 - **O mesmo caminho em todas as máquinas**, inclusive a do servidor: tudo passa por `https://backup.<domínio>`.
 
 ## Modos

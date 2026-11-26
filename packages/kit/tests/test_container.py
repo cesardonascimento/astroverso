@@ -77,6 +77,11 @@ class ContainerTest(unittest.TestCase):
         self.addCleanup(patch.stop)
         return fake
 
+    def test_read_only(self) -> None:
+        plain = container.render(container.Container("a", "img", "teste"))
+        self.assertNotIn("ReadOnly", plain)
+        self.assertIn("ReadOnly=true\n", container.render(container.Container("a", "img", "teste", read_only=True)))
+
     def test_render(self) -> None:
         text = container.render(SPEC)
         self.assertIn("ContainerName=astroverso-teste\n", text)

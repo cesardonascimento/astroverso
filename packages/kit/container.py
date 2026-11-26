@@ -34,6 +34,7 @@ class Container:
     entrypoint: str = ""
     health_start: str = "30s"
     stop_signal: str = ""
+    read_only: bool = False
 
 
 def quadlets() -> Path:
@@ -76,6 +77,8 @@ def render(spec: Container) -> str:
         lines.append(f"Entrypoint={_quote(spec.entrypoint)}")
     if spec.stop_signal:
         lines.append(f"StopSignal={spec.stop_signal}")
+    if spec.read_only:
+        lines.append("ReadOnly=true")
     if spec.command:
         lines.append(f"Exec={' '.join(_quote(part) for part in spec.command)}")
     if spec.health:

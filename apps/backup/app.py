@@ -299,6 +299,11 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
 
 
 def check() -> None:
+    if mode() == "server":
+        try:
+            server.heal()
+        except SystemExit:
+            ui.warn("o servidor de backup não voltou ao ajustar as pastas de destino")
     watch.run(APP, collect, BUTTONS, "backups em ordem")
 
 
