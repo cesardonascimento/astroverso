@@ -78,6 +78,11 @@ class BackupTest(unittest.TestCase):
             backup.read_code(code[:-10])
         with self.assertRaises(ValueError):
             backup.read_code("outra-coisa")
+        with self.assertRaises(ValueError):
+            backup.read_code(backup.link_code("https://backup.casa.com", "notebook", [backup.Destination("../outro", "/x")]))
+        with self.assertRaises(ValueError):
+            backup.read_code(backup.link_code("http://backup.casa.com", "notebook", [LOCAL]))
+        self.assertEqual(backup.tag_text("Fotos, 2025"), "Fotos_ 2025")
 
     def test_backup_goes_to_chosen_destinations(self) -> None:
         self.link()

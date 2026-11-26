@@ -205,13 +205,22 @@ def load_entities(source: Path) -> None:
     ui.ok("rotinas, credenciais e usuários do backup carregados")
 
 
+def _json_list(output: str) -> list:
+    lines = output.splitlines()
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("["):
+            try:
+                found = json.loads("\n".join(lines[index:]))
+            except ValueError:
+                continue
+            if isinstance(found, list):
+                return found
+    return []
+
+
 def credential_names() -> set[tuple[str, str]]:
     code, output = cli("export:credentials", "--all", timeout=120)
-    start = output.find("[")
-    try:
-        items = json.loads(output[start:]) if code == 0 and start >= 0 else []
-    except ValueError:
-        items = []
+    items = _json_list(output) if code == 0 else []
     return {(str(item.get("type")), str(item.get("name"))) for item in items if isinstance(item, dict)}
 
 

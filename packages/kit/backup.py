@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import time
 import zlib
 from collections.abc import Callable, Iterator, Sequence
@@ -18,6 +19,8 @@ CHANNEL = "backup"
 KEYS = ("BACKUP_URL", "BACKUP_USER", "BACKUP_PASSWORD", "BACKUP_REPO_PASSWORD")
 TARGETS = "BACKUP_TO"
 CODE = "astroverso-backup:"
+IDENTIFIER = re.compile(r"^[0-9a-f]{8}$")
+USER = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
 @dataclass(frozen=True)
@@ -99,8 +102,10 @@ def read_code(text: str) -> tuple[str, str, list[Destination]]:
         url, user = str(data["url"]), str(data["user"])
     except (ValueError, KeyError, TypeError, AttributeError):
         raise ValueError("código incompleto: copie de novo, inteiro") from None
-    if not url or not user or not items:
-        raise ValueError("código sem pastas de destino: cadastre uma no servidor")
+    if not url.startswith("https://") or not USER.match(user) or not items:
+        raise ValueError("código sem endereço, usuário ou pastas de destino: copie de novo do servidor")
+    if not all(IDENTIFIER.match(item.id) for item in items):
+        raise ValueError("código com uma pasta de destino inválida: copie de novo do servidor")
     return url, user, items
 
 
@@ -324,7 +329,7 @@ def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], ret
         return _report(app, what, [f"{path} indisponível (disco desligado, travado ou pasta apagada): nada foi guardado"],
                        0, retry, notify, [])
     started = time.monotonic()
-    tags = ["--tag", TAG, "--tag", f"app:{app}", "--tag", f"dados:{name}", *[f"--exclude={rule}" for rule in exclude]]
+    tags = ["--tag", TAG, "--tag", f"app:{app}", "--tag", f"dados:{tag_text(name)}", *[f"--exclude={rule}" for rule in exclude]]
     for item in chosen:
         ui.info(f"guardando {path} em {item.path}...")
         code, output = restic("backup", str(path), "--host", net.hostname(), *tags, destination=item, unshare=unshare)
@@ -333,13 +338,17 @@ def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], ret
     return _report(app, what, problems, int(time.monotonic() - started), retry, notify, chosen)
 
 
+def tag_text(name: str) -> str:
+    return name.replace(",", "_")
+
+
 def versions(app: str, destination: Destination, data: str = "") -> list[dict]:
     code, output = restic("snapshots", "--json", "--tag", f"app:{app}", "--host", net.hostname(), destination=destination, timeout=120)
     try:
         found = json.loads(output) if code == 0 else []
     except ValueError:
         found = []
-    wanted = f"dados:{data}" if data else ""
+    wanted = f"dados:{tag_text(data)}" if data else ""
     chosen = [item for item in found if isinstance(item, dict) and (
         wanted in (item.get("tags") or []) if data else not any(str(tag).startswith("dados:") for tag in item.get("tags") or []))]
     return sorted(chosen, key=lambda item: item.get("time", ""), reverse=True)

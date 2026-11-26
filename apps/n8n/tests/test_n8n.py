@@ -224,7 +224,7 @@ class N8nTest(unittest.TestCase):
         (folder / "b.json").write_text(json.dumps({"id": "def", "name": "Avisos", "nodes": []}))
         imported: list = []
         with mock.patch.object(n8n, "installed", return_value=True), \
-                mock.patch.object(n8n, "cli", return_value=(0, 'aviso antes\n[{"id": "x", "name": "Astroverso: Discord", "type": "httpHeaderAuth"}]')), \
+                mock.patch.object(n8n, "cli", return_value=(0, '[license SDK] Skipping renewal on init\n[{"id": "x", "name": "Astroverso: Discord", "type": "httpHeaderAuth"}]')), \
                 mock.patch.object(n8n, "import_file", side_effect=lambda kind, content: imported.append(json.loads(content)["name"]) or (0, "")):
             keys = [f"{folder}\n".encode(), b"\r", b"s\n"]
             outcome = run_in_pty(lambda: (app.import_workflows(), imported)[1], keys, columns=200)
