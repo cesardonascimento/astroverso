@@ -355,5 +355,9 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
     pelo nome); o executor oficial libera só o `crypto` e o `moment` no `require`.
 - `python3 -I` não põe a pasta do script no caminho de importação.
 - Python como processo 1 de um container ignora o SIGTERM sem tratador: cada parada espera 10 s e termina à força.
+- Containers sem root (rede `pasta`) chegam na máquina por `host.containers.internal` (`169.254.1.2`), que **não** cai
+  no loopback: um serviço ouvindo só em `127.0.0.1` fica fora do alcance do Caddy. Ouvindo no IP da rede (ou em
+  todos), o Caddy chega mesmo com a porta fechada no firewall (o tráfego conta como da própria máquina): é assim que
+  o Cockpit e o painel do AdGuard ficam só pelo Caddy.
 - Segredos nunca em argumentos de comando (aparecem no `ps`): vão pela entrada padrão (`input=` do `kit.run`)
   ou por arquivo temporário.
