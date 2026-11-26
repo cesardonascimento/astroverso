@@ -198,3 +198,23 @@ class DistroTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AutoUpdatesTest(unittest.TestCase):
+    def test_active_last_and_reboot(self) -> None:
+        from kit.distro import fedora
+
+        with tempfile.TemporaryDirectory() as folder:
+            conf = Path(folder) / "automatic.conf"
+            with mock.patch.object(fedora, "AUTOMATIC_CONF", conf), mock.patch.object(fedora, "unit_enabled", return_value=True):
+                self.assertFalse(fedora.auto_updates_active())
+                conf.write_text(fedora.AUTOMATIC_TEXT)
+                self.assertTrue(fedora.auto_updates_active())
+        self.assertIn("apply_updates = yes", fedora.AUTOMATIC_TEXT)
+        self.assertIn("reboot = never", fedora.AUTOMATIC_TEXT)
+        with mock.patch.object(fedora.run, "output", return_value=(0, "success\nqua 2026-11-25 06:10:00 -03\n")):
+            self.assertEqual(fedora.auto_updates_last(), ("success", "qua 2026-11-25 06:10:00 -03"))
+        with mock.patch.object(fedora.run, "output", return_value=(1, "")):
+            self.assertTrue(fedora.reboot_pending())
+        with mock.patch.object(fedora.run, "output", return_value=(0, "")):
+            self.assertFalse(fedora.reboot_pending())

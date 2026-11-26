@@ -4,17 +4,27 @@ import shutil
 from pathlib import Path
 
 from kit import backup as kit_backup
-from kit import changes, config, ui
+from kit import changes, config, ui, watch
 from kit.app import Action
 
-from . import power, ssh
+from . import power, ssh, updates
 
 APP = "system"
-DESCRIPTION = "Configurações da máquina: sempre ligada (energia) e acesso remoto (SSH e chave para o GitHub)"
+DESCRIPTION = "Configurações da máquina: sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
+BUTTONS = (("Resumo da máquina", "system:summary"), ("Verificar de novo", "system:watch"))
+
+
+def watch_change() -> changes.Change:
+    return watch.change(
+        APP, "Verificar a máquina de hora em hora e avisar no Discord",
+        f"Um timer do usuário ({watch.name(APP)}.timer) confere a cada hora se a atualização automática falhou e se "
+        "alguma atualização pede reinício, e avisa no canal #system do Discord só quando algo muda.",
+        "a máquina",
+    )
 
 
 def items() -> list[changes.Change]:
-    return power.items() + ssh.items() + [kit_backup.change(APP)]
+    return power.items() + ssh.items() + updates.items() + [watch_change(), kit_backup.change(APP)]
 
 
 def status() -> bool:
@@ -32,6 +42,8 @@ def install(reuse: bool | None = None) -> None:
     ui.step("SSH: acesso remoto")
     changes.install(APP, ssh.items(), again)
     ssh.install(again)
+    ui.step("Atualizações do sistema")
+    changes.install(APP, updates.items() + [watch_change()], again)
     changes.install(APP, [kit_backup.change(APP)], again)
     summary()
 
@@ -66,6 +78,15 @@ def summary() -> None:
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     ssh.summary()
+    watch.summary(APP)
+
+
+def collect(previous: watch.State) -> dict[str, watch.Problem]:
+    return updates.collect()
+
+
+def check() -> None:
+    watch.run(APP, collect, BUTTONS, "máquina em dia")
 
 
 def manage() -> None:
@@ -78,6 +99,7 @@ def actions() -> list[Action]:
         Action("changes", "Mudanças no sistema", manage),
         Action("keys", "Chaves SSH autorizadas", ssh.manage_keys),
         Action("github", "Chave desta máquina para o GitHub", ssh.github),
+        Action("watch", "Verificar agora", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
     ]

@@ -30,6 +30,8 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | `/etc/ssh/sshd_config.d/10-astroverso.conf` (`AllowUsers <usuário>`, `PermitRootLogin no`), conferido pelo `sshd -t` | Só a sua conta desta máquina entra por SSH | |
 | `~/.ssh/authorized_keys` gerado a partir de `~/.astroverso/system/ssh-keys.json` | Só os PCs da lista entram sem senha; a lista tem um nome por chave | |
 | `~/.ssh/id_ed25519` (só se você pedir a chave para o GitHub) | A chave desta máquina para baixar e atualizar repositórios por SSH | |
+| Pacote `dnf5-plugin-automatic`, `/etc/dnf/automatic.conf` (`apply_updates = yes`, `reboot = never`) e o timer `dnf5-automatic.timer` ligado (perguntada) | O sistema aplica as atualizações sozinho, todo dia por volta das 6h, sem nunca reiniciar; o reinício pendente é avisado no Discord | |
+| Unidades do usuário `astroverso-system-watch.timer` e `.service` (perguntada) | A verificação de hora em hora (abaixo) | |
 | `~/.astroverso/system/.env` (`CHANGE_<ID>=yes/no`) | As respostas da instalação, para o Reinstalar | |
 | Unidades do usuário `astroverso-system-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
 
@@ -47,7 +49,17 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | Mudanças no sistema | Checklist com as mudanças aplicadas marcadas; marcar aplica, desmarcar desfaz (as ⚠ pedem confirmação) |
 | Chaves SSH autorizadas | Lista, adiciona (cole a chave pública do PC) e remove chaves |
 | Chave desta máquina para o GitHub | Cria a chave (se faltar), mostra a parte pública e confere o acesso |
+| Verificar agora | A verificação de hora em hora na hora (também no Discord) |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
+
+## Verificação de hora em hora
+
+Avisa no canal `#system` do Discord só quando algo muda, com os botões **Resumo da máquina** e **Verificar de novo**:
+
+| O que confere | Nível |
+|---|---|
+| A última atualização automática falhou (`dnf5-automatic.service`) | erro |
+| Uma atualização pede reinício (`dnf needs-restarting`): reinicie quando puder, pelo Cockpit, por exemplo | aviso |
 
 ## Remover
 

@@ -28,6 +28,28 @@ def new_key(folder: Path, comment: str) -> str:
     return path.with_suffix(".pub").read_text().strip()
 
 
+class FakeUpdates:
+    def __init__(self) -> None:
+        self.on = False
+        self.last = ("", "")
+        self.pending = False
+
+    def auto_updates_active(self):
+        return self.on
+
+    def auto_updates_on(self):
+        self.on = True
+
+    def auto_updates_off(self):
+        self.on = False
+
+    def auto_updates_last(self):
+        return self.last
+
+    def reboot_pending(self):
+        return self.pending
+
+
 class FakeSystem:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
@@ -113,6 +135,7 @@ class SystemTest(unittest.TestCase):
         self.addCleanup(patch.stop)
         ui.set_app("system")
         self.system = FakeSystem()
+        self.updates = FakeUpdates()
         fake_net = mock.Mock(lan_network=mock.Mock(return_value="192.168.0.0/24"), hostname=mock.Mock(return_value="servidor"))
         real_output = ssh.run.output
 
@@ -124,6 +147,8 @@ class SystemTest(unittest.TestCase):
         self.github = False
         for patch in (
             mock.patch.object(power, "distro", self.system),
+            mock.patch.object(app.updates, "distro", self.updates),
+            mock.patch.object(app.watch, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(ssh, "distro", self.system),
             mock.patch.object(ssh, "net", fake_net),
             mock.patch.object(ssh.run, "output", side_effect=output),
@@ -196,18 +221,20 @@ class SystemTest(unittest.TestCase):
             return self.system.calls
 
         self.github = True
-        keys = [b"\n"] * 10
+        keys = [b"\n"] * 12
         with mock.patch.object(ssh, "_import"), mock.patch.object(ssh.run, "cmd", side_effect=lambda args, **_: self._keygen(args)):
             outcome = run_in_pty(scenario, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("Desligar a suspensão e a hibernação? [S/n]", outcome.screen)
         self.assertIn("Aceitar SSH só da rede de casa e do Tailscale? [S/n]", outcome.screen)
         self.assertIn("o GitHub aceitou a chave desta máquina", outcome.screen)
+        self.assertIn("Atualizar o sistema sozinho, todo dia de madrugada (sem reiniciar)? [S/n]", outcome.screen)
         self.assertIn("⚠ Ignorar a tampa fechada", outcome.screen)
         saved = config.load("system")
         self.assertEqual({key: value for key, value in saved.items() if key.startswith("CHANGE_")}, {
             "CHANGE_POWER_SLEEP": "yes", "CHANGE_POWER_LID": "yes", "CHANGE_POWER_KEYS": "yes", "CHANGE_POWER_BLANK": "yes",
-            "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes", "CHANGE_BACKUP": "yes",
+            "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes", "CHANGE_UPDATES": "yes",
+            "CHANGE_WATCH": "yes", "CHANGE_BACKUP": "yes",
         })
 
     def _keygen(self, args) -> None:
@@ -225,6 +252,17 @@ class SystemTest(unittest.TestCase):
         self.assertIn("GitHub pendente", outcome.screen)
         self.assertTrue(ssh.machine_key().exists())
 
+    def test_updates_collect(self) -> None:
+        self.assertEqual(app.collect({}), {})
+        self.updates.on = True
+        self.updates.last = ("success", "qua 2026-11-25 06:10:00 -03")
+        self.assertEqual(app.collect({}), {})
+        self.updates.last = ("exit-code", "qua 2026-11-25 06:10:00 -03")
+        self.updates.pending = True
+        found = app.collect({})
+        self.assertEqual(sorted(found), ["reboot", "updates"])
+        self.assertEqual((found["updates"].level, found["reboot"].level), ("erro", "aviso"))
+
     def test_remove_keeps_sshd(self) -> None:
         self.system.masked = True
         self.system.limited = True
@@ -238,7 +276,7 @@ class SystemTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("keys", False), ("github", False), ("backup-now", True), ("restore-version", False)])
+                         [("summary", True), ("changes", False), ("keys", False), ("github", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
 
 
 if __name__ == "__main__":

@@ -311,3 +311,42 @@ def firewall_limited(service: str, sources: Sequence[str]) -> bool:
     return service not in _listed("service") and all(
         run.succeeds(["firewall-cmd", "-q", "--query-rich-rule", _rich(source, service)]) for source in sources
     )
+
+
+AUTOMATIC_CONF = Path("/etc/dnf/automatic.conf")
+AUTOMATIC_TIMER = "dnf5-automatic.timer"
+AUTOMATIC_SERVICE = "dnf5-automatic.service"
+AUTOMATIC_TEXT = (
+    "# Gerado pelo Astroverso (app system): aplica as atualizações sozinho, sem reiniciar.\n"
+    "[commands]\napply_updates = yes\nreboot = never\n\n[emitters]\nemit_via = stdio\n"
+)
+
+
+def auto_updates_active() -> bool:
+    try:
+        written = AUTOMATIC_CONF.read_text() == AUTOMATIC_TEXT
+    except OSError:
+        written = False
+    return written and unit_enabled(AUTOMATIC_TIMER)
+
+
+def auto_updates_on() -> None:
+    install(["dnf5-plugin-automatic"])
+    file_put(AUTOMATIC_CONF, AUTOMATIC_TEXT, 0o644)
+    service_enable(AUTOMATIC_TIMER)
+
+
+def auto_updates_off() -> None:
+    service_disable(AUTOMATIC_TIMER)
+    if file_drop(AUTOMATIC_CONF):
+        ui.ok("atualização automática desligada")
+
+
+def auto_updates_last() -> tuple[str, str]:
+    code, output = run.output(["systemctl", "show", AUTOMATIC_SERVICE, "-p", "Result", "-p", "ExecMainStartTimestamp", "--value"], timeout=10)
+    lines = output.strip().splitlines() if code == 0 else []
+    return (lines[0], lines[1]) if len(lines) >= 2 else ("", "")
+
+
+def reboot_pending() -> bool:
+    return run.output(["dnf", "-q", "-C", "needs-restarting"], timeout=120)[0] == 1

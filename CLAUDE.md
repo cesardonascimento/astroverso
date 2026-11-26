@@ -267,8 +267,11 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado
   for perdido). O `remove` não desliga o `sshd` nem apaga o `authorized_keys`.
 - `~/.ssh/authorized_keys` é gerado a partir de `~/.astroverso/system/ssh-keys.json` (nome do PC + chave).
-- Outras ideias do projeto antigo (atualizações automáticas, resumo da máquina com disco e temperatura) ficam para
-  depois do refactor, para o usuário revisar com calma. O Wake-on-LAN virou o app `wol`.
+- Atualizações automáticas (`updates.py`, pela camada `kit.distro`): o `dnf5-automatic` aplica sozinho, todo dia, e
+  **nunca reinicia** (decisão: num servidor, reiniciar é escolha do usuário, pelo Cockpit); a verificação de hora em
+  hora avisa a atualização que falhou e o reinício pendente. Ficam no Astroverso, não no astroverso-devenv (o devenv
+  é o ambiente de desenvolvimento e também roda no WSL).
+- O resumo da máquina (disco, temperatura) fica pelo Cockpit (decisão do usuário). O Wake-on-LAN virou o app `wol`.
 
 ### Pacotes previstos
 

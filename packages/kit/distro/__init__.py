@@ -163,3 +163,23 @@ def sysctl_has(name: str, values: Mapping[str, str]) -> bool:
 
 def resolver_route_has(name: str, domain: str, server: str) -> bool:
     return bool(backend().resolver_route_has(name, domain, server))
+
+
+def auto_updates_active() -> bool:
+    return bool(backend().auto_updates_active())
+
+
+def auto_updates_on() -> None:
+    backend().auto_updates_on()
+
+
+def auto_updates_off() -> None:
+    backend().auto_updates_off()
+
+
+def auto_updates_last() -> tuple[str, str]:
+    return backend().auto_updates_last()
+
+
+def reboot_pending() -> bool:
+    return bool(backend().reboot_pending())
