@@ -11,7 +11,7 @@ from . import agent, client, server
 
 APP = "discord"
 DESCRIPTION = "Bot do Discord do Astroverso: avisos dos apps em canais próprios e o comando /astro"
-ORDER = 50
+ORDER = 60
 MODES = ("server", "client")
 
 

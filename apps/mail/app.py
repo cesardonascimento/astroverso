@@ -14,7 +14,7 @@ from . import cloudflare, mailbox
 
 APP = "mail"
 DESCRIPTION = "E-mail do Astroverso: caixa de entrada para automações (lida no Nextcloud Mail) e envio para qualquer app"
-ORDER = 70
+ORDER = 80
 DOCS = Path(__file__).with_name("docs")
 MODES = ("server", "client")
 FETCH = "astroverso-mail-fetch"

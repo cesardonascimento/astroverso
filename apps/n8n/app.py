@@ -13,7 +13,7 @@ from . import commands, connections, modules, n8n
 
 APP = "n8n"
 DESCRIPTION = "Rotinas automáticas montadas pelo navegador (n8n) em https://n8n.<domínio>, com módulos do Astroverso"
-ORDER = 90
+ORDER = 100
 BUTTONS = (("Resumo do n8n", "n8n:summary"), ("Verificar de novo", "n8n:watch"))
 FILES = (".env", "n8n.env", "owner_password_hash", "commands.json")
 
