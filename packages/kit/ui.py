@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import os
 import select
 import shutil
@@ -314,6 +315,10 @@ def banner() -> None:
     sys.stdout.flush()
 
 
+class Cancelled(KeyboardInterrupt):
+    pass
+
+
 class _Tty:
     def __init__(self, label: str) -> None:
         try:
@@ -349,24 +354,51 @@ class _Tty:
         mark = self.paint("!", AMBER, bold=True) if self.depth else "aviso:"
         self.write(f"{_tag(self.depth)}       {mark} {self.paint(text, AMBER)}\n")
 
-    def readline(self, secret: bool = False) -> str:
+    def cancel(self, label: str) -> NoReturn:
+        self.write(f"\r\033[K{self.answered(label, 'cancelado', GRAY)}\n")
+        raise Cancelled
+
+    def readline(self, label: str, secret: bool = False) -> str:
         old = termios.tcgetattr(self.fd)
-        if secret:
-            new = termios.tcgetattr(self.fd)
-            new[3] &= ~termios.ECHO
-            termios.tcsetattr(self.fd, termios.TCSAFLUSH, new)
-        data = b""
+        tty.setcbreak(self.fd)
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        text = ""
         try:
-            while not data.endswith(b"\n"):
-                chunk = os.read(self.fd, 4096)
-                if not chunk:
+            while True:
+                data = os.read(self.fd, 4096)
+                if not data:
                     fail("entrada encerrada")
-                data += chunk
+                if data == b"\x1b" and select.select([self.fd], [], [], 0.05)[0]:
+                    data += os.read(self.fd, 4096)
+                while data:
+                    if data[:2] in (b"\x1b[", b"\x1bO"):
+                        end = next((i for i in range(2, len(data)) if 0x40 <= data[i] <= 0x7E), len(data) - 1)
+                        data = data[end + 1:]
+                        continue
+                    byte, data = data[:1], data[1:]
+                    if byte == b"\x1b":
+                        self.cancel(label)
+                    if byte in (b"\r", b"\n"):
+                        self.write("\n")
+                        return text
+                    if byte in (b"\x7f", b"\x08"):
+                        if text:
+                            text = text[:-1]
+                            if not secret:
+                                self.write("\b \b")
+                    elif byte == b"\x15":
+                        if not secret:
+                            self.write("\b \b" * len(text))
+                        text = ""
+                    elif byte == b"\x04" and not text:
+                        fail("entrada encerrada")
+                    elif byte[0] >= 0x20:
+                        char = decoder.decode(byte)
+                        text += char
+                        if not secret:
+                            self.write(char)
         finally:
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, old)
-        if secret:
-            self.write("\n")
-        return data.decode(errors="replace").rstrip("\r\n")
 
     @contextmanager
     def raw(self) -> Iterator[None]:
@@ -427,7 +459,7 @@ def ask(label: str, default: str | None = None, validate: Validator | None = Non
         while True:
             suffix = f" {term.paint(f'[{default}]', GRAY)}" if default else ""
             term.write(f"{term.question(label)}{suffix}{term.paint(':', bold=True)} ")
-            answer = term.readline().strip() or (default or "")
+            answer = term.readline(label).strip() or (default or "")
             if not answer:
                 term.warn("resposta obrigatória")
                 continue
@@ -445,13 +477,13 @@ def secret(label: str, confirm: bool = True) -> str:
     with _terminal(label) as term:
         while True:
             term.write(f"{term.question(label)}{term.paint(':', bold=True)} ")
-            first = term.readline(secret=True)
+            first = term.readline(label, secret=True)
             if not first:
                 term.warn("resposta obrigatória")
                 continue
             if confirm:
                 term.write(f"{term.question('confirme')}{term.paint(':', bold=True)} ")
-                if term.readline(secret=True) != first:
+                if term.readline("confirme", secret=True) != first:
                     term.warn("os valores não conferem")
                     continue
                 term.write("\033[1A\r\033[K")
@@ -464,7 +496,7 @@ def ask_list(label: str, validate: Validator | None = None) -> list[str]:
     with _terminal(label) as term:
         while True:
             term.write(f"{term.question(label)} {_hint(term, 'Enter vazio termina')}{term.paint(':', bold=True)} ")
-            answer = term.readline().strip()
+            answer = term.readline(label).strip()
             if not answer:
                 term.write("\033[1A\r\033[K")
                 break
@@ -486,7 +518,7 @@ def confirm(question: str, default: bool = False) -> bool:
         while True:
             hint = term.paint("[S/n]" if default else "[s/N]", GRAY)
             term.write(f"{term.question(question)} {hint} ")
-            answer = term.readline().strip().lower()
+            answer = term.readline(question).strip().lower()
             if not answer:
                 result = default
             elif answer in ("s", "sim", "y", "yes"):
@@ -551,7 +583,7 @@ def _labels(items: Sequence[str], details: Sequence[str], term: _Tty) -> list[tu
 
 def menu(title: str, items: Sequence[str], details: Sequence[str] = ()) -> int:
     back = len(items) - 1 if items and items[-1] in ("Voltar", "Sair") else None
-    hint = "↑/↓ e Enter" + (f", Esc {'volta' if items[-1] == 'Voltar' else 'sai'}" if back is not None else "")
+    hint = "↑/↓ e Enter, Esc " + ("cancela" if back is None else "volta" if items[-1] == "Voltar" else "sai")
     with _terminal(title) as term, term.raw():
         view = _List(term, title, hint, len(items))
         width = len(str(len(items)))
@@ -571,7 +603,10 @@ def menu(title: str, items: Sequence[str], details: Sequence[str] = ()) -> int:
                 continue
             if key == "enter":
                 break
-            if key == "esc" and back is not None:
+            if key == "esc":
+                if back is None:
+                    view.close("cancelado", GRAY)
+                    raise Cancelled
                 view.cursor = back
                 break
             if key.isdigit() and 1 <= int(key) <= len(items):
@@ -592,7 +627,7 @@ def checklist(
     marks = [i in selected for i in range(len(items))]
     shown = [f"⚠ {item}" if i in danger else item for i, item in enumerate(items)]
     offset = 1 if all_option else 0
-    hint = "↑/↓, Espaço marca, a = todos, Enter confirma" + (", Esc volta" if cancel else "")
+    hint = "↑/↓, Espaço marca, a = todos, Enter confirma, Esc " + ("volta" if cancel else "cancela")
     with _terminal(title) as term, term.raw():
         view = _List(term, title, hint, len(items) + offset)
         labels = _labels(shown, details, term)
@@ -612,9 +647,11 @@ def checklist(
                 continue
             if key == "enter":
                 break
-            if key == "esc" and cancel:
+            if key == "esc":
                 view.close("cancelado", GRAY)
-                return None
+                if cancel:
+                    return None
+                raise Cancelled
             if key == "a" or (key == "space" and view.cursor < offset):
                 marks = [not all(marks)] * len(items)
             elif key == "space":

@@ -38,8 +38,10 @@ journal, redirecionamento) ou com `NO_COLOR`. Elas usam 24 bits com `COLORTERM=t
 - **Perguntas e menus** usam `/dev/tty`. Sem terminal, terminam com "sem terminal para perguntar". Depois da
   resposta, a pergunta vira uma linha com o valor escolhido (segredos aparecem como `••••••••`).
 - **Teclas:** ↑/↓ (ou `k`/`j`), Home, End, PgUp, PgDn, 1 a 9 no menu, Espaço e `a` (todos) no checklist. Esc
-  escolhe o último item do menu quando ele é "Voltar" ou "Sair". No checklist, Esc só cancela com `cancel=True`.
-  Nos outros casos, é ignorado.
+  escolhe o último item do menu quando ele é "Voltar" ou "Sair", e o checklist com `cancel=True` devolve `None`. Nos
+  outros casos (perguntas de texto, confirmações, menus e checklists sem volta), Esc levanta `ui.Cancelled` (filha
+  de `KeyboardInterrupt`), e a pergunta vira "cancelado".
+- **Texto** é lido tecla por tecla: acentos, Backspace, Ctrl+U (apaga a linha) e Enter; as setas são ignoradas.
 - Listas maiores que o terminal rolam, com o contador "N de M".
 - O terminal é restaurado (eco, cursor, quebra de linha) mesmo com Ctrl+C, que chega ao chamador como
   `KeyboardInterrupt`.

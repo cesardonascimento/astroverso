@@ -6,7 +6,9 @@ nome). Menus e instalação seguem essa ordem.
 
 **Sem argumentos**, abre o logo e o menu: "Instalar apps" (checklist dos que ainda não estão instalados, com a
 descrição de cada um e a linha "Todos" no topo, e um resumo no fim) e "Gerenciar apps" (cada app instalado: as ações dele, "Reinstalar" e
-"Remover", com confirmação). Na primeira vez, cria o atalho `~/.local/bin/astroverso`.
+"Remover", com confirmação). Na primeira vez, cria o atalho `~/.local/bin/astroverso`. Esc (ou Ctrl+C) no meio de uma
+instalação, ação ou remoção cancela e volta ao menu, sem desfazer o que já foi feito; numa instalação de vários apps,
+os seguintes também ficam de fora.
 
 **Uso direto**, sem menus, para serviços do systemd e para o pacote `backup` (o código de saída diz se deu certo):
 
@@ -14,6 +16,6 @@ descrição de cada um e a linha "Todos" no topo, e um resumo no fim) e "Gerenci
 astroverso <app> install | remove | status | backup <pasta> | restore <pasta> | action <id>
 ```
 
-`status` sai com 0 se o app está instalado e 1 se não. Ctrl+C sai com 130.
+`status` sai com 0 se o app está instalado e 1 se não. Esc ou Ctrl+C sai com 130.
 
 Testes: `python3 -m unittest discover -s packages -t packages` (todos os pacotes).

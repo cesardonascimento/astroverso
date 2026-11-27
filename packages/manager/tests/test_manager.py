@@ -165,6 +165,36 @@ class ManagerTest(unittest.TestCase):
         self.assertFalse(first.exists())
         self.assertFalse(second.exists())
 
+    def test_interactive_esc_cancels_install(self) -> None:
+        state = self.app("pergunta", install="ui.ask('nome')")
+        self.app("zeta")
+        keys = [b"\r", b" ", b"\r", b"\x1b", b"\x1b"]
+        outcome = run_in_pty(lambda: cli.main([], self.apps), keys)
+        screen = outcome.screen
+        self.assertEqual(outcome.code, 0, screen)
+        self.assertIn("Esc cancela a instalação", screen)
+        self.assertIn("instalação do pergunta cancelada", screen)
+        self.assertIn("cancelados: pergunta, zeta", screen)
+        self.assertIn("O que fazer? Sair", screen)
+        self.assertFalse(state.exists())
+
+    def test_interactive_ctrl_c_cancels_action(self) -> None:
+        source = APP.format(state=str(self.root / "acao.state"), name="acao", install="pass").replace(
+            'lambda: ui.ok("pong")', 'lambda: ui.ask("nome")'
+        )
+        state = self.app("acao", source=source)
+        state.write_text("ok")
+        keys = [b"\x1b[B", b"\r", b"\r", b"\r", b"\x03", b"\x1b", b"\x1b", b"\x1b"]
+        outcome = run_in_pty(lambda: cli.main([], self.apps), keys)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertIn("ação Responder pong cancelada", outcome.screen)
+
+    def test_direct_esc(self) -> None:
+        self.app("pergunta", install="ui.ask('nome')")
+        outcome = run_in_pty(lambda: cli.main(["pergunta", "install"], self.apps), [b"\x1b"])
+        self.assertEqual(outcome.result, 130, outcome.screen)
+        self.assertIn("interrompido", outcome.screen)
+
     def test_ensure_command(self) -> None:
         home = self.root / "home"
         with mock.patch.object(sys, "stdout", io.StringIO()) as out:

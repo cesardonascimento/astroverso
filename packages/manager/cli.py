@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from kit import distro, ui
@@ -31,6 +31,27 @@ def _valid(apps: list[LoadedApp]) -> list[LoadedApp]:
     return [app for app in apps if app.module]
 
 
+def _stopped(stop: KeyboardInterrupt) -> None:
+    if not isinstance(stop, ui.Cancelled):
+        sys.stdout.write("\n")
+
+
+def _run(app: LoadedApp, what: str, function: Callable[..., object], *args: object) -> bool | None:
+    try:
+        return call(app, function, *args)[0]
+    except KeyboardInterrupt as stop:
+        _stopped(stop)
+        ui.warn(f"{what} cancelada")
+        return None
+
+
+def _confirm(question: str) -> bool:
+    try:
+        return ui.confirm(question)
+    except ui.Cancelled:
+        return False
+
+
 def _install(apps: list[LoadedApp]) -> None:
     pending = [app for app in apps if not installed(app)]
     if not pending:
@@ -41,17 +62,25 @@ def _install(apps: list[LoadedApp]) -> None:
     )
     if not chosen:
         return
-    done, failed = [], []
-    for index in chosen:
+    done: list[str] = []
+    failed: list[str] = []
+    skipped: list[str] = []
+    for position, index in enumerate(chosen):
         app = pending[index]
         ui.step(f"Instalando {app.name}")
-        success, _ = call(app, app.module.install)
+        ui.note("Esc cancela a instalação e volta ao menu.")
+        success = _run(app, f"instalação do {app.name}", app.module.install)
+        if success is None:
+            skipped = [pending[i].name for i in chosen[position:]]
+            break
         (done if success else failed).append(app.name)
     ui.step("Resumo")
     if done:
         ui.ok(f"instalados: {', '.join(done)}")
     if failed:
         ui.error(f"falharam: {', '.join(failed)}")
+    if skipped:
+        ui.warn(f"cancelados: {', '.join(skipped)}")
 
 
 def _manage_app(app: LoadedApp) -> None:
@@ -62,15 +91,16 @@ def _manage_app(app: LoadedApp) -> None:
         choice = ui.menu(f"Gerenciar {app.name}", labels)
         if choice < len(actions):
             ui.step(actions[choice].label)
-            call(app, actions[choice].run)
+            _run(app, f"ação {actions[choice].label}", actions[choice].run)
         elif labels[choice] == "Reinstalar":
             ui.step(f"Reinstalando {app.name}")
-            if call(app, app.module.install)[0]:
+            ui.note("Esc cancela a instalação e volta ao menu.")
+            if _run(app, f"instalação do {app.name}", app.module.install):
                 ui.ok(f"{app.name} reinstalado")
         elif labels[choice] == "Remover":
-            if ui.confirm(f"remover o {app.name}?"):
+            if _confirm(f"remover o {app.name}?"):
                 ui.step(f"Removendo {app.name}")
-                if call(app, app.module.remove)[0]:
+                if _run(app, f"remoção do {app.name}", app.module.remove):
                     ui.ok(f"{app.name} removido")
                     return
         else:
@@ -145,7 +175,7 @@ def main(argv: Sequence[str] | None = None, folder: Path = APPS) -> int:
             ui.info(USAGE)
             return 0
         return direct(folder, args)
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
+    except KeyboardInterrupt as stop:
+        _stopped(stop)
         ui.warn("interrompido")
         return 130

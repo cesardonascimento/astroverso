@@ -17,8 +17,15 @@ class FakeTty(io.StringIO):
 
 
 def run(code: str, keys: list[bytes], lines: int = 24) -> tuple[object, str]:
-    outcome = run_in_pty(lambda: eval(code, {"ui": ui, "check_port": check_port}), keys, lines)
+    outcome = run_in_pty(lambda: eval(code, {"ui": ui, "check_port": check_port, "attempt": attempt}), keys, lines)
     return outcome.result, outcome.screen
+
+
+def attempt(function: object, *args: object, **kwargs: object) -> object:
+    try:
+        return function(*args, **kwargs)
+    except ui.Cancelled:
+        return "cancelado"
 
 
 def check_port(value: str) -> str:
@@ -103,6 +110,26 @@ class PromptTest(unittest.TestCase):
         result, _ = run('ui.ask_list("item")', [b"a\n", b"b\n", b"\n"])
         self.assertEqual(result, ["a", "b"])
 
+    def test_editing(self) -> None:
+        result, screen = run('ui.ask("nome")', ["joão".encode(), b"\x7f\x7fe\x1b[D\n"])
+        self.assertEqual(result, "joe")
+        self.assertEqual(run('ui.ask("nome")', [b"errado", b"\x15certo\n"])[0], "certo")
+        self.assertEqual(run('ui.secret("senha", confirm=False)', [b"abx\x7fc\n"])[0], "abc")
+
+    def test_esc_cancels(self) -> None:
+        result, screen = run('attempt(ui.ask, "nome", default="x")', [b"abc", b"\x1b"])
+        self.assertEqual(result, "cancelado")
+        self.assertIn("? nome cancelado", screen)
+        self.assertEqual(run('attempt(ui.secret, "senha")', [b"\x1b"])[0], "cancelado")
+        self.assertEqual(run('attempt(ui.confirm, "seguir?")', [b"\x1b"])[0], "cancelado")
+        self.assertEqual(run('attempt(ui.ask_list, "item")', [b"a\n", b"\x1b"])[0], "cancelado")
+
+    def test_ctrl_c_still_interrupts(self) -> None:
+        code = 'ui.ask("nome")'
+        outcome = run_in_pty(lambda: eval(code, {"ui": ui}), [b"\x03"])
+        self.assertEqual(outcome.code, 99)
+        self.assertIn("KeyboardInterrupt", outcome.screen)
+
     def test_without_terminal(self) -> None:
         with mock.patch("os.open", side_effect=OSError), mock.patch.object(sys, "stderr", io.StringIO()):
             with self.assertRaises(SystemExit):
@@ -128,8 +155,11 @@ class MenuTest(unittest.TestCase):
     def test_menu_esc_back(self) -> None:
         self.assertEqual(run('ui.menu("O que?", ["a", "Voltar"])', [b"\x1b"])[0], 1)
 
-    def test_menu_esc_ignored_and_unknown_keys(self) -> None:
-        self.assertEqual(run('ui.menu("O que?", ["a", "b"])', [b"\x1b", b"\x1b[C", b"\r"])[0], 0)
+    def test_menu_esc_cancels_and_unknown_keys(self) -> None:
+        self.assertEqual(run('ui.menu("O que?", ["a", "b"])', [b"\x1b[C", b"\r"])[0], 0)
+        result, screen = run('attempt(ui.menu, "O que?", ["a", "b"])', [b"\x1b"])
+        self.assertEqual(result, "cancelado")
+        self.assertIn("Esc cancela", screen)
 
     def test_menu_scroll(self) -> None:
         items = [f"item {i}" for i in range(30)]
@@ -149,6 +179,7 @@ class MenuTest(unittest.TestCase):
         result, screen = run('ui.checklist("Quais?", ["a"], selected=[0], cancel=True)', [b"\x1b"])
         self.assertIsNone(result)
         self.assertIn("cancelado", screen)
+        self.assertEqual(run('attempt(ui.checklist, "Quais?", ["a"])', [b"\x1b"])[0], "cancelado")
 
     def test_terminal_restored(self) -> None:
         code = '(ui.menu("O que?", ["a"]), bool(__import__("termios").tcgetattr(0)[3] & __import__("termios").ECHO))[1]'
