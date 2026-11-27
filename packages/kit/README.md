@@ -102,6 +102,7 @@ a pasta de um app.
 | `mounts()` | Os discos cadastrados: `Disk(uuid, path, fstype, line)`, com `name` (o nome da pasta) |
 | `mounted(caminho)` | Se há algo montado nesse caminho (`findmnt`) |
 | `responds(caminho)` | Montado, com o aparelho por baixo presente e a pasta lida em até 20 s (pega o disco preso depois de uma queda da conexão) |
+| `photo_of(pasta)` / `photo_disks()` / `in_photo_disk(caminho)` | Os discos de fotografias do app `disks` (marcados por `astroverso-fotografia.json` na raiz, com o disco de origem): nada grava neles, e o `kit.folders` os esconde e recusa |
 | `containing(caminho)` / `available(caminho)` | O disco onde fica uma pasta; se ela está num disco que responde (verdadeiro fora dos discos) |
 | `usage(caminho)` | `(usado, total)` em bytes |
 

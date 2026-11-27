@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from dataclasses import dataclass
@@ -119,3 +120,23 @@ def available(path: Path) -> bool:
 def usage(path: Path) -> tuple[int, int]:
     total, used, _ = shutil.disk_usage(path)
     return used, total
+
+
+PHOTO = "astroverso-fotografia.json"
+
+
+def photo_of(path: Path) -> dict[str, str] | None:
+    try:
+        data = json.loads((path / PHOTO).read_text())
+    except (OSError, ValueError):
+        return None
+    return {str(key): str(value) for key, value in data.items()} if isinstance(data, dict) else None
+
+
+def photo_disks() -> list[Disk]:
+    return [disk for disk in mounts() if (disk.path / PHOTO).exists()]
+
+
+def in_photo_disk(path: Path) -> bool:
+    disk = containing(path)
+    return disk is not None and (disk.path / PHOTO).exists()

@@ -139,10 +139,11 @@ class DisksAppTest(unittest.TestCase):
     def test_items_and_actions(self) -> None:
         app.save_registry([{"uuid": LUKS, "name": "dados"}])
         ids = [(item.id, item.danger) for item in app.items()]
-        self.assertEqual(ids, [("disk-1111aaaa", True), ("watch", False), ("backup", False)])
+        self.assertEqual(ids, [("disk-1111aaaa", True), ("watch", False), ("photos", False), ("backup", False)])
         self.assertEqual(app.registry_file().stat().st_mode & 0o777, 0o600)
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("disks", False), ("changes", False), ("watch", True), ("backup-now", True),
+                         [("summary", True), ("disks", False), ("changes", False), ("watch", True), ("photos", False),
+                          ("photos-now", True), ("photos-timer", False), ("photos-release", False), ("backup-now", True),
                           ("restore-version", False)])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             self.assertFalse(app.status())

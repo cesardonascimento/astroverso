@@ -205,7 +205,11 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Cada disco cadastrado (`~/.astroverso/disks/disks.json`) é uma Change ⚠: desfazer só desmonta e tira as linhas;
   descadastrar em "Discos da máquina" também descadastra o TPM.
 - Os outros apps leem pelo `kit.disks` (o `fstab` é o contrato): `mounts()`, `available(pasta)`.
-- Verificação de hora em hora: não montado, preso (não responde) e 90% ocupado.
+- Verificação de hora em hora: não montado, preso (não responde), 90% ocupado e fotografia parada ou atrasada.
+- **Fotografias** (`photos.py`, decisão do usuário: igual ao sistema antigo, só discos inteiros): toda noite às 03:00, a origem
+  vai inteira para `<disco de fotografias>/atual/` (`podman unshare rsync -aH --numeric-ids --delete`) e o que mudou ou saiu
+  para `versoes/<data>/` (30 dias). Nada grava no disco de fotografias (`astroverso-fotografia.json` na raiz; o
+  `kit.folders` esconde e recusa). Não roda com um disco ausente; para com mais de 10% de exclusões ("Liberar a fotografia").
 
 ### App `n8n`
 

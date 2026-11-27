@@ -10,12 +10,12 @@ from kit import watch as kit_watch
 from kit.app import Action
 from kit.watch import Problem
 
-from . import mount
+from . import mount, photos
 
 APP = "disks"
 DESCRIPTION = "Discos de dados da máquina: montados em /srv/<nome> no boot, os criptografados destravados pelo TPM"
 ORDER = 20
-PACKAGES = ["cryptsetup", "tpm2-tss"]
+PACKAGES = ["cryptsetup", "tpm2-tss", "rsync"]
 BUTTONS = (("Resumo dos discos", "disks:summary"), ("Verificar de novo", "disks:watch"))
 FULL = 90
 
@@ -89,7 +89,7 @@ def watch_change() -> changes.Change:
 
 
 def extras() -> list[changes.Change]:
-    return [watch_change(), vault.change(APP)]
+    return [watch_change(), photos.change(), vault.change(APP)]
 
 
 def items() -> list[changes.Change]:
@@ -170,7 +170,7 @@ def remove() -> None:
 
 
 def backup(folder: Path) -> None:
-    for source in (config.env_file(APP), registry_file()):
+    for source in (config.env_file(APP), registry_file(), photos.pairs_file()):
         if source.exists():
             shutil.copy2(source, folder / source.name)
 
@@ -179,7 +179,7 @@ def restore(folder: Path) -> None:
     if not (folder / ".env").exists():
         ui.fail(f"backup sem a configuração do {APP}: {folder / '.env'}")
     config.state(APP)
-    for name, target in ((".env", config.env_file(APP)), ("disks.json", registry_file())):
+    for name, target in ((".env", config.env_file(APP)), ("disks.json", registry_file()), ("photos.json", photos.pairs_file())):
         if (folder / name).exists():
             shutil.copy2(folder / name, target)
             target.chmod(0o600)
@@ -212,6 +212,8 @@ def summary() -> None:
         ui.table(rows, ["Disco", "Caminho", "Sistema", "Situação", "Uso"])
     else:
         ui.info("nenhum disco cadastrado: escolha em Discos da máquina")
+    ui.section("Fotografias")
+    ui.table(photos.rows() or [[ui.off("nenhuma"), "-", "-", "-"]], ["Origem", "Fotografias em", "Última", "Histórico"])
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     kit_watch.summary(APP)
@@ -232,6 +234,7 @@ def collect(previous: kit_watch.State) -> dict[str, Problem]:
             if percent >= FULL:
                 found[f"full:{disk.name}"] = Problem("aviso", f"Disco {disk.name} com {percent}% ocupado",
                                                      f"Sobram {mount.human(total - used)}. Libere espaço antes que os apps parem de gravar.", "full")
+    found.update(photos.collect())
     return found
 
 
@@ -269,6 +272,10 @@ def actions() -> list[Action]:
         Action("disks", "Discos da máquina", manage_disks),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
+        Action("photos", "Fotografias dos discos", photos.manage),
+        Action("photos-now", "Fotografar agora", lambda: photos.run_all(), remote=True, confirm=True),
+        Action("photos-timer", "Fotografar (timer)", lambda: photos.run_all(), menu=False),
+        Action("photos-release", "Liberar a fotografia", photos.release),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

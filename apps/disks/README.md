@@ -6,7 +6,7 @@ destravados pelo TPM, sem pedir senha. Os discos são **da máquina**, de nenhum
 
 ## O que a instalação faz
 
-1. Instala o `cryptsetup` e o `tpm2-tss` (se faltarem).
+1. Instala o `cryptsetup`, o `tpm2-tss` e o `rsync` (se faltarem).
 2. **Discos da máquina:** lista os discos que não são do sistema (a partir de 1 GiB: ext4, xfs, btrfs, NTFS, exFAT,
    FAT ou LUKS), com nome, tamanho, tipo e modelo, e monta os escolhidos:
    - **LUKS:** pede a senha uma vez para cadastrar o TPM (PCR 7, Secure Boot conferido). Depois, o disco destrava
@@ -14,7 +14,7 @@ destravados pelo TPM, sem pedir senha. Os discos são **da máquina**, de nenhum
      (nada pode pedir senha no boot, porque a máquina reinicia de longe).
    - O nome vem do rótulo do disco (ou `disco-<uuid>`); no LUKS, o rótulo de dentro é copiado para o cabeçalho, para
      aparecer mesmo com o disco travado.
-3. Pergunta a verificação de hora em hora, o backup diário da configuração e o das pastas dos discos.
+3. Pergunta a verificação de hora em hora, a fotografia noturna e o backup diário da configuração.
 4. Mostra o Resumo dos discos.
 
 Na reinstalação com a configuração salva, monta de novo os discos cadastrados, sem perguntar.
@@ -23,14 +23,16 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 
 | Mudança | Por quê | ⚠ |
 |---|---|---|
-| Pacotes `cryptsetup` e `tpm2-tss` | Destravar os discos LUKS pelo TPM | |
+| Pacotes `cryptsetup`, `tpm2-tss` e `rsync` | Destravar os discos LUKS pelo TPM; tirar as fotografias | |
 | Por disco (perguntada pela escolha em **Discos da máquina**): linha em `/etc/fstab` depois de `# astroverso <uuid>`, montada em `/srv/<nome>` (`nofail`, `nosuid`, `nodev`, `context=container_file_t`, antes do `user@<uid>.service`; NTFS/exFAT/FAT com `uid`/`gid` e `umask=077`) | O disco monta no boot, só do seu usuário, e os containers o enxergam | ⚠ |
 | Por disco LUKS: linha em `/etc/crypttab` (`tpm2-device=auto`, `headless=true`, `nofail`) e o TPM cadastrado no disco (`systemd-cryptenroll`, PCR 7) | O disco destrava no boot sem senha | ⚠ |
 | Por disco: links em `/etc/systemd/system/<dispositivo>.device.wants/` (e no `.wants` do `systemd-cryptsetup@`) | O disco monta de novo sozinho quando é religado (gaveta USB) | ⚠ |
 | `/srv/<nome>` (`770`, seu usuário; imutável quando desmontado) | O ponto de montagem; desmontado, ninguém grava no disco do sistema por engano | |
 | `/etc/fstab.astroverso-bak` e `/etc/crypttab.astroverso-bak` | Cópia de antes da primeira mudança | |
-| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `watch.json`) | A configuração | |
+| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `photos.json` com as fotografias, `photos-state.json` com a última de cada uma, `watch.json`) | A configuração | |
 | Unidades do usuário `astroverso-disks-watch.timer` e `.service` (perguntada, padrão sim) | A verificação de hora em hora | |
+| Unidades do usuário `astroverso-disks-photos.timer` e `.service` (perguntada, padrão sim) | A fotografia de cada disco às 03:00 (abaixo) | |
+| Por fotografia: `astroverso-fotografia.json` na raiz do disco de fotografias (origem: nome e UUID) | Marca o disco como de fotografias (some dos seletores de pasta) e diz ao Resgatar um disco de onde ele veio | |
 | Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
 
 ## Ações
@@ -41,8 +43,30 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Discos da máquina | Checklist com os discos encontrados (e os cadastrados que estão desligados): marcar monta, desmarcar desmonta (com confirmação), tira do `fstab` e descadastra o TPM. Os dados continuam no disco |
 | Mudanças no sistema | Desmonta e monta de novo cada disco cadastrado (sem descadastrar o TPM), liga e desliga a verificação e os backups |
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
-| Fazer backup das pastas agora / Restaurar uma pasta de uma versão | O backup das pastas na hora (também no Discord) e a restauração de uma versão numa pasta nova, sem mexer na original |
+| Fotografias dos discos | Adicionar (disco de origem e disco de fotografias, com confirmação) e tirar fotografias. Os dados que já estão nos discos ficam |
+| Fotografar agora | Todas as fotografias na hora (também no Discord, com confirmação) |
+| Liberar a fotografia | Uma fotografia parada pela trava de exclusões: mostra quantos e quais arquivos sairiam do `atual/` e roda sem a trava |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do vault. Numa máquina nova, o TPM pede a senha do LUKS de novo |
+
+## Fotografias
+
+Toda noite às 03:00, cada disco de origem é copiado inteiro (`podman unshare rsync -aH --numeric-ids --delete`, que guarda
+donos, permissões e links) para o disco de fotografias:
+
+```
+/srv/<disco de fotografias>/
+├── astroverso-fotografia.json   de qual disco ele é
+├── atual/                       igual à origem (o espelho)
+└── versoes/<AAAA-MM-DD>/        o que mudou ou foi apagado naquela noite, por 30 dias
+```
+
+- **Nada grava no disco de fotografias:** ele some dos seletores de pasta (`kit.folders`) e um caminho digitado nele é
+  recusado.
+- Não roda com um dos discos desligado ou travado (uma origem sumida esvaziaria o `atual/`).
+- **Trava de exclusões:** se fosse tirar do `atual/` mais de 10% dos arquivos de uma vez, para sem mexer em nada e avisa
+  no `#disks`; **Liberar a fotografia** mostra a lista e roda.
+- Com o disco de fotografias a partir de 90% ocupado, as `versoes/` mais antigas saem antes do prazo.
+- Um `atual/` que já existe (do sistema antigo) é aproveitado: a primeira rodada só copia o que mudou.
 
 ## Verificação de hora em hora
 
@@ -53,6 +77,8 @@ Avisa no canal `#disks` do Discord só quando algo muda, com os botões **Resumo
 | Disco cadastrado não montado (desligado, desconectado, não destravou) | erro |
 | Disco montado que parou de responder (a conexão caiu e voltou: fica inacessível até reiniciar) | erro |
 | Disco com 90% ou mais ocupado | aviso |
+| Fotografia parada pela trava de exclusões | erro |
+| Fotografia sem rodar há mais de 36 h | erro |
 
 ## Para os outros apps (`kit.disks`)
 

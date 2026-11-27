@@ -44,7 +44,8 @@ def suggestions(current: str = "") -> list[Path]:
     found: list[Path] = []
     for path in [Path(current).expanduser()] if current else []:
         found.append(path)
-    found += [disk.path for disk in disks.mounts()]
+    photos = {disk.path for disk in disks.photo_disks()}
+    found += [disk.path for disk in disks.mounts() if disk.path not in photos]
     found += [item.path for item in clouds.load()]
     found.append(Path.home())
     unique: list[Path] = []
@@ -63,6 +64,8 @@ def pick(question: str, current: str = "", validate: Validator | None = None) ->
     def check(value: str) -> str:
         path = Path(value.strip()).expanduser()
         text = str(path if path.is_absolute() else start / path)
+        if disks.in_photo_disk(Path(text)):
+            raise ValueError("esse é um disco de fotografias: nada grava nele")
         return validate(text) if validate else text
 
     return ui.ask(question, default=str(start), validate=check)
