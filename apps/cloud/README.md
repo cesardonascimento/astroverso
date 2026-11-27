@@ -1,28 +1,30 @@
 # cloud
 
-Liga pastas a contas na nuvem pelo [rclone](https://rclone.org): **sincronizações de duas vias** (as duas pontas
-ficam iguais) e **envios de uma via** (o destino vira um espelho da origem). A origem é uma pasta da máquina ou uma pasta
-de outra conta (ex.: uma pasta do Nextcloud ⇄ o Proton Drive). Você escolhe as pastas e para onde elas vão: o
-Astroverso não decide o que vai para a nuvem. Provedores: Proton Drive (`proton.py`) e Nextcloud pelo WebDAV
-(`nextcloud.py`); outro provedor entra como outro módulo.
+Liga pastas a contas na nuvem pelo [rclone](https://rclone.org), **nas duas vias** (as duas pontas ficam iguais). A
+pasta fica num disco da máquina ou **dentro do Nextcloud** (ex.: `/proton` da sua conta ⇄ a raiz do Proton Drive). Não
+tem nada a ver com os backups nem com o Nextcloud em si: é só manter cópias dos seus dados nos serviços de nuvem e
+vice-versa. Você escolhe as pastas e para onde elas vão. Provedores: Proton Drive (`proton.py`); o Nextcloud entra pelo
+WebDAV (`nextcloud.py`), só como lado de uma sincronização; outro provedor entra como outro módulo.
 
 ## O que a instalação faz
 
 1. Instala o `rclone` (pacote da distribuição, sem container).
 2. **Contas na nuvem:** conecta uma conta (o login é testado na hora). Passo a passo: [proton.md](docs/proton.md) e
    [nextcloud.md](docs/nextcloud.md) (com uma senha de app).
-3. **Sincronizações e envios:** cada um liga uma origem (uma pasta da máquina, pelo seletor de pastas `kit.folders`, ou
-   uma pasta de outra conta) a uma pasta de uma conta (num menu que navega pelas pastas da nuvem, com "Criar uma pasta
-   aqui").
+3. **Sincronizações:** cada uma liga uma pasta ("Na máquina (um disco)", pelo seletor de pastas `kit.folders`, ou
+   "Dentro do Nextcloud", navegando pelas pastas da sua conta) a uma pasta de uma conta na nuvem (num menu que navega
+   pelas pastas da nuvem, com "Criar uma pasta aqui"). Na primeira pasta do Nextcloud, o app usa a mesma conexão do
+   app `vault` (com confirmação) ou pede uma senha de app.
 4. Publica as pastas ligadas pelo `kit.clouds` (`~/.astroverso/clouds/cloud.json`): é a marca ☁ nos seletores dos
    outros apps (ex.: "Proton Drive (duas vias)").
 5. Pergunta as mudanças no sistema e mostra o Resumo da nuvem.
 
 Na reinstalação com a configuração salva, não pergunta nada (a conta sem login nesta máquina pede o login).
 
-## Duas vias (de hora em hora)
+## Duas vias (de 2 em 2 horas, das 08:00 às 20:00)
 
-`rclone bisync` da pasta da máquina com a da nuvem, no minuto 20 de cada hora.
+`rclone bisync` das duas pastas às 08, 10, 12, 14, 16, 18 e 20 horas: fora da madrugada, que fica para os backups
+(01:00) e a fotografia dos discos (03:00).
 
 | Situação | O que acontece |
 |---|---|
@@ -33,22 +35,18 @@ Na reinstalação com a configuração salva, não pergunta nada (a conta sem lo
 
 Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: pode passar dos 5%.
 
-## Uma via (todo dia às 05:00)
+Não existe "sincronizar sem exclusões de dia e com exclusões à noite": numa sincronização de duas vias, uma exclusão
+que não vai para o outro lado faz o arquivo voltar de lá na rodada seguinte. A proteção é a trava de 5%.
 
-`rclone sync` da pasta da máquina para a da nuvem: o que sai da pasta sai da nuvem. Às 05:00, depois dos backups da
-madrugada (e da manutenção de domingo do app `vault`), para não enviar uma pasta de backups no meio de uma gravação.
-Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma ação.
+## Detalhes
 
-## Nas duas
-
-- **Pasta do Nextcloud com uma nuvem:** use o Nextcloud como conta (WebDAV), e não a pasta dos arquivos dele no disco.
-  Tudo passa pelo Nextcloud: ele fica em dia sem varredura, os arquivos ficam com o dono certo, e o que a nuvem apagar
-  vai para a lixeira e as versões dele. Entre duas contas, o rclone roda sem `podman unshare`.
+- **Pasta do Nextcloud:** passa sempre pelo Nextcloud (WebDAV), nunca pela pasta dos arquivos dele no disco (o seletor
+  recusa uma pasta com `.ncdata`/`.ocdata` acima dela). Ele fica em dia sem varredura, os arquivos ficam com o dono
+  certo, e o que a nuvem apagar vai para a lixeira e as versões dele. Entre duas contas, o rclone roda sem `podman unshare`.
 - Pasta num disco desligado ou travado (`kit.disks.available`): a rodada não roda (uma pasta vazia pareceria "tudo
   apagado") e fica como falha.
 - O rclone roda por `podman unshare`, para mexer também nos arquivos gravados por containers (ex.: o Nextcloud).
-- Uma trava impede duas rodadas ao mesmo tempo: a sincronização da hora pula a vez; o envio das 05:00 espera.
-- Sem regra nem validação de destino: se um envio cair dentro de uma pasta de duas vias, a escolha é sua.
+- Uma trava impede duas rodadas ao mesmo tempo: a rodada seguinte pula a vez.
 
 ## Mudanças na máquina
 
@@ -58,8 +56,7 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | `~/.astroverso/cloud/` (`.env`, `rclone.conf` `600` com as contas e as senhas ofuscadas, `accounts.json`, `jobs.json`, `state.json` com a última rodada, `watch.json`) | A configuração e o estado | |
 | `~/.astroverso/clouds/cloud.json` | As pastas ligadas, para a marca ☁ dos outros apps | |
 | `~/.cache/rclone/bisync/` | As listas da última rodada de cada sincronização (do próprio rclone) | |
-| Unidades do usuário `astroverso-cloud-sync.timer` e `.service` (perguntada) | As sincronizações de duas vias de hora em hora | ⚠ |
-| Unidades do usuário `astroverso-cloud-send.timer` e `.service` (perguntada) | Os envios às 05:00 | ⚠ |
+| Unidades do usuário `astroverso-cloud-sync.timer` e `.service` (perguntada) | As sincronizações de 2 em 2 horas, das 08:00 às 20:00 (a reinstalação tira o antigo `astroverso-cloud-send`) | ⚠ |
 | Unidades do usuário `astroverso-cloud-watch.timer` e `.service` (perguntada) | A verificação de hora em hora | |
 | Unidades do usuário `astroverso-cloud-backup.timer` e `.service` (perguntada) | Backup diário da configuração (sem as senhas) no vault | |
 
@@ -68,18 +65,18 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | Passo | Por quê | Como fazer |
 |---|---|---|
 | Entrar uma vez pelo site do Proton Drive | O rclone não conclui o primeiro acesso de uma conta nova | [proton.md](docs/proton.md#antes-de-começar) |
-| Criar uma senha de app no Nextcloud (para usá-lo como conta) | O app cloud não usa a sua senha de login | [nextcloud.md](docs/nextcloud.md#criar-a-senha-de-app) |
+| Criar uma senha de app no Nextcloud (se não usar a do app `vault`) | O app cloud não usa a sua senha de login | [nextcloud.md](docs/nextcloud.md#criar-a-senha-de-app) |
 
 ## Ações
 
 | Ação | O que faz |
 |---|---|
-| Resumo da nuvem | Contas, sincronizações e envios com a última rodada, mudanças e verificação. Também no Discord |
+| Resumo da nuvem | Contas, sincronizações com a última rodada, mudanças e verificação. Também no Discord |
 | Contas na nuvem | Adicionar, entrar de novo (sessão encerrada) e remover uma conta desta máquina (nada é apagado na nuvem) |
-| Sincronizações e envios | Adicionar e tirar (tirar não apaga nada, nem na máquina nem na nuvem) |
-| Sincronizar agora / Enviar agora | Uma rodada na hora (também no Discord) |
+| Sincronizações | Adicionar e tirar (tirar não apaga nada, nem na máquina nem na nuvem) |
+| Sincronizar agora | Uma rodada na hora (também no Discord) |
 | Liberar exclusões | Para uma rodada travada nos 5%: mostra o que seria apagado e, com confirmação, roda liberando |
-| Mudanças no sistema / Verificar agora / Fazer backup agora / Restaurar uma versão | Como nos outros apps. O backup leva as contas (provedor e e-mail), as sincronizações e os envios, sem as senhas: na restauração, cada conta pede o login de novo |
+| Mudanças no sistema / Verificar agora / Fazer backup agora / Restaurar uma versão | Como nos outros apps. O backup leva as contas (provedor e e-mail) e as sincronizações, sem as senhas: na restauração, cada conta pede o login de novo |
 
 ## Verificação de hora em hora
 
@@ -89,7 +86,7 @@ Avisa no canal `#cloud` do Discord só quando algo muda, com os botões **Resumo
 |---|---|
 | Rodada com exclusões travadas | erro |
 | Rodada que falhou (login, internet, disco indisponível) | erro |
-| Duas vias sem rodada certa há mais de 3 h, envio há mais de 30 h | aviso |
+| Sincronização sem rodada certa há mais de 14 h | aviso |
 
 ## Remover
 

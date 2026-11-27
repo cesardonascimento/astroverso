@@ -5,23 +5,24 @@ import time
 from pathlib import Path
 
 from kit import vault
-from kit import changes, clouds, config, distro, folders, ui, units, watch
+from kit import changes, clouds, config, distro, folders, run, ui, units, watch
 from kit.app import Action
 from kit.watch import Problem
 
-from . import jobs, rclone
+from . import jobs, nextcloud, rclone
 from .jobs import Job
 
 APP = "cloud"
-DESCRIPTION = "Pastas sincronizadas com a nuvem pelo rclone (Proton Drive, Nextcloud): duas vias e envios"
+DESCRIPTION = "Pastas sincronizadas nas duas vias com a nuvem pelo rclone (Proton Drive), inclusive pastas do Nextcloud"
 ORDER = 50
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
 BUTTONS = (("Resumo da nuvem", "cloud:summary"), ("Sincronizar agora", "cloud:sync"))
+HOURS = "08,10,12,14,16,18,20"
 TIMERS = {
-    "sync": ("astroverso-cloud-sync", "*-*-* *:20:00", "sincroniza as pastas de duas vias", "sync"),
-    "send": ("astroverso-cloud-send", "*-*-* 05:00:00", "envia as pastas de uma via", "send"),
+    "sync": ("astroverso-cloud-sync", f"*-*-* {HOURS}:00:00", "sincroniza as pastas", "sync"),
 }
-LATE = {"sync": 3 * 3600, "send": 30 * 3600}
+LATE = 14 * 3600
+OLD_SEND = "astroverso-cloud-send"
 
 
 def _timer_units(kind: str) -> dict[str, str]:
@@ -47,14 +48,12 @@ def _timer_change(kind: str, label: str, why: str) -> changes.Change:
 
 def items() -> list[changes.Change]:
     return [
-        _timer_change("sync", "Sincronizar as pastas de duas vias de hora em hora",
-                      f"Um timer do usuário ({TIMERS['sync'][0]}.timer) roda o rclone bisync de cada sincronização a cada hora "
-                      "(minuto 20). Sem ele, nada vai nem volta da nuvem."),
-        _timer_change("send", "Enviar as pastas de uma via todo dia às 05:00",
-                      f"Um timer do usuário ({TIMERS['send'][0]}.timer) espelha cada envio na nuvem às 05:00, depois dos backups "
-                      "da madrugada. Se a máquina estava desligada, roda ao ligar."),
+        _timer_change("sync", "Sincronizar as pastas de 2 em 2 horas, das 08:00 às 20:00",
+                      f"Um timer do usuário ({TIMERS['sync'][0]}.timer) roda o rclone bisync de cada sincronização às "
+                      f"{HOURS.replace(',', ', ')} horas, fora da madrugada (backups à 01:00, fotografia dos discos às 03:00). "
+                      "Sem ele, nada vai nem volta da nuvem."),
         watch.change(APP, "Verificar a nuvem de hora em hora e avisar no Discord",
-                     f"Um timer do usuário ({watch.name(APP)}.timer) confere cada sincronização e envio (falha, exclusões "
+                     f"Um timer do usuário ({watch.name(APP)}.timer) confere cada sincronização (falha, exclusões "
                      "travadas, disco indisponível, atraso) e avisa no canal #cloud do Discord só quando algo muda.",
                      "a nuvem"),
         vault.change(APP),
@@ -103,7 +102,7 @@ def manage_accounts() -> None:
         if choice.startswith("Entrar"):
             relogin(found[index])
         elif any(found[index].id in (job.account, job.source_account) for job in jobs.jobs()):
-            ui.warn("essa conta tem sincronizações ou envios: tire-os antes, em Sincronizações e envios")
+            ui.warn("essa conta tem sincronizações: tire-as antes, em Sincronizações")
         elif ui.confirm(f"Remover a conta {found[index].label()} desta máquina? (nada é apagado na nuvem)", default=False):
             rclone.drop_section(found[index].id)
             jobs.save_accounts([item for item in found if item.id != found[index].id])
@@ -146,16 +145,41 @@ def _local(value: str) -> str:
         raise ValueError("use um caminho completo")
     if path in (Path("/"), Path.home()) or config.home() == path or config.home() in path.parents:
         raise ValueError("escolha uma pasta só para isso (fora do ~/.astroverso)")
+    if inside_nextcloud(path):
+        raise ValueError("essa pasta é dos arquivos do Nextcloud: escolha Dentro do Nextcloud")
     return str(path)
+
+
+def inside_nextcloud(path: Path) -> bool:
+    for folder in [path, *path.parents]:
+        if folder in (Path("/"), Path.home(), Path("/srv")):
+            continue
+        if any(run.succeeds(["podman", "unshare", "test", "-e", str(folder / marker)], timeout=20) for marker in (".ncdata", ".ocdata")):
+            return True
+    return False
 
 
 def _pick_account(question: str, found: list[jobs.Account]) -> jobs.Account:
     return found[0] if len(found) == 1 else found[ui.menu(question, [item.label() for item in found])]
 
 
-def _source(found: list[jobs.Account]) -> tuple[str, str] | None:
-    if len(found) > 1 and ui.menu("De onde vem a pasta?", ["Uma pasta da máquina", "Uma pasta de uma conta (ex.: o Nextcloud)"]) == 1:
-        owner = _pick_account("Qual conta?", found)
+def _nextcloud_account() -> jobs.Account | None:
+    found = [item for item in jobs.accounts() if item.provider == nextcloud.NAME and item.id in rclone.sections()]
+    if found:
+        return _pick_account("Qual conta do Nextcloud?", found)
+    section = jobs.new_account_id(nextcloud.NAME)
+    user = nextcloud.from_vault(section) or nextcloud.login(section)
+    item = jobs.Account(section, nextcloud.NAME, user)
+    jobs.save_accounts(jobs.accounts() + [item])
+    return item
+
+
+def _source() -> tuple[str, str] | None:
+    if ui.menu("Onde fica a pasta?", ["Na máquina (um disco)", "Dentro do Nextcloud"]) == 1:
+        ui.note("Uma pasta do Nextcloud sincroniza pelo próprio Nextcloud (WebDAV): ele vê cada arquivo que chega, com o dono certo.")
+        owner = _nextcloud_account()
+        if owner is None:
+            return None
         path = pick_remote(owner.id)
         return None if path is None else (f"{owner.id}:{path}", owner.id)
     local = folders.pick("pasta da máquina", validate=_local)
@@ -163,21 +187,20 @@ def _source(found: list[jobs.Account]) -> tuple[str, str] | None:
     return local, ""
 
 
-def add_job(kind: str) -> None:
-    found = [item for item in jobs.accounts() if item.id in rclone.sections()]
-    if not found:
-        ui.warn("nenhuma conta conectada: adicione uma em Contas na nuvem")
+def add_job() -> None:
+    if not any(item.id in rclone.sections() and item.provider != nextcloud.NAME for item in jobs.accounts()):
+        ui.warn("nenhuma conta na nuvem conectada: adicione uma em Contas na nuvem")
         return
-    if kind == "sync":
-        ui.note("Duas vias: o que muda de um lado vai para o outro, de hora em hora.")
-    else:
-        ui.note("Uma via: a pasta de destino vira um espelho da de origem, todo dia às 05:00 (o que sai da origem sai do destino).")
-    source = _source(found)
+    ui.note(
+        "Duas vias: o que muda de um lado vai para o outro, de 2 em 2 horas, das 08:00 às 20:00. Se uma rodada for apagar "
+        "mais de 5% dos arquivos, ela para e espera você em Liberar exclusões."
+    )
+    source = _source()
     if source is None:
         ui.info("nada mudou")
         return
     local, used = source
-    others = [item for item in found if item.id != used]
+    others = [item for item in jobs.accounts() if item.id in rclone.sections() and item.id != used and item.provider != nextcloud.NAME]
     if not others:
         ui.warn("falta outra conta para o outro lado: adicione uma em Contas na nuvem")
         return
@@ -186,14 +209,13 @@ def add_job(kind: str) -> None:
     if remote is None:
         ui.info("nada mudou")
         return
-    job = Job(jobs.new_job_id(kind, local, f"{owner.id}:{remote}"), kind, local, owner.id, remote)
+    job = Job(jobs.new_job_id("sync", local, f"{owner.id}:{remote}"), "sync", local, owner.id, remote)
     if any(item.id == job.id for item in jobs.jobs()):
         ui.warn("isso já está cadastrado")
         return
     jobs.save_jobs(jobs.jobs() + [job])
     ui.ok(f"{_side(job)} {job.arrow()} {owner.label()}:/{remote}")
-    if kind == "sync":
-        ui.info("a primeira rodada junta os dois lados sem apagar nada; ela roda no próximo horário ou em Sincronizar agora")
+    ui.info("a primeira rodada junta os dois lados sem apagar nada; ela roda no próximo horário ou em Sincronizar agora")
 
 
 def _side(job: Job) -> str:
@@ -208,7 +230,7 @@ def _job_rows() -> list[list[str | ui.Cell]]:
     rows: list[list[str | ui.Cell]] = []
     for job in jobs.jobs():
         owner = jobs.account(job.account)
-        rows.append([jobs.KINDS[job.kind], _side(job), job.arrow(), f"{owner.label() if owner else job.account}:/{job.remote}", _situation(saved.get(job.id, {}))])
+        rows.append([_side(job), job.arrow(), f"{owner.label() if owner else job.account}:/{job.remote}", _situation(saved.get(job.id, {}))])
     return rows
 
 
@@ -226,15 +248,13 @@ def manage_jobs() -> None:
     while True:
         current = jobs.jobs()
         if current:
-            ui.table(_job_rows(), ["Tipo", "Origem", "", "Destino", "Última rodada"])
-        options = ["Adicionar uma sincronização (duas vias)", "Adicionar um envio (uma via)"] + (["Tirar"] if current else []) + ["Pronto"]
-        choice = options[ui.menu("Sincronizações e envios", options)]
+            ui.table(_job_rows(), ["Pasta", "", "Nuvem", "Última rodada"])
+        options = ["Adicionar uma sincronização"] + (["Tirar"] if current else []) + ["Pronto"]
+        choice = options[ui.menu("Sincronizações", options)]
         if choice == "Pronto":
             return
-        if choice.startswith("Adicionar uma"):
-            add_job("sync")
-        elif choice.startswith("Adicionar um"):
-            add_job("send")
+        if choice.startswith("Adicionar"):
+            add_job()
         else:
             chosen = ui.checklist("O que sai?", [f"{job.local} {job.arrow()} {job.target()}" for job in current], cancel=True) or []
             if chosen:
@@ -245,7 +265,7 @@ def manage_jobs() -> None:
 def release() -> None:
     blocked = [job for job in jobs.jobs() if jobs.states().get(job.id, {}).get("blocked")]
     if not blocked:
-        ui.info("nenhuma sincronização ou envio com exclusões travadas")
+        ui.info("nenhuma sincronização com exclusões travadas")
         return
     index = ui.menu("Qual?", [f"{job.local} {job.arrow()} {job.target()}" for job in blocked] + ["Voltar"])
     if index >= len(blocked):
@@ -268,11 +288,12 @@ def install(reuse: bool | None = None) -> None:
     again = config.reuse(APP) if reuse is None else reuse
     ui.step("Nuvem")
     ui.note(
-        "Liga pastas da máquina a uma conta na nuvem: sincronizações de duas vias (as duas pontas ficam iguais) e envios "
-        "de uma via (a nuvem vira um espelho da pasta). Você escolhe as pastas: o Astroverso não decide o que vai para a nuvem."
+        "Liga pastas (de um disco ou de dentro do Nextcloud) a uma conta na nuvem, nas duas vias: as duas pontas ficam "
+        "iguais. Você escolhe as pastas: o Astroverso não decide o que vai para a nuvem."
     )
     distro.install(["rclone"])
     config.save(APP, {})
+    units.remove([f"{OLD_SEND}.timer", f"{OLD_SEND}.service"])
     for item in jobs.accounts():
         if item.id not in rclone.sections():
             ui.info(f"a conta {item.label()} precisa de login nesta máquina")
@@ -318,8 +339,8 @@ def summary() -> None:
     ui.section("Contas")
     ui.table([[item.label(), ui.good("conectada") if item.id in rclone.sections() else ui.pending("entre de novo")] for item in jobs.accounts()]
              or [[ui.off("nenhuma"), "-"]], ["Conta", "Situação"])
-    ui.section("Sincronizações e envios")
-    ui.table(_job_rows() or [[ui.off("nenhum"), "-", "", "-", "-"]], ["Tipo", "Origem", "", "Destino", "Última rodada"])
+    ui.section("Sincronizações")
+    ui.table(_job_rows() or [[ui.off("nenhuma"), "", "-", "-"]], ["Pasta", "", "Nuvem", "Última rodada"])
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     watch.summary(APP)
@@ -336,7 +357,7 @@ def collect(previous: watch.State) -> dict[str, Problem]:
             found[job.id] = Problem("erro", f"Exclusões travadas: {where}", "Mais de 5% dos arquivos seriam apagados. Confira e use Liberar exclusões no gerenciador.", "blocked")
         elif item.get("error"):
             found[job.id] = Problem("erro", f"Falhou: {where}", item["error"], "error")
-        elif item.get("ok") and now - item["ok"] > LATE[job.kind]:
+        elif item.get("ok") and now - item["ok"] > LATE:
             found[job.id] = Problem("aviso", f"Atrasado: {where}", f"Última rodada certa em {time.strftime('%d/%m %H:%M', time.localtime(item['ok']))}.", "late")
     return found
 
@@ -353,11 +374,9 @@ def actions() -> list[Action]:
     return [
         Action("summary", "Resumo da nuvem", summary, remote=True),
         Action("accounts", "Contas na nuvem", manage_accounts),
-        Action("jobs", "Sincronizações e envios", manage_jobs),
-        Action("sync", "Sincronizar agora", lambda: jobs.run_kind("sync", False), remote=True),
-        Action("send", "Enviar agora", lambda: jobs.run_kind("send", False), remote=True),
-        Action("sync-timer", "Sincronizar (timer)", lambda: jobs.run_kind("sync", False), menu=False),
-        Action("send-timer", "Enviar (timer)", lambda: jobs.run_kind("send", True), menu=False),
+        Action("jobs", "Sincronizações", manage_jobs),
+        Action("sync", "Sincronizar agora", lambda: jobs.run_all(False), remote=True),
+        Action("sync-timer", "Sincronizar (timer)", lambda: jobs.run_all(False), menu=False),
         Action("release", "Liberar exclusões", release),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),

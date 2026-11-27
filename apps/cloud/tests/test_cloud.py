@@ -19,6 +19,7 @@ assert APP.module is not None, APP.problem
 app = APP.module
 jobs = app.jobs
 rclone = app.rclone
+INSIDE = app.inside_nextcloud
 
 
 class FakeRclone:
@@ -46,6 +47,7 @@ class CloudAppTest(unittest.TestCase):
             mock.patch.object(rclone, "obscure", side_effect=lambda secret: f"obscuro({len(secret)})"),
             mock.patch.object(disks, "mounts", return_value=[]),
             mock.patch.object(jobs, "LOCKS", self.home / "locks"),
+            mock.patch.object(app, "inside_nextcloud", return_value=False),
             mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
@@ -74,8 +76,8 @@ class CloudAppTest(unittest.TestCase):
     def test_add_sync_job(self) -> None:
         self.connect()
         local = self.home / "dados"
-        keys = [b"\x1b[B", b"\r", b"dados\n", b"\x1b[B", b"\r", b"\x1b[B", b"\r", b"\x1b[B", b"\r"]
-        outcome = run_in_pty(lambda: app.add_job("sync"), keys, columns=160)
+        keys = [b"\r", b"\x1b[B", b"\r", b"dados\n", b"\x1b[B", b"\r", b"\x1b[B", b"\r", b"\x1b[B", b"\r"]
+        outcome = run_in_pty(app.add_job, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         [job] = jobs.jobs()
         self.assertEqual((job.kind, job.local, job.account, job.remote), ("sync", str(local), "proton-1", "Fotos/2025"))
@@ -91,7 +93,7 @@ class CloudAppTest(unittest.TestCase):
         (self.home / "locks").mkdir()
         (self.home / "locks" / "velha.lck").write_text("")
         with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertTrue(jobs.run_kind("sync", False))
+            self.assertTrue(jobs.run_all(False))
             self.assertIn("--resync", self.fake.calls[-1])
             self.assertIn("<unshare>", self.fake.calls[-1])
             self.assertIn("--max-delete", self.fake.calls[-1])
@@ -109,36 +111,35 @@ class CloudAppTest(unittest.TestCase):
                 self.assertFalse(jobs.run_job(job))
             self.assertIn("indisponível", jobs.states()["j1"]["error"])
 
-    def test_send_mirrors_with_delete_guard(self) -> None:
+    def test_late(self) -> None:
         self.connect()
-        local = self.home / "backups"
-        local.mkdir()
-        for index in range(400):
-            (local / f"{index}.pack").write_text("x")
-        job = jobs.Job("j2", "send", str(local), "proton-1", "Backups")
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertTrue(jobs.run_job(job))
-        args = self.fake.calls[-1]
-        self.assertEqual(args[:3], ["sync", str(local), "proton-1:Backups"])
-        self.assertEqual(args[args.index("--max-delete") + 1], "20")
-        self.assertNotIn("--max-delete", jobs.send_args(job, force=True))
-        saved = jobs.states()
-        saved["j2"]["ok"] = time.time() - 31 * 3600
-        jobs.state_file().write_text(__import__("json").dumps(saved))
+        job = jobs.Job("j2", "sync", str(self.home), "proton-1", "Fotos")
         jobs.save_jobs([job])
+        jobs.state_file().write_text(__import__("json").dumps({"j2": {"ok": time.time() - 13 * 3600}}))
+        self.assertEqual(app.collect({}), {})
+        jobs.state_file().write_text(__import__("json").dumps({"j2": {"ok": time.time() - 15 * 3600}}))
         self.assertEqual(app.collect({})["j2"].kind, "late")
+
+    def test_local_refuses_nextcloud_files(self) -> None:
+        with mock.patch.object(app, "inside_nextcloud", return_value=True):
+            with self.assertRaises(ValueError):
+                app._local(str(self.home / "nextcloud" / "eu" / "files" / "proton"))
+        markers = {str(self.home / "nc" / ".ncdata")}
+        with mock.patch.object(app.run, "succeeds", side_effect=lambda args, timeout=None: args[-1] in markers):
+            self.assertTrue(INSIDE(self.home / "nc" / "eu" / "files" / "proton"))
+            self.assertFalse(INSIDE(self.home / "outra" / "pasta"))
 
     def test_sync_between_two_accounts(self) -> None:
         self.connect()
         rclone.set_section("nextcloud-1", {"type": "webdav", "vendor": "nextcloud"})
         jobs.save_accounts(jobs.accounts() + [jobs.Account("nextcloud-1", "nextcloud", "eu")])
-        keys = [b"\x1b[B", b"\r", b"\r", b"\r", b"\x1b[B", b"\r", b"\r"]
+        keys = [b"\x1b[B", b"\r", b"\r", b"\r", b"\x1b[B", b"\r"]
         self.fake.calls.clear()
-        outcome = run_in_pty(lambda: app.add_job("sync"), keys, columns=160)
+        outcome = run_in_pty(app.add_job, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         [job] = jobs.jobs()
-        self.assertEqual((job.local, job.account, job.remote, job.remote_source, job.source_account), ("proton-1:Backups", "nextcloud-1", "", True, "proton-1"))
-        self.assertIsNone(clouds.mark(Path("/proton-1:Backups")) or None)
+        self.assertEqual((job.local, job.account, job.remote, job.remote_source, job.source_account), ("nextcloud-1:", "proton-1", "Backups", True, "nextcloud-1"))
+        self.assertIsNone(clouds.mark(Path("/nextcloud-1:")) or None)
         self.assertEqual(clouds.load(), [])
         job = jobs.Job("j9", "sync", "nextcloud-1:Proton", "proton-1", "")
         with mock.patch.object(sys, "stdout", io.StringIO()):
@@ -165,15 +166,27 @@ class CloudAppTest(unittest.TestCase):
         self.assertIn("pass = obscuro(12)", text)
         self.assertNotIn("senha-de-app", outcome.screen)
 
+    def test_nextcloud_from_vault(self) -> None:
+        self.connect()
+        vault = __import__("kit.vault").vault
+        vault.save("https://nextcloud.casa.com", "eu", "senha-do-vault", "/Backups", "chave")
+        self.fake.replies = [(0, "[]")]
+        outcome = run_in_pty(lambda: app._nextcloud_account().id, [b"\n"], columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertEqual(outcome.result, "nextcloud-1")
+        self.assertIn("Usar a mesma conexão do vault", outcome.screen)
+        self.assertIn("pass = obscuro(14)", rclone.conf().read_text())
+        self.assertEqual([item.provider for item in jobs.accounts()], ["proton", "nextcloud"])
+
     def test_install_without_account(self) -> None:
         installed: list[str] = []
         fake_units = mock.Mock(active=mock.Mock(return_value=False), install=lambda texts, start: installed.extend(start))
         with mock.patch.object(app, "units", fake_units), mock.patch.object(app.watch, "units", fake_units), \
                 mock.patch.object(app.distro, "install") as install:
             outcome = run_in_pty(lambda: (app.install(reuse=False), installed, [call.args for call in install.call_args_list])[1:],
-                                 [b"n\n", b"\n", b"\n", b"\n", b"\n"], columns=160)
+                                 [b"n\n", b"\n", b"\n", b"\n"], columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertEqual(outcome.result[0], ["astroverso-cloud-sync.timer", "astroverso-cloud-send.timer", "astroverso-cloud-watch.timer"])
+        self.assertEqual(outcome.result[0], ["astroverso-cloud-sync.timer", "astroverso-cloud-watch.timer"])
         self.assertEqual(outcome.result[1], [[["rclone"]]])
         self.assertIn("ligue o backup depois", outcome.screen)
         self.assertIn("Resumo da nuvem", outcome.screen)
@@ -187,12 +200,11 @@ class CloudAppTest(unittest.TestCase):
         self.assertEqual(sorted(path.name for path in folder.iterdir()), [".env", "accounts.json"])
 
     def test_items_and_actions(self) -> None:
-        self.assertEqual([(item.id, item.danger) for item in app.items()], [("sync", True), ("send", True), ("watch", False), ("backup", False)])
-        self.assertIn("ExecStart=", app._timer_units("sync")["astroverso-cloud-sync.service"])
-        self.assertIn("cloud action send-timer", app._timer_units("send")["astroverso-cloud-send.service"])
-        self.assertIn("OnCalendar=*-*-* 05:00:00", app._timer_units("send")["astroverso-cloud-send.timer"])
+        self.assertEqual([(item.id, item.danger) for item in app.items()], [("sync", True), ("watch", False), ("backup", False)])
+        self.assertIn("cloud action sync-timer", app._timer_units("sync")["astroverso-cloud-sync.service"])
+        self.assertIn("OnCalendar=*-*-* 08,10,12,14,16,18,20:00:00", app._timer_units("sync")["astroverso-cloud-sync.timer"])
         self.assertEqual([(a.id, a.remote) for a in app.actions() if a.menu],
-                         [("summary", True), ("accounts", False), ("jobs", False), ("sync", True), ("send", True), ("release", False),
+                         [("summary", True), ("accounts", False), ("jobs", False), ("sync", True), ("release", False),
                           ("changes", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fcntl
 import json
-import os
 import re
 import time
 import zlib
@@ -17,7 +16,7 @@ from . import nextcloud, proton, rclone
 
 APP = "cloud"
 PROVIDERS = {proton.NAME: proton, nextcloud.NAME: nextcloud}
-KINDS = {"sync": "duas vias", "send": "envio"}
+KINDS = {"sync": "duas vias"}
 RESYNC = ("must run --resync", "cannot find prior Path1 or Path2 listings", "--resync")
 TOO_MANY = ("too many deletes", "max-delete", "--max-delete")
 LOCKS = Path.home() / ".cache" / "rclone" / "bisync"
@@ -53,7 +52,7 @@ class Job:
         return self.local.split(":", 1)[0] if self.remote_source else ""
 
     def arrow(self) -> str:
-        return "⇄" if self.kind == "sync" else "⇒"
+        return "⇄"
 
 
 def _read(name: str) -> list[dict]:
@@ -199,20 +198,6 @@ def sync_args(job: Job, resync: bool = False, force: bool = False, dry: bool = F
     return args
 
 
-def count_files(path: Path) -> int:
-    return sum(len(names) for _, _, names in os.walk(path))
-
-
-def send_args(job: Job, force: bool = False, dry: bool = False) -> list[str]:
-    args = ["sync", job.local, job.target(), "--exclude", "*.partial", *_options(job)]
-    if not force:
-        limit = 50 if job.remote_source else max(10, count_files(Path(job.local)) * 5 // 100)
-        args += ["--max-delete", str(limit)]
-    if dry:
-        args.append("--dry-run")
-    return args
-
-
 def _blocked(output: str) -> bool:
     text = output.lower()
     return any(item in text for item in TOO_MANY)
@@ -225,14 +210,11 @@ def run_job(job: Job, force: bool = False) -> bool:
         ui.warn(problem)
         return False
     ui.info(f"{job.local} {job.arrow()} {job.target()}...")
-    if job.kind == "sync":
-        first = "ok" not in states().get(job.id, {})
-        code, output = rclone.call(sync_args(job, resync=first, force=force), unshare=not job.remote_source)
-        if code and not first and any(item in output.lower() for item in RESYNC) and not _blocked(output):
-            ui.info("o estado da sincronização se perdeu: juntando os dois lados sem apagar nada (--resync)")
-            code, output = rclone.call(sync_args(job, resync=True), unshare=not job.remote_source)
-    else:
-        code, output = rclone.call(send_args(job, force=force), unshare=not job.remote_source)
+    first = "ok" not in states().get(job.id, {})
+    code, output = rclone.call(sync_args(job, resync=first, force=force), unshare=not job.remote_source)
+    if code and not first and any(item in output.lower() for item in RESYNC) and not _blocked(output):
+        ui.info("o estado da sincronização se perdeu: juntando os dois lados sem apagar nada (--resync)")
+        code, output = rclone.call(sync_args(job, resync=True), unshare=not job.remote_source)
     if code == 0:
         record(job)
         ui.ok(f"{job.local} {job.arrow()} {job.target()} em dia")
@@ -246,10 +228,10 @@ def run_job(job: Job, force: bool = False) -> bool:
     return False
 
 
-def run_kind(kind: str, wait: bool) -> bool:
-    chosen = [job for job in jobs() if job.kind == kind]
+def run_all(wait: bool) -> bool:
+    chosen = jobs()
     if not chosen:
-        ui.info(f"nenhum{'a sincronização' if kind == 'sync' else ' envio'} cadastrad{'a' if kind == 'sync' else 'o'}")
+        ui.info("nenhuma sincronização cadastrada")
         return True
     with locked(wait) as mine:
         if not mine:
@@ -260,6 +242,5 @@ def run_kind(kind: str, wait: bool) -> bool:
 
 
 def preview(job: Job) -> list[str]:
-    args = sync_args(job, force=True, dry=True) if job.kind == "sync" else send_args(job, force=True, dry=True)
-    _, output = rclone.call(args, unshare=not job.remote_source)
+    _, output = rclone.call(sync_args(job, force=True, dry=True), unshare=not job.remote_source)
     return [line.strip() for line in output.splitlines() if re.search(r"delet", line, re.IGNORECASE)]

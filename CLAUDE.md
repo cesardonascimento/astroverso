@@ -26,7 +26,6 @@ o app ou pacote delas for migrado.
   | versão | cada backup datado de um app ("Restaurar uma versão") |
   | fotografia | a cópia noturna de um disco inteiro em outro disco (app `disks`: `atual/` + `versoes/`) |
   | espelho | o `atual/` da fotografia, igual ao disco de origem |
-  | envio | uma via do `cloud` |
   | sincronização | as duas vias do `cloud` |
   | `legacy/` | o código antigo |
 
@@ -184,15 +183,14 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 
 - rclone do pacote da distribuição, sem container. Contas por provedor (um módulo cada; por enquanto `proton.py`),
   com a senha ofuscada no `rclone.conf` do app (`600`) e o código das duas etapas só no login, por variável de ambiente.
-- Sincronizações de duas vias (`bisync` de hora em hora: o mais novo vence, `--resync --resync-mode newer` na primeira
-  rodada ou quando o estado se perde, trava de 5% de exclusões) e envios de uma via (`rclone sync` às 05:00, depois dos
-  backups; espelho por decisão do usuário, com trava de 5% dos arquivos da pasta). "Liberar exclusões" mostra a lista e
-  roda com `--force`.
+- Só sincronizações de duas vias (decisão do usuário: sem envios de uma via): `bisync` de 2 em 2 horas, das 08:00 às
+  20:00 (fora da madrugada dos backups e da fotografia), o mais novo vence, `--resync --resync-mode newer` na primeira
+  rodada ou quando o estado se perde, trava de 5% de exclusões. "Liberar exclusões" mostra a lista e roda com `--force`.
 - O destino é escolha do usuário, sem regra nem validação. O `cloud` publica as pastas ligadas pelo `kit.clouds` só
   para a marca ☁ nos seletores.
-- A origem pode ser outra conta: o Nextcloud entra como conta (WebDAV, senha de app), e uma pasta do Nextcloud
-  sincroniza com o Proton pelo Nextcloud, nunca gravando na pasta dos arquivos dele (o Nextcloud não veria as mudanças
-  e os donos ficariam errados).
+- A pasta pode ficar "Dentro do Nextcloud": o Nextcloud entra como conta (WebDAV; a mesma conexão do `kit.vault`, com
+  confirmação, ou uma senha de app) e a pasta sincroniza pelo Nextcloud, nunca pela pasta dos arquivos dele (o seletor
+  recusa uma pasta com `.ncdata`/`.ocdata` acima: o Nextcloud não veria as mudanças e os donos ficariam errados).
 - Roda por `podman unshare` (arquivos de containers), com trava entre rodadas e sem rodar com o disco indisponível.
 - O backup do app não leva as senhas: na restauração, cada conta pede o login de novo.
 
