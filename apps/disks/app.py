@@ -306,7 +306,7 @@ def validate_source(value: str) -> str:
 def _add_folder() -> None:
     ui.note("Uma pasta (ou o disco inteiro) que entra no backup diário. Depois, escolha para quais pastas de destino ela vai.")
     path = folders.pick("pasta com backup", str(disks.mounts()[0].path) if disks.mounts() else "", validate=validate_source)
-    chosen = kit_backup.pick(f"Para quais pastas vai o backup de {path}?")
+    chosen = kit_backup.pick(f"Onde guardar as fotografias de {path}?")
     if not chosen:
         ui.info("nada mudou")
         return
@@ -319,7 +319,7 @@ def _change_places() -> None:
     index = ui.menu("Qual pasta?", [entry["path"] for entry in entries] + ["Voltar"])
     if index >= len(entries):
         return
-    chosen = kit_backup.pick(f"Para quais pastas vai o backup de {entries[index]['path']}?", _places(entries[index])[0])
+    chosen = kit_backup.pick(f"Onde guardar as fotografias de {entries[index]['path']}?", _places(entries[index])[0])
     if chosen:
         entries[index]["to"] = [item.id for item in chosen]
         save_backups(entries)

@@ -160,6 +160,13 @@ def lost(app: str, key: str = TARGETS) -> list[str]:
 
 
 def pick(question: str, current: Sequence[Destination] = ()) -> list[Destination] | None:
+    ui.note(
+        "O backup tira uma fotografia por dia (criptografada) e guarda nas pastas que você marcar, cada dia como uma versão: "
+        "um arquivo apagado ou estragado hoje continua nas fotografias dos dias anteriores. Não é um espelho nem uma cópia "
+        "que se abre como pasta comum: para recuperar, use \"Restaurar uma versão\". As pastas aparecem aqui depois de "
+        "cadastradas em \"Pastas de destino\" no app backup (ex.: uma pasta num disco só de backup). Marque mais de uma para "
+        "ter a fotografia em mais lugares."
+    )
     items = destinations()
     ids = [item.id for item in current]
     chosen = ui.checklist(question, [item.path for item in items], details=[item.detail() for item in items],
@@ -175,8 +182,7 @@ def choose(app: str, key: str, what: str) -> bool:
         return False
     if targets(app, key) and not lost(app, key):
         return True
-    ui.note("As pastas de destino ficam na máquina do servidor de backup. Pode marcar mais de uma: o backup vai para todas.")
-    chosen = pick(f"Para quais pastas vai o backup {what}?", targets(app, key))
+    chosen = pick(f"Onde guardar as fotografias {what}?", targets(app, key))
     if not chosen:
         ui.warn("nenhuma pasta escolhida: o backup fica desligado")
         return False
@@ -235,8 +241,9 @@ def change(app: str) -> changes.Change:
     texts = units_text(app)
     return changes.Change(
         "backup", f"Fazer o backup da configuração do {app} todo dia (01:{minute(app):02d})",
-        f"Um timer do usuário ({unit(app)}.timer) guarda a configuração do {app}, criptografada, nas pastas de destino "
-        "que você escolher no servidor de backup do Astroverso (app backup), e avisa no canal #backup do Discord. Se a "
+        f"Um timer do usuário ({unit(app)}.timer) tira uma fotografia por dia (criptografada) da configuração do {app} e "
+        "guarda nas pastas de destino que você escolher no servidor de backup do Astroverso (app backup), com as versões "
+        "pelo tempo definido no servidor, e avisa no canal #backup do Discord. Se a "
         "máquina estava desligada no horário, o backup roda ao ligar. Para trocar as pastas, desligue e ligue de novo.",
         lambda: units.active(f"{unit(app)}.timer"),
         lambda: _enable(app, TARGETS, f"da configuração do {app}", texts),
@@ -248,8 +255,9 @@ def data_change(app: str, part: str, label: str, why: str, action: str, key: str
     texts = units_text(app, part, action, 2, what)
     return changes.Change(
         f"backup-{part}", f"{label} (02:{minute(app):02d})",
-        f"{why} Um timer do usuário ({unit(app, part)}.timer) faz o backup todo dia, criptografado, no servidor de backup "
-        "do Astroverso (app backup), com a mesma regra de versões das configurações, e avisa no canal #backup.",
+        f"{why} Um timer do usuário ({unit(app, part)}.timer) tira uma fotografia por dia (criptografada) e guarda no "
+        "servidor de backup do Astroverso (app backup), com as versões pelo tempo definido no servidor, e avisa no canal "
+        "#backup.",
         lambda: units.active(f"{unit(app, part)}.timer"),
         lambda: _enable(app, key, what, texts),
         lambda: _disable(app, key, texts),

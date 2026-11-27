@@ -249,7 +249,7 @@ pasta de destino é um repositório: `rest:<url>/<máquina>/<id>/`. **Quem escol
 | `restore(app, backup, restore)` | Escolhe a pasta de destino e a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
 | `opened(app)` | Contexto: escolhe a pasta de destino e a versão da configuração e entrega `(pasta, data)` com o conteúdo daquela versão (ou `None` se voltar), apagada no fim. Para restaurar só uma parte (ex.: uma rotina do n8n) |
 | `restore_data(app, nome)` | Traz uma versão dos dados numa pasta nova e vazia (padrão `~/Restaurado/<app>-<nome>-<data>`), sem mexer na original |
-| `targets(app, chave)` / `choose(app, chave, o_quê)` / `pick(pergunta, atuais)` | As pastas escolhidas por um app e a pergunta (checklist com a marca ☁) |
+| `targets(app, chave)` / `choose(app, chave, o_quê)` / `pick(pergunta, atuais)` | As pastas escolhidas por um app e a pergunta "Onde guardar as fotografias …?" (checklist com a marca ☁), depois de explicar que o backup é uma fotografia por dia, com versões, e não um espelho |
 | `versions(app, pasta, dados="")` / `summary(app, dados=)` | As versões do app nesta máquina numa pasta (as de configuração, ou as de uma parte dos dados) e a tabela para o resumo |
 | `link_code(url, usuário, pastas)` / `read_code(texto)` | O código de ligação mostrado pelo servidor e colado no cliente (sem segredos) |
 | `configured()` / `settings()` / `save(...)` / `destinations()` / `save_destinations(...)` / `forget()` / `ensure_repository(valores, pasta)` | A ligação com o servidor; o `ensure_repository` cria o repositório na primeira vez e traduz os erros comuns |
