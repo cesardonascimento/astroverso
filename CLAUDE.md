@@ -210,6 +210,8 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   vai inteira para `<disco de fotografias>/atual/` (`podman unshare rsync -aH --numeric-ids --delete`) e o que mudou ou saiu
   para `versoes/<data>/` (30 dias). Nada grava no disco de fotografias (`astroverso-fotografia.json` na raiz; o
   `kit.folders` esconde e recusa). Não roda com um disco ausente; para com mais de 10% de exclusões ("Liberar a fotografia").
+- **Resgatar um disco** (`rescue.py`): formata o disco novo (LUKS2 + TPM + ext4, com o nome do antigo), monta no mesmo
+  lugar e copia de volta o `atual/`. Única exceção à regra "formatar fica no Cockpit" (decisão do usuário).
 
 ### App `n8n`
 

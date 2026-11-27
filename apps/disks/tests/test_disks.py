@@ -143,7 +143,7 @@ class DisksAppTest(unittest.TestCase):
         self.assertEqual(app.registry_file().stat().st_mode & 0o777, 0o600)
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
                          [("summary", True), ("disks", False), ("changes", False), ("watch", True), ("photos", False),
-                          ("photos-now", True), ("photos-timer", False), ("photos-release", False), ("backup-now", True),
+                          ("photos-now", True), ("photos-timer", False), ("photos-release", False), ("rescue", False), ("backup-now", True),
                           ("restore-version", False)])
         with mock.patch.object(sys, "stdout", io.StringIO()):
             self.assertFalse(app.status())

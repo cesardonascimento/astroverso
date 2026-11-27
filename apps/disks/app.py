@@ -10,7 +10,7 @@ from kit import watch as kit_watch
 from kit.app import Action
 from kit.watch import Problem
 
-from . import mount, photos
+from . import mount, photos, rescue
 
 APP = "disks"
 DESCRIPTION = "Discos de dados da máquina: montados em /srv/<nome> no boot, os criptografados destravados pelo TPM"
@@ -276,6 +276,7 @@ def actions() -> list[Action]:
         Action("photos-now", "Fotografar agora", lambda: photos.run_all(), remote=True, confirm=True),
         Action("photos-timer", "Fotografar (timer)", lambda: photos.run_all(), menu=False),
         Action("photos-release", "Liberar a fotografia", photos.release),
+        Action("rescue", "Resgatar um disco", lambda: rescue.rescue(registry, save_registry, attach, disk_change)),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

@@ -234,20 +234,21 @@ def tpm_ok(device: str) -> bool:
     return run.succeeds(["cryptsetup", "open", "--test-passphrase", "--token-only", device], sudo=True)
 
 
-def tpm_enroll(device: str, name: str) -> bool:
+def tpm_enroll(device: str, name: str, known: str = "") -> bool:
     if tpm_ok(device):
         ui.ok(f"o TPM já destrava {name}")
         return True
     if not TPM.exists():
         ui.warn(f"máquina sem TPM 2.0: {name} não pode ser destravado sozinho no boot e fica de fora")
         return False
-    ui.note(
-        f"{name} é criptografado. Digite a senha do LUKS uma vez para cadastrar o TPM: depois disso, o TPM destrava o "
-        "disco no boot, sem pedir senha (a máquina reinicia de longe e ninguém está na frente dela). A senha continua "
-        "valendo como reserva."
-    )
-    for attempt in range(3):
-        password = ui.secret(f"senha do LUKS de {name}", confirm=False)
+    if not known:
+        ui.note(
+            f"{name} é criptografado. Digite a senha do LUKS uma vez para cadastrar o TPM: depois disso, o TPM destrava o "
+            "disco no boot, sem pedir senha (a máquina reinicia de longe e ninguém está na frente dela). A senha continua "
+            "valendo como reserva."
+        )
+    for attempt in range(1 if known else 3):
+        password = known or ui.secret(f"senha do LUKS de {name}", confirm=False)
         try:
             run.cmd(
                 ["systemd-cryptenroll", "--unlock-key-file=/dev/stdin", "--wipe-slot=tpm2", "--tpm2-device=auto", "--tpm2-pcrs=7", device],

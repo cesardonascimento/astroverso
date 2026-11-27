@@ -45,6 +45,7 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
 | Fotografias dos discos | Adicionar (disco de origem e disco de fotografias, com confirmação) e tirar fotografias. Os dados que já estão nos discos ficam |
 | Fotografar agora | Todas as fotografias na hora (também no Discord, com confirmação) |
+| Resgatar um disco | Recria um disco que morreu a partir da fotografia (abaixo) |
 | Liberar a fotografia | Uma fotografia parada pela trava de exclusões: mostra quantos e quais arquivos sairiam do `atual/` e roda sem a trava |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do vault. Numa máquina nova, o TPM pede a senha do LUKS de novo |
 
@@ -67,6 +68,22 @@ donos, permissões e links) para o disco de fotografias:
   no `#disks`; **Liberar a fotografia** mostra a lista e roda.
 - Com o disco de fotografias a partir de 90% ocupado, as `versoes/` mais antigas saem antes do prazo.
 - Um `atual/` que já existe (do sistema antigo) é aproveitado: a primeira rodada só copia o que mudou.
+
+## Resgatar um disco
+
+O disco de origem queimou: troque-o por um novo e use **Resgatar um disco**.
+
+1. Escolha o disco de fotografias (ele diz de qual disco é, pelo `astroverso-fotografia.json`; numa máquina reinstalada,
+   cadastre-o antes em Discos da máquina).
+2. Escolha o disco novo: só aparecem discos que não estão montados nem cadastrados.
+3. Confirme digitando o nome do disco antigo e escolha a senha do LUKS do disco novo (guarde no gerenciador de senhas).
+4. O resgate tira o disco antigo do cadastro, **formata o disco novo** (`wipefs`, LUKS2 com o nome antigo, ext4),
+   cadastra o TPM, monta em `/srv/<nome>` e copia de volta o `atual/` (`podman unshare rsync -aH --numeric-ids`, com os
+   donos). A fotografia noturna passa a ser do disco novo.
+5. Depois, reinicie a máquina ou os apps que usam o disco (no Nextcloud, rode também o Reparar).
+
+Volta tudo até a última fotografia: o que mudou depois dela não volta. Pelo `versoes/`, dá para recuperar arquivos soltos
+de outros dias. É a única ação do Astroverso que formata um disco (decisão do usuário); o resto fica no Cockpit.
 
 ## Verificação de hora em hora
 
