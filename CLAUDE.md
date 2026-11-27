@@ -267,7 +267,9 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 ### App `system`
 
 - Configurações da própria máquina, um arquivo por módulo: `hostname.py` (primeira etapa: o nome da máquina pelo
-  `hostnamectl`, sem `Change` e sem voltar ao anterior no `remove`, por decisão do usuário), `power.py` (suspensão
+  `hostnamectl`, sem `Change` e sem voltar ao anterior no `remove`, por decisão do usuário), `clock.py` (o acerto do
+  relógio pela internet, pela camada `kit.distro`: uma máquina com o relógio de hardware no horário local ficou 3 h
+  atrasada sem NTP), `power.py` (suspensão
   mascarada, tampa e teclas ignoradas no `logind`, tela do console apagada) e `ssh.py` (`sshd`, SSH só da rede local e do Tailscale,
   `AllowUsers` + `PermitRootLogin no`, chaves autorizadas e a chave da máquina para o GitHub).
 - O login por senha no SSH fica como na distribuição (decisão do usuário: é o caminho de volta se um PC autorizado

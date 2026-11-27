@@ -7,10 +7,10 @@ from kit import vault
 from kit import changes, config, ui, watch
 from kit.app import Action
 
-from . import hostname, power, ssh, updates
+from . import clock, hostname, power, ssh, updates
 
 APP = "system"
-DESCRIPTION = "Configurações da máquina: nome, sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
+DESCRIPTION = "Configurações da máquina: nome, relógio, sempre ligada (energia), acesso remoto (SSH e chave para o GitHub) e atualizações"
 ORDER = 10
 BUTTONS = (("Resumo da máquina", "system:summary"), ("Verificar de novo", "system:watch"))
 
@@ -18,14 +18,15 @@ BUTTONS = (("Resumo da máquina", "system:summary"), ("Verificar de novo", "syst
 def watch_change() -> changes.Change:
     return watch.change(
         APP, "Verificar a máquina de hora em hora e avisar no Discord",
-        f"Um timer do usuário ({watch.name(APP)}.timer) confere a cada hora se a atualização automática falhou e se "
-        "alguma atualização pede reinício, e avisa no canal #system do Discord só quando algo muda.",
+        f"Um timer do usuário ({watch.name(APP)}.timer) confere a cada hora se o relógio está sincronizado, se a "
+        "atualização automática falhou e se alguma atualização pede reinício, e avisa no canal #system do Discord só "
+        "quando algo muda.",
         "a máquina",
     )
 
 
 def items() -> list[changes.Change]:
-    return power.items() + ssh.items() + updates.items() + [watch_change(), vault.change(APP)]
+    return clock.items() + power.items() + ssh.items() + updates.items() + [watch_change(), vault.change(APP)]
 
 
 def status() -> bool:
@@ -36,6 +37,8 @@ def install(reuse: bool | None = None) -> None:
     again = config.reuse(APP) if reuse is None else reuse
     ui.step("Nome da máquina")
     hostname.install(again)
+    ui.step("Relógio")
+    changes.install(APP, clock.items(), again)
     ui.step("Energia: sempre ligada")
     ui.note(
         "Estes ajustes garantem que a máquina fique sempre ligada e acessível, mesmo de tampa fechada. Cada um é "
@@ -86,7 +89,7 @@ def summary() -> None:
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
-    return updates.collect()
+    return {**clock.collect(), **updates.collect()}
 
 
 def check() -> None:

@@ -218,8 +218,6 @@ class DistroTest(unittest.TestCase):
         ])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class AutoUpdatesTest(unittest.TestCase):
@@ -240,3 +238,27 @@ class AutoUpdatesTest(unittest.TestCase):
             self.assertTrue(fedora.reboot_pending())
         with mock.patch.object(fedora.run, "output", return_value=(0, "")):
             self.assertFalse(fedora.reboot_pending())
+
+
+class TimeSyncTest(unittest.TestCase):
+    def test_time_sync(self) -> None:
+        from kit.distro import fedora
+
+        answers = {"NTP": "yes\n", "NTPSynchronized": "no\n"}
+        with mock.patch.object(fedora.run, "output", side_effect=lambda args, timeout=None: (0, answers[args[3]])), \
+                mock.patch.object(fedora, "service_active", return_value=True):
+            self.assertTrue(fedora.time_sync_active())
+            self.assertFalse(fedora.time_synced())
+        with mock.patch.object(fedora.run, "output", return_value=(1, "")):
+            self.assertFalse(fedora.time_sync_active())
+        with mock.patch.object(fedora, "install") as install, mock.patch.object(fedora.run, "cmd") as cmd, \
+                mock.patch.object(sys, "stdout", io.StringIO()):
+            fedora.time_sync_on()
+            fedora.time_sync_off()
+        install.assert_called_once_with(["chrony"])
+        self.assertEqual([call.args[0] for call in cmd.call_args_list], [["timedatectl", "set-ntp", "true"], ["timedatectl", "set-ntp", "false"]])
+        self.assertTrue(all(call.kwargs["sudo"] for call in cmd.call_args_list))
+
+
+if __name__ == "__main__":
+    unittest.main()

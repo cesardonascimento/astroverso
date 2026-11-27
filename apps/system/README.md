@@ -10,12 +10,13 @@ importantes para a máquina continuar acessível.
 1. **Nome da máquina:** pergunta o nome (o atual como padrão; letras minúsculas, números e hífen) e aplica pelo
    `hostnamectl`. Vem primeiro porque o Tailscale, o endereço do Cockpit e os backups usam o nome. Trocar depois
    pede reinstalar os apps que já usavam o nome antigo. O nome não volta ao anterior no Remover (decisão do usuário).
-2. **Energia:** pergunta cada ajuste (tabela abaixo) e aplica os escolhidos.
-3. **SSH:** pergunta cada ajuste e aplica os escolhidos. Na primeira vez, as chaves que já estão em
+2. **Relógio:** pergunta se liga o acerto do relógio pela internet (NTP).
+3. **Energia:** pergunta cada ajuste (tabela abaixo) e aplica os escolhidos.
+4. **SSH:** pergunta cada ajuste e aplica os escolhidos. Na primeira vez, as chaves que já estão em
    `~/.ssh/authorized_keys` aparecem num checklist (marcadas) para você confirmar e dar um nome a cada uma (o PC).
-4. Pergunta se deve preparar a chave desta máquina para o GitHub: cria `~/.ssh/id_ed25519` (se faltar), mostra a
+5. Pergunta se deve preparar a chave desta máquina para o GitHub: cria `~/.ssh/id_ed25519` (se faltar), mostra a
    chave pública e o link para o passo a passo, e confere quando você disser que cadastrou.
-5. Mostra o Resumo da máquina.
+6. Mostra o Resumo da máquina.
 
 O login por senha no SSH continua como na distribuição: as chaves só deixam os seus PCs entrarem sem senha. Se um
 PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave dele em **Chaves SSH autorizadas**.
@@ -34,6 +35,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | `/etc/ssh/sshd_config.d/10-astroverso.conf` (`AllowUsers <usuário>`, `PermitRootLogin no`), conferido pelo `sshd -t` | Só a sua conta desta máquina entra por SSH | |
 | `~/.ssh/authorized_keys` gerado a partir de `~/.astroverso/system/ssh-keys.json` | Só os PCs da lista entram sem senha; a lista tem um nome por chave | |
 | `~/.ssh/id_ed25519` (só se você pedir a chave para o GitHub) | A chave desta máquina para baixar e atualizar repositórios por SSH | |
+| Pacote `chrony` e o acerto pela internet ligado (`timedatectl set-ntp true`: o `chronyd` liga, e o relógio do hardware passa a guardar UTC) (perguntada) | A hora certa sozinha: backups com a data certa, a sincronização da nuvem decidindo certo o arquivo mais novo e os timers no horário | |
 | Pacote `dnf5-plugin-automatic`, `/etc/dnf/automatic.conf` (`apply_updates = yes`, `reboot = never`) e o timer `dnf5-automatic.timer` ligado (perguntada) | O sistema aplica as atualizações sozinho, todo dia por volta das 6h, sem nunca reiniciar; o reinício pendente é avisado no Discord | |
 | Unidades do usuário `astroverso-system-watch.timer` e `.service` (perguntada) | A verificação de hora em hora (abaixo) | |
 | `~/.astroverso/system/.env` (`CHANGE_<ID>=yes/no`) | As respostas da instalação, para o Reinstalar | |
@@ -62,6 +64,7 @@ Avisa no canal `#system` do Discord só quando algo muda, com os botões **Resum
 
 | O que confere | Nível |
 |---|---|
+| O acerto pela internet está ligado, mas o relógio não sincronizou (`timedatectl`: `NTPSynchronized=no`) | aviso |
 | A última atualização automática falhou (`dnf5-automatic.service`) | erro |
 | Uma atualização pede reinício (`dnf needs-restarting`): reinicie quando puder, pelo Cockpit, por exemplo | aviso |
 

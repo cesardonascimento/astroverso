@@ -364,3 +364,27 @@ def auto_updates_last() -> tuple[str, str]:
 
 def reboot_pending() -> bool:
     return run.output(["dnf", "-q", "-C", "needs-restarting"], timeout=120)[0] == 1
+
+
+def _timedate(name: str) -> str:
+    code, output = run.output(["timedatectl", "show", "-p", name, "--value"], timeout=10)
+    return output.strip() if code == 0 else ""
+
+
+def time_sync_active() -> bool:
+    return _timedate("NTP") == "yes" and service_active("chronyd")
+
+
+def time_sync_on() -> None:
+    install(["chrony"])
+    run.cmd(["timedatectl", "set-ntp", "true"], sudo=True)
+    ui.ok("relógio acertado pela internet (NTP, chronyd)")
+
+
+def time_sync_off() -> None:
+    run.cmd(["timedatectl", "set-ntp", "false"], sudo=True)
+    ui.ok("acerto do relógio pela internet desligado")
+
+
+def time_synced() -> bool:
+    return _timedate("NTPSynchronized") == "yes"

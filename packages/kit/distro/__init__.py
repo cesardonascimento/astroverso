@@ -165,6 +165,22 @@ def resolver_route_has(name: str, domain: str, server: str) -> bool:
     return bool(backend().resolver_route_has(name, domain, server))
 
 
+def time_sync_active() -> bool:
+    return bool(backend().time_sync_active())
+
+
+def time_sync_on() -> None:
+    backend().time_sync_on()
+
+
+def time_sync_off() -> None:
+    backend().time_sync_off()
+
+
+def time_synced() -> bool:
+    return bool(backend().time_synced())
+
+
 def auto_updates_active() -> bool:
     return bool(backend().auto_updates_active())
 

@@ -34,6 +34,8 @@ class FakeUpdates:
         self.on = False
         self.last = ("", "")
         self.pending = False
+        self.clock = False
+        self.synced = True
 
     def auto_updates_active(self):
         return self.on
@@ -49,6 +51,18 @@ class FakeUpdates:
 
     def reboot_pending(self):
         return self.pending
+
+    def time_sync_active(self):
+        return self.clock
+
+    def time_sync_on(self):
+        self.clock = True
+
+    def time_sync_off(self):
+        self.clock = False
+
+    def time_synced(self):
+        return self.synced
 
 
 class FakeSystem:
@@ -152,6 +166,7 @@ class SystemTest(unittest.TestCase):
         for patch in (
             mock.patch.object(power, "distro", self.system),
             mock.patch.object(app.updates, "distro", self.updates),
+            mock.patch.object(app.clock, "distro", self.updates),
             mock.patch.object(app.watch, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(ssh, "distro", self.system),
             mock.patch.object(ssh, "net", fake_net),
@@ -227,7 +242,7 @@ class SystemTest(unittest.TestCase):
             return self.system.calls
 
         self.github = True
-        keys = [b"\n"] * 13
+        keys = [b"\n"] * 14
         with mock.patch.object(ssh, "_import"), mock.patch.object(ssh.run, "cmd", side_effect=lambda args, **_: self._keygen(args)):
             outcome = run_in_pty(scenario, keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -237,14 +252,23 @@ class SystemTest(unittest.TestCase):
         self.assertIn("Atualizar o sistema sozinho, todo dia de madrugada (sem reiniciar)? [S/n]", outcome.screen)
         self.assertIn("⚠ Ignorar a tampa fechada", outcome.screen)
         self.assertIn("nome da máquina: servidor", outcome.screen)
+        self.assertIn("Acertar o relógio pela internet (NTP)? [S/n]", outcome.screen)
         self.assertNotIn(["hostname", "servidor"], outcome.result)
         saved = config.load("system")
         self.assertEqual(saved["HOSTNAME"], "servidor")
         self.assertEqual({key: value for key, value in saved.items() if key.startswith("CHANGE_")}, {
-            "CHANGE_POWER_SLEEP": "yes", "CHANGE_POWER_LID": "yes", "CHANGE_POWER_KEYS": "yes", "CHANGE_POWER_BLANK": "yes",
+            "CHANGE_CLOCK": "yes", "CHANGE_POWER_SLEEP": "yes", "CHANGE_POWER_LID": "yes", "CHANGE_POWER_KEYS": "yes", "CHANGE_POWER_BLANK": "yes",
             "CHANGE_SSH_SERVER": "yes", "CHANGE_SSH_FIREWALL": "yes", "CHANGE_SSH_USERS": "yes", "CHANGE_UPDATES": "yes",
             "CHANGE_WATCH": "yes", "CHANGE_BACKUP": "yes",
         })
+
+    def test_clock_watch(self) -> None:
+        self.updates.clock, self.updates.synced = True, False
+        self.assertEqual(app.clock.collect()["clock"].title, "Relógio fora de sincronia")
+        self.updates.synced = True
+        self.assertEqual(app.clock.collect(), {})
+        self.updates.clock, self.updates.synced = False, False
+        self.assertEqual(app.clock.collect(), {})
 
     def test_hostname(self) -> None:
         self.assertEqual(hostname.validate(" Casa-01 "), "casa-01")
