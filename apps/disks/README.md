@@ -29,10 +29,9 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Por disco: links em `/etc/systemd/system/<dispositivo>.device.wants/` (e no `.wants` do `systemd-cryptsetup@`) | O disco monta de novo sozinho quando é religado (gaveta USB) | ⚠ |
 | `/srv/<nome>` (`770`, seu usuário; imutável quando desmontado) | O ponto de montagem; desmontado, ninguém grava no disco do sistema por engano | |
 | `/etc/fstab.astroverso-bak` e `/etc/crypttab.astroverso-bak` | Cópia de antes da primeira mudança | |
-| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `backups.json` com as pastas com backup e as pastas do vault de cada uma, `watch.json`) | A configuração | |
+| `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `watch.json`) | A configuração | |
 | Unidades do usuário `astroverso-disks-watch.timer` e `.service` (perguntada, padrão sim) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim, com as pastas do vault) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
-| Unidades do usuário `astroverso-disks-backup-folders.timer` e `.service` (perguntada, padrão sim) | Backup diário das pastas escolhidas em **Backup das pastas dos discos**, cada uma nas próprias pastas do vault (`kit.vault.run_data`, marca `dados:<disco>/<pasta>`, por `podman unshare`). Disco desligado ou travado: aquela pasta fica de fora e avisa no `#vault` | |
+| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
 
 ## Ações
 
@@ -42,9 +41,8 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Discos da máquina | Checklist com os discos encontrados (e os cadastrados que estão desligados): marcar monta, desmarcar desmonta (com confirmação), tira do `fstab` e descadastra o TPM. Os dados continuam no disco |
 | Mudanças no sistema | Desmonta e monta de novo cada disco cadastrado (sem descadastrar o TPM), liga e desliga a verificação e os backups |
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
-| Backup das pastas dos discos | Os dados que não são de nenhum app: adicionar uma pasta (ou o disco inteiro) pelo seletor de pastas e escolher as pastas do vault dela, trocar as pastas do vault, tirar pastas do backup (as versões guardadas continuam no servidor) |
 | Fazer backup das pastas agora / Restaurar uma pasta de uma versão | O backup das pastas na hora (também no Discord) e a restauração de uma versão numa pasta nova, sem mexer na original |
-| Fazer backup agora / Restaurar uma fotografia | Backup da configuração na hora (também no Discord) e restauração de uma versão do vault. Numa máquina nova, o TPM pede a senha do LUKS de novo |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do vault. Numa máquina nova, o TPM pede a senha do LUKS de novo |
 
 ## Verificação de hora em hora
 

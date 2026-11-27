@@ -1,208 +1,269 @@
+import base64
 import io
-import json
 import os
+import shutil
 import sys
+import tarfile
 import tempfile
+import threading
 import unittest
+import urllib.parse
+from datetime import date, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
 
 from kit import config, ui, vault
 from kit.testing import run_in_pty
 
-LOCAL = vault.Destination("aaaa1111", "/srv/backup-1")
-CLOUD = vault.Destination("bbbb2222", "/srv/dados/sincronizado/Backups", "drive (duas vias)")
+PREFIX = "/remote.php/dav/files/dono"
+REAL_PACK, REAL_UNPACK = vault.pack, vault.unpack
 
 
-class FakeRestic:
-    def __init__(self) -> None:
-        self.calls: list[tuple] = []
-        self.snapshots: dict[str, list[dict]] = {}
-        self.fail: set[str] = set()
+class FakeDav(BaseHTTPRequestHandler):
+    root: Path
+    token = "Basic " + base64.b64encode(b"dono:app").decode()
 
-    def __call__(self, *args, destination, values=None, timeout=None, unshare=False):
-        self.calls.append((destination.id, unshare, *args))
-        found = self.snapshots.setdefault(destination.id, [])
-        if args[0] == "backup":
-            if destination.id in self.fail:
-                return 1, "Fatal: unable to save snapshot: connection refused\n"
-            folder = Path(args[1])
-            config_file = folder / "config.txt"
-            found.append({"id": f"{destination.id}-{len(found)}", "time": f"2026-11-2{len(found)}T01:10:00Z", "paths": [str(folder)],
-                          "tags": [a for i, a in enumerate(args) if i and args[i - 1] == "--tag"],
-                          "content": config_file.read_text() if config_file.exists() else ""})
-            return 0, ""
-        if args[0] == "snapshots":
-            return 0, json.dumps(found)
-        if args[0] == "restore":
-            snapshot = next(item for item in found if item["id"] == args[1].split(":")[0])
-            Path(args[3]).mkdir(parents=True, exist_ok=True)
-            Path(args[3], "config.txt").write_text(snapshot["content"])
-            return 0, ""
-        return 0, ""
+    def log_message(self, *args: object) -> None:
+        pass
+
+    def _path(self) -> Path | None:
+        path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
+        if not path.startswith(PREFIX):
+            return None
+        return self.root / path[len(PREFIX):].strip("/")
+
+    def _reply(self, code: int, body: bytes = b"") -> None:
+        self.send_response(code)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _auth(self) -> Path | None:
+        self.rfile.read(int(self.headers.get("Content-Length") or 0)) if self.command != "PUT" else None
+        if self.headers.get("Authorization") != self.token:
+            self._reply(401)
+            return None
+        target = self._path()
+        if target is None:
+            self._reply(404)
+        return target
+
+    def do_PROPFIND(self) -> None:
+        target = self._auth()
+        if target is None:
+            return
+        if not target.exists():
+            return self._reply(404)
+        own = urllib.parse.urlparse(self.path).path.rstrip("/")
+        items = [own] + [f"{own}/{urllib.parse.quote(child.name)}" for child in sorted(target.iterdir())] if target.is_dir() else [own]
+        body = "".join(f"<d:response><d:href>{href}</d:href></d:response>" for href in items)
+        self._reply(207, f'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">{body}</d:multistatus>'.encode())
+
+    def do_MKCOL(self) -> None:
+        target = self._auth()
+        if target is None:
+            return
+        if target.exists():
+            return self._reply(405)
+        if not target.parent.exists():
+            return self._reply(409)
+        target.mkdir()
+        self._reply(201)
+
+    def do_PUT(self) -> None:
+        data = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        target = self._auth()
+        if target is None:
+            return
+        if not target.parent.is_dir():
+            return self._reply(409)
+        target.write_bytes(data)
+        self._reply(201)
+
+    def do_GET(self) -> None:
+        target = self._auth()
+        if target is None:
+            return
+        self._reply(200, target.read_bytes()) if target.is_file() else self._reply(404)
+
+    def do_DELETE(self) -> None:
+        target = self._auth()
+        if target is None:
+            return
+        if not target.exists():
+            return self._reply(404)
+        shutil.rmtree(target) if target.is_dir() else target.unlink()
+        self._reply(204)
 
 
-class BackupTest(unittest.TestCase):
+def fake_pack(folder: Path, target: Path, key: str) -> str:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        archive.add(folder, arcname=".")
+    target.write_bytes(key.encode() + b"\n" + buffer.getvalue())
+    return ""
+
+
+def fake_unpack(source: Path, target: Path, key: str) -> str:
+    head, _, body = source.read_bytes().partition(b"\n")
+    if head.decode() != key:
+        return "a senha dos backups não abriu o arquivo"
+    with tarfile.open(fileobj=io.BytesIO(body)) as archive:
+        archive.extractall(target, filter="data")
+    return ""
+
+
+class VaultTest(unittest.TestCase):
     def setUp(self) -> None:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.home = Path(temp.name)
+        self.cloud = self.home / "nuvem"
+        self.cloud.mkdir()
+        handler = type("Handler", (FakeDav,), {"root": self.cloud})
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
         ui.set_app("teste")
-        self.restic = FakeRestic()
         self.sent: list[tuple] = []
         for patch in (
             mock.patch.dict(os.environ, {"HOME": temp.name}),
-            mock.patch.object(vault, "restic", self.restic),
-            mock.patch.object(vault, "_clean", side_effect=lambda folder: __import__("shutil").rmtree(folder, ignore_errors=True)),
+            mock.patch.object(vault, "pack", fake_pack),
+            mock.patch.object(vault, "unpack", fake_unpack),
+            mock.patch.object(vault, "_clean", side_effect=lambda folder: shutil.rmtree(folder, ignore_errors=True)),
             mock.patch.object(vault.net, "hostname", return_value="servidor"),
             mock.patch.object(vault.discord, "notify", side_effect=lambda *a, **k: self.sent.append((a, k)) or True),
         ):
             patch.start()
             self.addCleanup(patch.stop)
 
-    def link(self) -> None:
-        vault.save("https://vault.casa.com/", "servidor", "acesso", "repo")
-        vault.save_destinations([LOCAL, CLOUD])
+    def link(self, password: str = "app") -> None:
+        vault.save(self.url + "/", "dono", password, "Backups/", "chave")
         config.state("nuvem")
 
-    def test_not_configured_does_nothing(self) -> None:
+    def save_config(self, text: str) -> None:
+        (config.state("nuvem") / "config.txt").write_text(text)
+
+    def backup(self, folder: Path) -> None:
+        shutil.copy2(config.state("nuvem") / "config.txt", folder / "config.txt")
+
+    def test_not_configured(self) -> None:
         with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertFalse(vault.run_backup("nuvem", lambda folder: None))
-        self.assertEqual(self.restic.calls, [])
+            self.assertFalse(vault.run_backup("nuvem", self.backup))
+        self.assertFalse(vault.configured())
 
-    def test_link_code(self) -> None:
-        code = vault.link_code("https://vault.casa.com", "notebook", [LOCAL, CLOUD])
-        self.assertTrue(code.startswith(vault.CODE))
-        self.assertEqual(vault.read_code(f"  {code[:20]}\n{code[20:]} "), ("https://vault.casa.com", "notebook", [LOCAL, CLOUD]))
-        with self.assertRaises(ValueError):
-            vault.read_code(code[:-10])
-        with self.assertRaises(ValueError):
-            vault.read_code("outra-coisa")
-        with self.assertRaises(ValueError):
-            vault.read_code(vault.link_code("https://vault.casa.com", "notebook", [vault.Destination("../outro", "/x")]))
-        with self.assertRaises(ValueError):
-            vault.read_code(vault.link_code("http://vault.casa.com", "notebook", [LOCAL]))
-        self.assertEqual(vault.tag_text("Fotos, 2025"), "Fotos_ 2025")
+    def test_clean_folder(self) -> None:
+        self.assertEqual(vault.clean_folder(" Backups/casa/ "), "/Backups/casa")
+        for bad in ("", "/", "a/../b"):
+            with self.assertRaises(ValueError):
+                vault.clean_folder(bad)
 
-    def test_backup_goes_to_chosen_destinations(self) -> None:
+    def test_verify(self) -> None:
+        values = dict(zip(vault.KEYS, (self.url, "dono", "app", "/Backups/casa", "-")))
+        self.assertEqual(vault.verify(values), "")
+        self.assertTrue((self.cloud / "Backups" / "casa").is_dir())
+        values["VAULT_PASSWORD"] = "errada"
+        self.assertEqual(vault.verify(values), "o Nextcloud recusou o usuário ou a senha de app")
+        values["VAULT_URL"] = "http://127.0.0.1:1"
+        self.assertIn("não respondeu", vault.verify(values))
+
+    def test_backup_and_restore(self) -> None:
         self.link()
+        self.assertEqual(vault.settings()["VAULT_FOLDER"], "/Backups")
         self.assertEqual(vault.settings_file().stat().st_mode & 0o777, 0o600)
-        self.assertEqual(vault.destinations_file().stat().st_mode & 0o777, 0o600)
-        env = vault.environment(CLOUD)
-        self.assertEqual(env["RESTIC_REPOSITORY"], "rest:https://vault.casa.com/servidor/bbbb2222/")
-        self.assertEqual((env["RESTIC_REST_PASSWORD"], env["RESTIC_PASSWORD"]), ("acesso", "repo"))
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertFalse(vault.run_backup("nuvem", lambda folder: None))
-            self.assertIn("nenhuma pasta do vault escolhida", self.sent[-1][0][3])
-            config.save("nuvem", {vault.TARGETS: "bbbb2222,sumiu"})
-            self.assertFalse(vault.run_backup("nuvem", lambda folder: (folder / "config.txt").write_text("v1")))
-        self.assertIn("a pasta do vault sumiu não existe mais", self.sent[-1][0][3])
-        self.assertEqual([call[0] for call in self.restic.calls], ["bbbb2222"])
-        call = self.restic.calls[0][2:]
-        self.assertEqual([call[i + 1] for i, item in enumerate(call) if item == "--tag"], ["astroverso", "app:nuvem"])
-        self.assertFalse(Path(call[1]).exists())
-        config.save("nuvem", {vault.TARGETS: "aaaa1111,bbbb2222"})
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertTrue(vault.run_backup("nuvem", lambda folder: (folder / "config.txt").write_text("v2")))
-        self.assertEqual(self.sent[-1][0][:3], ("vault", "info", "Backup do nuvem feito em servidor"))
-        self.assertIn("/srv/backup-1, /srv/dados/sincronizado/Backups", self.sent[-1][0][3])
-
-    def test_failures_notify_with_retry(self) -> None:
-        self.link()
-        config.save("nuvem", {vault.TARGETS: "aaaa1111,bbbb2222"})
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertFalse(vault.run_backup("nuvem", lambda folder: (_ for _ in ()).throw(SystemExit(1))))
-            self.restic.fail = {"bbbb2222"}
-            self.assertFalse(vault.run_backup("nuvem", lambda folder: (folder / "config.txt").write_text("x")))
-        self.assertEqual(self.sent[0][0][1], "erro")
-        self.assertIn("o backup do app falhou", self.sent[0][0][3])
-        self.assertIn("em /srv/dados/sincronizado/Backups: Fatal: unable to save snapshot: connection refused", self.sent[1][0][3])
-        self.assertNotIn("backup-1", self.sent[1][0][3])
-        self.assertEqual(self.sent[1][1]["actions"], (("Tentar de novo", "nuvem:backup-now"),))
-
-    def test_choose_asks_once(self) -> None:
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertFalse(vault.choose("nuvem", vault.TARGETS, "do nuvem"))
-        self.link()
-        outcome = run_in_pty(lambda: (vault.choose("nuvem", vault.TARGETS, "do nuvem"), config.load("nuvem").get(vault.TARGETS)),
-                             [b"\x1b[B", b" ", b"\r"], columns=160)
+        self.save_config("primeira")
+        with mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            self.assertTrue(vault.run_backup("nuvem", self.backup))
+        today = date.today().isoformat()
+        sent = self.cloud / "Backups" / "servidor" / today / "nuvem.tar.zst.gpg"
+        self.assertTrue(sent.is_file())
+        self.assertIn("backup do nuvem enviado", out.getvalue())
+        self.assertEqual(self.sent[-1][0][:2], ("vault", "info"))
+        self.assertFalse((config.home() / ".backups" / "nuvem").exists())
+        self.assertEqual(vault.versions("nuvem"), [(today, "nuvem.tar.zst.gpg")])
+        self.save_config("segunda")
+        outcome = run_in_pty(lambda: (vault.restore("nuvem", self.backup, lambda folder: self.save_config(
+            (folder / "config.txt").read_text() + "!")), (config.state("nuvem") / "config.txt").read_text())[1], [b"\r", b"s\n"])
         self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertEqual(outcome.result, [True, "aaaa1111,bbbb2222"])
-        self.assertIn("☁ drive (duas vias)", outcome.screen)
-        self.assertTrue(run_in_pty(lambda: vault.choose("nuvem", vault.TARGETS, "do nuvem"), []).result)
+        self.assertEqual(outcome.result, "primeira!")
+        self.assertTrue((sent.parent / "nuvem-antes-da-restauracao.tar.zst.gpg").is_file())
+        self.assertEqual([name for _, name in vault.versions("nuvem")], ["nuvem-antes-da-restauracao.tar.zst.gpg", "nuvem.tar.zst.gpg"])
 
-    def test_data_backup(self) -> None:
+    def test_wrong_key_and_failures(self) -> None:
         self.link()
-        folder = self.home / "fotos"
+        self.save_config("x")
         with mock.patch.object(sys, "stdout", io.StringIO()):
-            self.assertFalse(vault.run_data("nuvem", "fotos", folder, [LOCAL], "backup-data"))
-            self.assertIn("indisponível", self.sent[-1][0][3])
-            folder.mkdir()
-            with mock.patch.object(vault.disks, "available", return_value=False):
-                self.assertFalse(vault.run_data("nuvem", "fotos", folder, [LOCAL], "backup-data"))
-            self.assertTrue(vault.run_data("nuvem", "fotos", folder, [LOCAL], "backup-data", unshare=True))
-        destination, unshare, *args = self.restic.calls[-1]
-        self.assertEqual((destination, unshare, args[1]), ("aaaa1111", True, str(folder)))
-        self.assertIn("dados:fotos", args)
-        self.assertEqual(self.sent[-1][0][2], "Backup de fotos (nuvem) feito em servidor")
-        self.assertEqual(vault.versions("nuvem", LOCAL), [])
-        self.assertEqual(len(vault.versions("nuvem", LOCAL, "fotos")), 1)
+            self.assertTrue(vault.run_backup("nuvem", self.backup))
+        values = vault.settings()
+        vault.save(values["VAULT_URL"], "dono", "app", "/Backups", "outra")
+        outcome = run_in_pty(lambda: vault.restore("nuvem", self.backup, lambda folder: None), [b"\r", b"s\n"])
+        self.assertEqual(outcome.code, 1)
+        self.assertIn("a senha dos backups não abriu o arquivo", outcome.screen)
+        vault.save(values["VAULT_URL"], "dono", "errada", "/Backups", "chave")
+        with mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            self.assertFalse(vault.run_backup("nuvem", self.backup))
+        self.assertIn("recusou o usuário ou a senha de app", out.getvalue())
+        self.assertEqual(self.sent[-1][0][:2], ("vault", "erro"))
+        self.assertEqual(self.sent[-1][1]["actions"], (("Tentar de novo", "nuvem:backup-now"),))
+        with mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            self.assertFalse(vault.run_backup("nuvem", lambda folder: ui.fail("sem banco"), notify=False))
+        self.assertIn("o backup do app falhou", out.getvalue())
 
-    def test_restore_takes_safety_copy(self) -> None:
+    def test_prune(self) -> None:
         self.link()
-        config.save("nuvem", {vault.TARGETS: "aaaa1111"})
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            vault.run_backup("nuvem", lambda folder: (folder / "config.txt").write_text("antiga"))
+        folder = self.cloud / "Backups" / "servidor"
+        today = date(2026, 11, 27)
+        for day in (today, today - timedelta(days=90), today - timedelta(days=91), today - timedelta(days=400)):
+            (folder / day.isoformat()).mkdir(parents=True)
+        (folder / "outra-coisa").mkdir()
+        self.assertEqual(vault.prune(vault.Dav(), "/Backups/servidor", today), 2)
+        self.assertEqual(sorted(path.name for path in folder.iterdir()), ["2026-08-29", "2026-11-27", "outra-coisa"])
 
-        def scenario():
-            seen = {}
-            vault.restore("nuvem", lambda folder: (folder / "config.txt").write_text("atual"),
-                           lambda folder: seen.setdefault("texto", (folder / "config.txt").read_text()))
-            return seen, [item["tags"] for item in self.restic.snapshots["aaaa1111"]]
-
-        outcome = run_in_pty(scenario, [b"\r", b"\r", b"s\n"], columns=140)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        seen, tags = outcome.result
-        self.assertEqual(seen, {"texto": "antiga"})
-        self.assertEqual(tags[-1], ["astroverso", "app:nuvem", "antes-da-restauracao"])
-
-    def test_restore_data_into_new_folder(self) -> None:
+    def test_opened(self) -> None:
         self.link()
-        folder = self.home / "fotos"
-        folder.mkdir()
+        self.save_config("parte")
         with mock.patch.object(sys, "stdout", io.StringIO()):
-            vault.run_data("nuvem", "fotos", folder, [CLOUD], "backup-data")
-        busy = self.home / "ocupada"
-        busy.mkdir()
-        (busy / "x").write_text("x")
-        target = self.home / "volta"
-        outcome = run_in_pty(lambda: (vault.restore_data("nuvem", "fotos"), self.restic.calls)[1], [b"\x1b[B", b"\r", b"\r", f"{busy}\n".encode(), f"{target}\n".encode()], columns=160)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertIn("essa pasta já tem arquivos", outcome.screen)
-        self.assertTrue((target / "config.txt").exists())
-        restore = next(call for call in outcome.result if call[2] == "restore")
-        self.assertEqual(restore[0], "bbbb2222")
+            vault.run_backup("nuvem", self.backup)
 
-    def test_change_and_units(self) -> None:
-        change = vault.change("nuvem")
-        self.assertEqual(change.id, "backup")
-        self.assertIn(f"01:{vault.minute('nuvem'):02d}", change.label)
-        text = vault.units_text("nuvem")["astroverso-nuvem-backup.service"]
-        self.assertIn(f"ExecStart={vault.COMMAND} nuvem action backup-now", text)
-        self.assertNotIn("Nice", text)
-        self.assertIn("Persistent=true", vault.units_text("nuvem")["astroverso-nuvem-backup.timer"])
-        data = vault.data_change("nuvem", "files", "Backup dos arquivos", "Os arquivos.", "backup-files", "BACKUP_FILES_TO", "dos arquivos")
-        self.assertEqual(data.id, "backup-files")
-        self.assertIn("02:", data.label)
-        texts = vault.units_text("nuvem", "files", "backup-files", 2, "dos arquivos")
-        self.assertIn("nuvem action backup-files", texts["astroverso-nuvem-backup-files.service"])
+        def read() -> str:
+            with vault.opened("nuvem") as found:
+                assert found is not None
+                return (found[0] / "config.txt").read_text() + "|" + found[1]
 
-    def test_translated_errors(self) -> None:
-        values = dict(zip(vault.KEYS, ("https://b", "u", "p", "r")))
-        with mock.patch.object(vault, "restic", return_value=(1, "unexpected HTTP response (401): 401 Unauthorized")):
-            self.assertEqual(vault.ensure_repository(values, LOCAL), "o servidor recusou o usuário ou a senha de acesso")
-        with mock.patch.object(vault, "restic", return_value=(1, "Fatal: wrong password or no key found")):
-            self.assertEqual(vault.ensure_repository(values, LOCAL), "a senha do repositório não confere")
+        outcome = run_in_pty(read, [b"\r"])
+        self.assertEqual(outcome.result, "parte|" + date.today().strftime("%d/%m/%Y"))
+        self.assertFalse((config.home() / ".backup-restore" / "nuvem").exists())
+
+    def test_change_needs_vault(self) -> None:
+        item = vault.change("nuvem")
+        self.assertEqual(item.id, "backup")
+        with mock.patch.object(vault.units, "install") as install, mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            item.apply()
+            self.assertIn("instale o app vault", out.getvalue())
+            install.assert_not_called()
+            self.link()
+            item.apply()
+            install.assert_called_once()
+        texts = vault.units_text("nuvem")
+        self.assertIn(f"OnCalendar=*-*-* 01:{vault.minute('nuvem'):02d}:00", texts["astroverso-nuvem-backup.timer"])
+        self.assertIn("nuvem action backup-now", texts["astroverso-nuvem-backup.service"])
+
+    @unittest.skipUnless(shutil.which("gpg") and shutil.which("podman") and shutil.which("zstd"), "sem gpg, podman ou zstd")
+    def test_real_pack(self) -> None:
+        source = self.home / "origem"
+        (source / "sub").mkdir(parents=True)
+        (source / "sub" / "a.txt").write_text("conteúdo")
+        target = self.home / "a.tar.zst.gpg"
+        self.assertEqual(REAL_PACK(source, target, "senha"), "")
+        self.assertNotIn(b"conte", target.read_bytes())
+        back = self.home / "volta"
+        back.mkdir()
+        self.assertIn("senha dos backups", REAL_UNPACK(target, back, "errada"))
+        self.assertEqual(REAL_UNPACK(target, back, "senha"), "")
+        self.assertEqual((back / "sub" / "a.txt").read_text(), "conteúdo")
 
 
 if __name__ == "__main__":

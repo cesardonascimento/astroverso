@@ -232,29 +232,23 @@ As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps
 | `undo_all(mudanças)` | Desfaz todas, na ordem inversa (no `remove`) |
 | `rows(mudanças)` | Linhas de tabela (mudança, aplicada ou desfeita) para o resumo |
 
-## backup
+## vault
 
-O backup de cada app no servidor do app `vault` (restic por HTTPS). A máquina fica ligada ao servidor por
-`~/.astroverso/vault.env` (`VAULT_URL`, `VAULT_USER`, `VAULT_PASSWORD`, `VAULT_REPO_PASSWORD`, `600`) e
-`~/.astroverso/vault-folders.json` (as pastas do vault do servidor: `Destination(id, path, cloud)`). Cada
-pasta do vault é um repositório: `rest:<url>/<máquina>/<id>/`. **Quem escolhe as pastas é o app**, guardadas no
-`.env` dele (`BACKUP_TO` para a configuração; outra chave para cada parte dos dados).
+O backup de cada app: um arquivo criptografado por dia, enviado para uma pasta do Nextcloud pelo WebDAV (só a biblioteca
+padrão, `urllib`). A máquina fica ligada por `~/.astroverso/vault.env` (`VAULT_URL`, `VAULT_USER`, `VAULT_PASSWORD` (a
+senha de app), `VAULT_FOLDER`, `VAULT_KEY` (a senha dos backups), `600`), gravado pelo app `vault`. Cada backup fica em
+`<pasta>/<máquina>/<AAAA-MM-DD>/<app>.tar.zst.gpg` (`podman unshare tar --zstd`, que guarda os donos dos arquivos de
+containers, e `gpg` simétrico AES256 com a senha pela entrada padrão). Os dias com mais de 90 são apagados a cada envio.
 
 | Nome | O que faz |
 |---|---|
-| `change(app)` | A mudança perguntada do backup diário: ao ligar, pergunta as pastas do vault (`choose`) e instala o timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now`. Desfazer tira o timer e esquece as pastas |
-| `data_change(app, parte, rótulo, porquê, ação, chave, o_quê)` | Igual, para dados: timer `astroverso-<app>-backup-<parte>` às 02:MM, que roda a ação dada; com `chave=None`, o app guarda as pastas de cada item do jeito dele |
-| `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app numa pasta temporária, manda pelo `restic backup` para cada pasta escolhida (marcas `astroverso`, `app:<app>` e o rótulo), apaga a pasta e avisa no `#vault` (falha com o botão "Tentar de novo"). Sem servidor, só avisa; sem pasta escolhida ou com pasta que saiu do servidor, avisa o erro |
-| `run_data(app, nome, caminho, pastas, ação, unshare=, missing=, exclude=)` | Manda uma pasta de dados direto (marca `dados:<nome>`), com `podman unshare` para os arquivos de containers; `missing` são as pastas escolhidas que saíram do servidor (avisadas como erro). Pasta num disco desligado ou travado (`kit.disks.available`): não guarda nada e avisa |
-| `restore(app, backup, restore)` | Escolhe a pasta do vault e a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
-| `opened(app)` | Contexto: escolhe a pasta do vault e a versão da configuração e entrega `(pasta, data)` com o conteúdo daquela versão (ou `None` se voltar), apagada no fim. Para restaurar só uma parte (ex.: uma rotina do n8n) |
-| `restore_data(app, nome)` | Traz uma versão dos dados numa pasta nova e vazia (padrão `~/Restaurado/<app>-<nome>-<data>`), sem mexer na original |
-| `targets(app, chave)` / `choose(app, chave, o_quê)` / `pick(pergunta, atuais)` | As pastas escolhidas por um app e a pergunta "Onde guardar as fotografias …?" (checklist com a marca ☁), depois de explicar que o backup é uma fotografia por dia, com versões, e não um espelho |
-| `versions(app, pasta, dados="")` / `summary(app, dados=)` | As versões do app nesta máquina numa pasta (as de configuração, ou as de uma parte dos dados) e a tabela para o resumo |
-| `link_code(url, usuário, pastas)` / `read_code(texto)` | O código de ligação mostrado pelo servidor e colado no cliente (sem segredos) |
-| `configured()` / `settings()` / `save(...)` / `destinations()` / `save_destinations(...)` / `forget()` / `ensure_repository(valores, pasta)` | A ligação com o servidor; o `ensure_repository` cria o repositório na primeira vez e traduz os erros comuns |
-
-As senhas vão por variável de ambiente (`RESTIC_REST_PASSWORD`, `RESTIC_PASSWORD`), nunca em argumentos.
+| `change(app)` | A mudança perguntada do backup diário: instala o timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now`. Sem o vault configurado, avisa e fica desligada |
+| `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app em `~/.astroverso/.backups/<app>/`, empacota, criptografa, envia, apaga os dias antigos e avisa no `#vault` (falha com o botão "Tentar de novo"). Com `label`, o arquivo é `<app>-<label>.tar.zst.gpg`. Sem o vault configurado, só avisa |
+| `restore(app, backup, restore)` | Escolhe a data (as 30 mais novas), guarda antes um backup "antes-da-restauracao", baixa, abre e chama `restore(pasta)` do app |
+| `opened(app)` | Contexto: escolhe a data e entrega `(pasta, data)` com o conteúdo daquele backup (ou `None` se voltar), apagada no fim. Para restaurar só uma parte (ex.: uma rotina do n8n) |
+| `versions(app)` / `summary(app)` | Os backups do app nesta máquina (data e arquivo) e a tabela para o resumo |
+| `configured()` / `settings()` / `save(...)` / `verify(valores)` / `forget()` | A ligação com o Nextcloud; o `verify` cria a pasta (nível a nível: o WebDAV do Nextcloud não cria pastas encadeadas) e traduz os erros comuns |
+| `Dav(valores)` | O cliente WebDAV: `names` (`PROPFIND` com `Depth: 1`), `mkdirs`, `put`, `get`, `delete` |
 
 ## mail
 

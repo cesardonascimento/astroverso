@@ -1,268 +1,90 @@
 import io
-import json
 import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "packages"))
 
-from kit import vault
-from kit import config, container, disks, routes, ui
+from kit import config, ui, vault
 from kit.testing import run_in_pty
 from manager.apps import load
 
 APP = load(ROOT / "apps" / "vault")
 assert APP.module is not None, APP.problem
 app = APP.module
-server = app.server
 
 
-class FakeContainer:
-    Container = container.Container
-    Volume = container.Volume
-
-    def __init__(self) -> None:
-        self.calls: list[tuple] = []
-        self.running = False
-
-    def prepare(self):
-        self.calls.append(("prepare",))
-
-    def start(self, spec, timeout=180):
-        self.calls.append(("start", spec.name, tuple(spec.command)))
-        self.running = True
-
-    def restart(self, spec, timeout=180):
-        self.calls.append(("restart", spec.name))
-
-    def active(self, name):
-        return self.running
-
-    def remove(self, name, image=None):
-        self.calls.append(("remove", name))
-
-    def unit(self, name):
-        return f"{name}.service"
-
-
-class FakeRun:
-    def __init__(self, snapshots: dict[str, list[dict]]) -> None:
-        self.snapshots = snapshots
-
-    def capture(self, args, sudo=False, input=None, timeout=None):
-        return "$apr1$abc$hash" if args[:2] == ["openssl", "passwd"] else ""
-
-    def output(self, args, timeout=None, env=None, input=None):
-        name = Path((env or {}).get("RESTIC_REPOSITORY", "")).name
-        if args[:2] == ["restic", "snapshots"]:
-            return 0, json.dumps(self.snapshots.get(name, []))
-        if args[:3] == ["restic", "cat", "config"]:
-            return (0, "") if (env or {}).get("RESTIC_PASSWORD") == "antiga" else (1, "wrong password")
-        return 0, ""
-
-
-def snapshot(app_name: str, hours: float) -> dict:
-    moment = datetime.now(timezone.utc) - timedelta(hours=hours)
-    return {"time": moment.isoformat().replace("+00:00", "Z"), "tags": ["astroverso", f"app:{app_name}"]}
-
-
-class BackupAppTest(unittest.TestCase):
+class VaultAppTest(unittest.TestCase):
     def setUp(self) -> None:
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.home = Path(temp.name)
-        patch = mock.patch.dict(os.environ, {"HOME": str(self.home)})
-        patch.start()
-        self.addCleanup(patch.stop)
-        ui.set_app("vault")
-        config.home().mkdir()
-        (config.home() / "astroverso.env").write_text("DOMAIN=casa.com\n")
-        self.box = FakeContainer()
-        self.snapshots: dict[str, list[dict]] = {}
-        self.checked: list[tuple] = []
+        self.tries: list[dict] = []
         for patch in (
-            mock.patch.object(server, "container", self.box),
-            mock.patch.object(app, "container", self.box),
-            mock.patch.object(server, "run", FakeRun(self.snapshots)),
-            mock.patch.object(disks, "mounts", return_value=[]),
+            mock.patch.dict(os.environ, {"HOME": str(self.home)}),
             mock.patch.object(app.distro, "install"),
-            mock.patch.object(app.net, "hostname", return_value="servidor"),
-            mock.patch.object(vault, "ensure_repository", side_effect=lambda values, item: self.checked.append(item.path) or ""),
-            mock.patch.object(vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
-            mock.patch.object(server, "units", mock.Mock(active=mock.Mock(return_value=False))),
-            mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change("watch", a[1], a[2], lambda: False, lambda: None, lambda: None)),
+            mock.patch.object(app.changes, "install"),
+            mock.patch.object(app.changes, "undo_all"),
+            mock.patch.object(vault, "verify", side_effect=self.verify),
+            mock.patch.object(vault.net, "hostname", return_value="servidor"),
         ):
             patch.start()
             self.addCleanup(patch.stop)
+        ui.set_app("vault")
+        config.home().mkdir()
+        (config.home() / "astroverso.env").write_text("DOMAIN=casa.com\n")
 
-    def destination(self, path: Path) -> vault.Destination:
-        config.state("vault")
-        item = vault.Destination(server.new_id(str(path), set()), str(path))
-        server.save_destinations([item])
-        return item
+    def verify(self, values: dict) -> str:
+        self.tries.append(dict(values))
+        return "" if values["VAULT_PASSWORD"] == "certa" else "o Nextcloud recusou o usuário ou a senha de app"
 
-    def test_server_install(self) -> None:
-        keys = [b"\r", b"\n", b"\n", b"\r", b"\r", b"Backups\n", b"3", b"\r", b"\n", b"\n", b"\n", b"\r"]
-        outcome = run_in_pty(lambda: (app.install(reuse=False), self.box.calls, self.checked)[1:], keys, columns=200)
+    def test_install(self) -> None:
+        keys = [b"\r", b"dono\n", b"\r", b"errada\n", b"certa\n", b"chave\n", b"chave\n"]
+        outcome = run_in_pty(lambda: (app.install(False), vault.settings())[1], keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
-        calls, checked = outcome.result
-        start = next(call for call in calls if call[0] == "start")
-        self.assertIn("--append-only", start[2])
-        self.assertIn("--private-repos", start[2])
-        values = config.load("vault")
-        self.assertEqual((values["MODE"], values["KEEP_DAILY"], values["KEEP_MONTHLY"]), ("server", "30", "12"))
-        [item] = server.destinations()
-        self.assertEqual(item.path, str(self.home / "Backups"))
-        self.assertTrue((self.home / "Backups" / "servidor").is_dir())
-        self.assertEqual(vault.destinations(), [item])
-        self.assertEqual(values["BACKUP_TO"], item.id)
-        self.assertEqual(len(checked), 1)
-        local = server.clients()["servidor"]
-        self.assertEqual(vault.settings(), {"VAULT_URL": "https://vault.casa.com", "VAULT_USER": "servidor",
-                                                 "VAULT_PASSWORD": local["PASSWORD"], "VAULT_REPO_PASSWORD": local["REPO_PASSWORD"]})
-        self.assertEqual((server.clients_folder() / "servidor.env").stat().st_mode & 0o777, 0o600)
-        self.assertEqual(server.htpasswd().read_text(), "servidor:$apr1$abc$hash\n")
-        self.assertEqual(json.loads((routes.folder() / "vault.json").read_text()), [{"host": "vault.casa.com", "target": "http://astroverso-vault:8080"}])
-        self.assertIn("docs/senhas.md", outcome.screen)
-        self.assertIn(f"senha do repositório: {local['REPO_PASSWORD']}", outcome.screen)
-        self.assertIn("código de ligação: astroverso-vault:", outcome.screen)
+        self.assertEqual(outcome.result, {"VAULT_URL": "https://nextcloud.casa.com", "VAULT_USER": "dono", "VAULT_PASSWORD": "certa",
+                                          "VAULT_FOLDER": "/Backups", "VAULT_KEY": "chave"})
+        self.assertIn("recusou o usuário", outcome.screen)
+        self.assertIn("os backups vão para /Backups", outcome.screen)
+        self.assertNotIn("chave", outcome.screen.replace("senha dos backups", ""))
+        self.assertTrue(app.status())
+        with mock.patch.object(sys, "stdout", io.StringIO()) as out:
+            app.install(True)
+        self.assertIn("continuam indo para /Backups", out.getvalue())
 
-    def test_volumes_per_machine_and_destination(self) -> None:
-        item = self.destination(self.home / "Backups")
-        (self.home / "Backups").mkdir()
+    def test_install_gives_up(self) -> None:
+        outcome = run_in_pty(lambda: app.install(False), [b"\r", b"dono\n", b"\r", b"a\n", b"b\n", b"c\n"], columns=160)
+        self.assertEqual(outcome.code, 1)
+        self.assertIn("o Nextcloud não aceitou", outcome.screen)
+        self.assertFalse(app.status())
+
+    def test_change_key_and_remove(self) -> None:
+        vault.save("https://nextcloud.casa.com", "dono", "certa", "/Backups", "velha")
+        outcome = run_in_pty(lambda: (app.change_key(), vault.settings()["VAULT_KEY"])[1], [b"nova\n", b"nova\n"])
+        self.assertEqual(outcome.result, "nova")
+        self.assertIn("continuam abrindo só com a senha antiga", outcome.screen)
+        config.save("vault", {})
         with mock.patch.object(sys, "stdout", io.StringIO()):
-            server.add("servidor")
-            server.add("notebook")
-        text = container.render(server.spec())
-        self.assertIn("ReadOnly=true", text)
-        self.assertIn(f"Volume={self.home}/Backups/notebook:/data/notebook/{item.id}:Z", text)
-        self.assertIn(f"Volume={self.home}/Backups/servidor:/data/servidor/{item.id}:Z", text)
-        with mock.patch.object(disks, "containing", return_value=disks.Disk("u", self.home, "ext4", "")), \
-                mock.patch.object(disks, "available", return_value=True):
-            self.assertIn(f"/data/notebook/{item.id}:rw", container.render(server.spec()))
+            app.remove()
+        self.assertFalse(vault.settings_file().exists())
+        self.assertFalse(app.status())
 
-    def test_missing_destination_stays_out_and_heals(self) -> None:
-        here = self.home / "Backups"
-        gone = self.home / "disco-usb" / "backups"
-        here.mkdir()
-        config.state("vault")
-        items = [vault.Destination("aaaa1111", str(here)), vault.Destination("bbbb2222", str(gone))]
-        server.save_destinations(items)
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            server.add("servidor")
-        with mock.patch.object(disks, "available", side_effect=lambda path: "disco-usb" not in str(path)):
-            self.assertEqual([item.id for item in server.available()], ["aaaa1111"])
-            text = container.render(server.spec())
-            self.assertIn("/data/servidor/aaaa1111", text)
-            self.assertNotIn("bbbb2222", text)
-            with mock.patch.object(sys, "stdout", io.StringIO()):
-                server.heal()
-        self.assertEqual(self.box.calls[-1][0], "start")
-        gone.mkdir(parents=True)
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            server.heal()
-        self.assertTrue((gone / "servidor").is_dir())
-        self.assertIn("/data/servidor/bbbb2222", container.render(server.spec()))
-        self.box.running = True
-        with mock.patch.object(server, "available", return_value=[]), mock.patch.object(server.run, "succeeds", create=True) as stop, \
-                mock.patch.object(sys, "stdout", io.StringIO()), mock.patch.object(sys, "stderr", io.StringIO()):
-            server.heal()
-        stop.assert_called_once()
-        self.assertTrue(server.htpasswd().exists())
-
-    def test_client_install(self) -> None:
-        code = vault.link_code("https://vault.casa.com", "notebook", [vault.Destination("aaaa1111", "/srv/b")])
-        keys = [b"\x1b[B", b"\r", b"errado\n", f"{code}\n".encode(), b"acesso\n", b"repo\n", b"\n", b"\r"]
-        outcome = run_in_pty(lambda: app.install(reuse=False), keys, columns=400)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertIn("o código começa com astroverso-vault:", outcome.screen)
-        self.assertEqual(vault.settings(), {"VAULT_URL": "https://vault.casa.com", "VAULT_USER": "notebook",
-                                                 "VAULT_PASSWORD": "acesso", "VAULT_REPO_PASSWORD": "repo"})
-        self.assertEqual(vault.destinations(), [vault.Destination("aaaa1111", "/srv/b")])
-        self.assertNotIn("repo\n", outcome.screen)
-        other = vault.link_code("https://vault.casa.com", "notebook", [vault.Destination("cccc3333", "/srv/c")])
-        outcome = run_in_pty(app.update_destinations, [f"{other}\n".encode()], columns=400)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertEqual(vault.destinations(), [vault.Destination("cccc3333", "/srv/c")])
-
-    def test_add_machine(self) -> None:
-        self.destination(self.home / "Backups")
-        config.save("vault", {"MODE": "server"})
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            server.add("servidor")
-        self.box.running = True
-        outcome = run_in_pty(lambda: (app.add_machine(), self.box.calls)[1], [b"servidor\n", b"notebook\n", b"\r"], columns=400)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertIn("a máquina servidor já está cadastrada", outcome.screen)
-        self.assertEqual(sorted(server.clients()), ["notebook", "servidor"])
-        self.assertIn(["restart", server.NAME], outcome.result)
-        self.assertTrue((self.home / "Backups" / "notebook").is_dir())
-        self.assertIn("usuário: notebook", outcome.screen)
-        item = server.destinations()[0]
-        self.assertIn(f"repositório em {item.path}: rest:https://vault.casa.com/notebook/{item.id}/", outcome.screen)
-        self.assertIn("docs/windows.md", outcome.screen)
-        code = next(line for line in outcome.screen.splitlines() if "código de ligação" in line).split(": ", 1)[1].strip()
-        self.assertEqual(vault.read_code(code)[1], "notebook")
-
-    def test_returning_machine_keeps_old_password(self) -> None:
-        item = self.destination(self.home / "Backups")
-        config.save("vault", {"MODE": "server"})
-        server.repository(item, "notebook").mkdir(parents=True)
-        (server.repository(item, "notebook") / "config").write_text("x")
-        keys = [b"notebook\n", b"\x1b[B", b"\r", b"errada\n", b"antiga\n"]
-        outcome = run_in_pty(app.add_machine, keys, columns=400)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertIn("essa senha não abre os backups de notebook", outcome.screen)
-        self.assertEqual(server.clients()["notebook"]["REPO_PASSWORD"], "antiga")
-        self.assertNotIn("errada", outcome.screen)
-
-    def test_server_reinstall_reuses_old_password(self) -> None:
-        item = self.destination(self.home / "Backups")
-        config.save("vault", {"MODE": "server", "KEEP_DAILY": "30", "KEEP_MONTHLY": "12"})
-        server.repository(item, "servidor").mkdir(parents=True)
-        (server.repository(item, "servidor") / "config").write_text("x")
-        outcome = run_in_pty(lambda: app._server(True), [b"antiga\n"], columns=400)
-        self.assertEqual(outcome.code, 0, outcome.screen)
-        self.assertEqual(server.clients()["servidor"]["REPO_PASSWORD"], "antiga")
-        self.assertEqual(vault.settings()["VAULT_REPO_PASSWORD"], "antiga")
-
-    def test_collect(self) -> None:
-        item = self.destination(self.home / "Backups")
-        config.save("vault", {"MODE": "server"})
-        with mock.patch.object(sys, "stdout", io.StringIO()):
-            server.add("servidor")
-            server.add("notebook")
-            server.add("novo")
-        for name in ("servidor", "notebook", "novo"):
-            server.repository(item, name).mkdir(parents=True)
-        (server.repository(item, "servidor") / "config").write_text("x")
-        (server.repository(item, "notebook") / "config").write_text("x")
-        self.snapshots["servidor"] = [snapshot("nextcloud", 2), snapshot("network", 50), snapshot("antigo", 24 * 30)]
-        self.snapshots["notebook"] = [snapshot("system", 40)]
-        self.assertEqual(list(app.collect({})), ["server"])
-        self.box.running = True
-        found = app.collect({})
-        self.assertEqual(sorted(found), [f"app:servidor:{item.id}:network", "machine:notebook"])
-        self.assertEqual(found["machine:notebook"].level, "erro")
-        with mock.patch.object(disks, "available", return_value=False):
-            self.assertEqual(list(app.collect({})), [f"destination:{item.id}"])
-
-    def test_latest_separates_data(self) -> None:
-        data = snapshot("nextcloud", 1)
-        data["tags"].append("dados:arquivos")
-        self.assertEqual(sorted(server.latest([snapshot("nextcloud", 2), data])), ["nextcloud", "nextcloud (arquivos)"])
+    def test_backup_restore(self) -> None:
+        config.save("vault", {})
+        folder = self.home / "copia"
+        folder.mkdir()
+        app.backup(folder)
+        self.assertTrue((folder / ".env").exists())
+        app.restore(folder)
 
     def test_actions(self) -> None:
-        config.save("vault", {"MODE": "client"})
-        self.assertEqual([a.id for a in app.actions()], ["summary", "changes", "backup-now", "restore-version", "update-destinations"])
-        config.save("vault", {"MODE": "server"})
-        self.assertIn("add-machine", [a.id for a in app.actions()])
-        self.assertIn("destinations", [a.id for a in app.actions()])
+        self.assertEqual([(a.id, a.remote) for a in app.actions()],
+                         [("summary", True), ("changes", False), ("test", True), ("key", False), ("backup-now", True), ("restore-version", False)])
+        self.assertEqual([item.id for item in app.items()], ["backup"])
 
 
 if __name__ == "__main__":

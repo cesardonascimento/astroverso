@@ -22,7 +22,7 @@ local, pela biblioteca padrão do Python) a cada 4 s, por até 3 min, até ela r
 | Mudança | Por quê |
 |---|---|
 | `~/.astroverso/wol/` (`.env`, `machines.json` `600` com nome, IP e MAC de cada máquina) | O cadastro |
-| Unidades do usuário `astroverso-wol-backup.timer` e `.service` (perguntada, com as pastas do vault) | Backup diário do cadastro no vault (`kit.vault`) |
+| Unidades do usuário `astroverso-wol-backup.timer` e `.service` (perguntada) | Backup diário do cadastro no vault (`kit.vault`) |
 
 Sem porta aberta nem ajuste no firewall: o pacote só sai pela rede local.
 
@@ -41,7 +41,7 @@ Sem porta aberta nem ajuste no firewall: o pacote só sai pela rede local.
 | Ligar uma máquina | Escolhe numa lista e liga |
 | Máquinas da rede | Adicionar e remover |
 | Ligar `<nome>` | Uma por máquina cadastrada, só no Discord: `/astro wol:ligar-<nome>` (aparece no `/astro` quando o agente atualiza a lista) |
-| Mudanças no sistema / Fazer backup agora / Restaurar uma fotografia | Como nos outros apps |
+| Mudanças no sistema / Fazer backup agora / Restaurar uma versão | Como nos outros apps |
 
 ## Remover
 

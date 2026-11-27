@@ -65,7 +65,7 @@ externa) você cadastra no próprio n8n: o backup leva junto, criptografadas.
 | `~/.astroverso/n8n/` (`.env` com as respostas e a chave das chamadas, `commands.json` com os comandos do Discord, `n8n.env` e `runners.env` `600` com a chave de criptografia e o token, `owner_password_hash`, `data/` com o banco) | A configuração e as rotinas |
 | `~/.astroverso/routes/n8n.json` | O endereço publicado para o Caddy |
 | Unidades do usuário `astroverso-n8n-watch.timer` e `.service` (perguntada) | A verificação de hora em hora |
-| Unidades do usuário `astroverso-n8n-backup.timer` e `.service` (perguntada, com as pastas do vault) | O backup diário (abaixo) |
+| Unidades do usuário `astroverso-n8n-backup.timer` e `.service` (perguntada) | O backup diário (abaixo) |
 
 ## Versões das rotinas
 
@@ -76,7 +76,7 @@ código. Três camadas de versão:
 |---|---|
 | Histórico de versões do próprio n8n | Desfazer uma edição recente, pela tela do n8n |
 | **Restaurar uma rotina** (ação) | Trazer **uma** rotina de um backup (dias ou meses atrás) sem mexer nas outras: como cópia desligada ao lado da atual (`<nome> (restaurada de dd/mm)`), para comparar, ou substituindo a atual (volta ligada se estava ligada, por `publish:workflow`) |
-| **Restaurar uma fotografia** (ação) | O n8n inteiro de uma data (máquina nova, desastre) |
+| **Restaurar uma versão** (ação) | O n8n inteiro de uma data (máquina nova, desastre) |
 
 ## Backup
 
@@ -95,7 +95,7 @@ A restauração para os containers, apaga o banco e carrega a exportação **num
 | Resumo do n8n | Situação, versão, endereço, containers e módulos (com o endereço de cada um para as rotinas) e as conexões. Também no Discord |
 | Atualizar as conexões do Astroverso | Regrava as credenciais das conexões (também no Discord) |
 | Trocar a senha do administrador | Novo hash e reinício do n8n |
-| Restaurar uma rotina / Restaurar uma fotografia | Veja "Versões das rotinas" |
+| Restaurar uma rotina / Restaurar uma versão | Veja "Versões das rotinas" |
 | Comandos do Discord | Cadastra comandos que chamam o webhook de uma rotina: nome, caminho do webhook e descrição (`commands.json`). Cada um vira `/astro n8n:<nome>` (veja abaixo) |
 | `<comando>` | Um por comando cadastrado, só no Discord: chama a rotina e mostra a mensagem dela |
 | Importar rotinas (arquivos JSON) | Traz rotinas de uma pasta (exportadas de outro n8n ou do backup), desligadas; a de mesmo `id` é substituída. Antes, avisa as credenciais que ainda não existem (a importação liga cada nó pelo `id` ou pelo nome e tipo) |

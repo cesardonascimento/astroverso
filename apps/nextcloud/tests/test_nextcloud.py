@@ -146,7 +146,7 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual((nextcloud.secrets_folder() / "db_password").stat().st_mode & 0o777, 0o644)
 
     def test_reinstall_asks_nothing(self) -> None:
-        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes", "CHANGE_BACKUP": "yes", "CHANGE_BACKUP_FILES": "yes"})
+        config.save("nextcloud", {"HOST": "nextcloud.casa.com", "ADMIN_USER": "dono", "FILES": str(self.home / "Nextcloud"), "CHANGE_WATCH": "yes", "CHANGE_MAILBOXES": "yes", "CHANGE_BACKUP": "yes"})
         (nextcloud.html() / "config").mkdir(parents=True)
         (nextcloud.html() / "config" / "config.php").write_text("<?php")
         outcome = run_in_pty(lambda: (app.install(reuse=True), self.host.calls)[1], [], columns=160)
@@ -249,17 +249,8 @@ class NextcloudTest(unittest.TestCase):
 
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("bring", False), ("watch", True), ("backup-now", True), ("restore-version", False),
-                          ("backup-files", True), ("restore-files", False)])
-        self.assertEqual([item.id for item in app.items()][-2:], ["backup", "backup-files"])
-
-    def test_backup_files(self) -> None:
-        with mock.patch.object(app.vault, "run_data", return_value=True) as run_data, \
-                mock.patch.object(app.vault, "targets", return_value=["x"]):
-            self.assertTrue(app.backup_files())
-        args, kwargs = run_data.call_args
-        self.assertEqual(args, ("nextcloud", "arquivos", nextcloud.files(), ["x"], "backup-files"))
-        self.assertEqual((kwargs["unshare"], kwargs["missing"], kwargs["exclude"]), (True, [], ("appdata_*/preview",)))
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("bring", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
+        self.assertEqual([item.id for item in app.items()][-1], "backup")
 
 
 if __name__ == "__main__":

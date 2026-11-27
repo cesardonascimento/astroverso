@@ -20,7 +20,7 @@ o estado em `~/.astroverso/<app>`) não são mudanças: são o app.
 
 **Backup: cada app manda o seu.** Todo app põe `kit.vault.change(APP)` nas mudanças perguntadas e ganha as ações
 `Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True)` e
-`Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore))`.
+`Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore))`.
 
 **Passos em plataformas de terceiros** (Tailscale, Cloudflare, Discord, roteador, firewall de outro computador)
 ficam em `apps/<app>/docs/<plataforma>.md`, com o passo a passo completo, e uma seção para cada passo. Na etapa
