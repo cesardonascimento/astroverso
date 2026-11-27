@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, container, docs, mail, mailboxes, net, run, ui, units, validate, watch
 from kit.app import Action
 
@@ -79,7 +79,7 @@ def items() -> list[changes.Change]:
             "parados na Cloudflare, o token e a Quarentena, e avisa no Discord quando algo muda.",
             "o e-mail",
         ),
-        kit_backup.change(APP),
+        vault.change(APP),
     ]
 
 
@@ -512,7 +512,7 @@ def actions() -> list[Action]:
         Action("cleanup", "Limpar Workers e KV antigos da Cloudflare", cleanup),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]
 

@@ -80,7 +80,7 @@ código. Três camadas de versão:
 
 ## Backup
 
-Pelo `kit.backup`, com o n8n no ar: `export:entities` (rotinas com o histórico, credenciais criptografadas, usuários e o
+Pelo `kit.vault`, com o n8n no ar: `export:entities` (rotinas com o histórico, credenciais criptografadas, usuários e o
 resto do banco), **cada rotina num arquivo JSON separado** (`export:workflow --backup`, sem segredos: as credenciais vão
 só pelo `id`), o `.env`, o `n8n.env` (a chave de criptografia: sem ela, as credenciais do backup não abrem) e o hash da
 senha. O `database.sqlite` não vai: copiado com o n8n rodando, pode sair inconsistente.

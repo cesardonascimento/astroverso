@@ -4,7 +4,7 @@ import shutil
 import time
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, clouds, config, distro, folders, ui, units, watch
 from kit.app import Action
 from kit.watch import Problem
@@ -57,7 +57,7 @@ def items() -> list[changes.Change]:
                      f"Um timer do usuário ({watch.name(APP)}.timer) confere cada sincronização e envio (falha, exclusões "
                      "travadas, disco indisponível, atraso) e avisa no canal #cloud do Discord só quando algo muda.",
                      "a nuvem"),
-        kit_backup.change(APP),
+        vault.change(APP),
     ]
 
 
@@ -361,6 +361,6 @@ def actions() -> list[Action]:
         Action("release", "Liberar exclusões", release),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

@@ -8,7 +8,7 @@ sys.path.insert(0, str(ROOT / "packages"))
 
 from kit import docs
 
-FOLDER = ROOT / "apps" / "backup"
+FOLDER = ROOT / "apps" / "vault"
 LINK = re.compile(r'docs\.link\(DOCS / "([^"]+)"(?:, "([^"]+)")?\)')
 RELATIVE = re.compile(r"\]\(([\w-]+\.md)(?:#([^)]+))?\)")
 

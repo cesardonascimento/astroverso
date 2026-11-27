@@ -4,7 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, container, disks, docs, folders, routes, ui, validate, watch
 from kit.app import Action
 
@@ -32,8 +32,8 @@ def items() -> list[changes.Change]:
             "arquivos, e avisa no Discord quando algo quebra e quando volta ao normal.",
             "o Nextcloud",
         ),
-        kit_backup.change(APP),
-        kit_backup.data_change(
+        vault.change(APP),
+        vault.data_change(
             APP, "files", "Fazer o backup dos arquivos do Nextcloud todo dia",
             "Guarda a pasta dos arquivos de todos os usuários do Nextcloud (sem as miniaturas, que ele recria), nas pastas "
             "de destino que você escolher, separada do backup da configuração.",
@@ -43,8 +43,8 @@ def items() -> list[changes.Change]:
 
 
 def backup_files() -> bool:
-    return kit_backup.run_data(APP, FILES_DATA, nextcloud.files(), kit_backup.targets(APP, FILES_TO), "backup-files",
-                               unshare=True, missing=kit_backup.lost(APP, FILES_TO), exclude=SKIP)
+    return vault.run_data(APP, FILES_DATA, nextcloud.files(), vault.targets(APP, FILES_TO), "backup-files",
+                               unshare=True, missing=vault.lost(APP, FILES_TO), exclude=SKIP)
 
 
 def status() -> bool:
@@ -191,7 +191,7 @@ def summary() -> None:
     ui.table([[spec.name, ui.good("no ar") if container.active(spec.name) else ui.bad("parado")] for spec in nextcloud.specs()],
              ["Container", "Situação"])
     watch.summary(APP)
-    kit_backup.summary(APP, [("Arquivos", "files", FILES_TO, FILES_DATA)])
+    vault.summary(APP, [("Arquivos", "files", FILES_TO, FILES_DATA)])
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
@@ -248,8 +248,8 @@ def actions() -> list[Action]:
         Action("mailboxes", "Atualizar as contas de e-mail", accounts.sync, remote=True),
         Action("bring", "Trazer uma pasta para o Nextcloud", bring_folder),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
         Action("backup-files", "Fazer backup dos arquivos agora", backup_files, remote=True),
-        Action("restore-files", "Restaurar os arquivos de uma versão (numa pasta nova)", lambda: kit_backup.restore_data(APP, FILES_DATA)),
+        Action("restore-files", "Restaurar os arquivos de uma versão (numa pasta nova)", lambda: vault.restore_data(APP, FILES_DATA)),
     ]

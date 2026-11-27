@@ -1,6 +1,6 @@
 # Backup de um PC com Windows (sem Astroverso)
 
-O Astroverso não roda no Windows, mas o PC pode mandar backups de pastas para o servidor de backup da casa do mesmo
+O Astroverso não roda no Windows, mas o PC pode mandar backups de pastas para o vault da casa do mesmo
 jeito que os apps: com o [restic](https://restic.net) e uma tarefa agendada. É o PC que manda (o servidor nunca busca),
 criptografado, só acrescentando versões. O servidor acompanha o PC como qualquer outra máquina: resumo, aviso de 36 h
 sem backup e a manutenção de domingo (30 diárias e 12 mensais).
@@ -12,7 +12,7 @@ No gerenciador do Astroverso, na máquina do servidor: **backup → Adicionar um
 
 - a **senha de acesso** e a **senha do repositório** (guarde as duas no gerenciador de senhas: veja
   [senhas.md](senhas.md));
-- as linhas **repositório em `<pasta>`: `rest:https://backup.<domínio>/<nome-da-máquina>/<id>/`**, uma por pasta de
+- as linhas **repositório em `<pasta>`: `rest:https://vault.<domínio>/<nome-da-máquina>/<id>/`**, uma por pasta de
   destino. Cada pasta do PC vai para o repositório da pasta de destino que você escolher.
 
 Os mesmos dados aparecem depois em **Mostrar os dados de uma máquina**.
@@ -68,8 +68,8 @@ function Guardar($Repositorio, $Pasta, $Nome) {
     if ($LASTEXITCODE -ne 0) { $script:Falhou = $true }
 }
 
-Guardar "rest:https://backup.<domínio>/<nome-da-máquina>/<id>/" "D:\Fotos" "fotos"
-Guardar "rest:https://backup.<domínio>/<nome-da-máquina>/<id>/" "C:\Users\<você>\Documents" "documentos"
+Guardar "rest:https://vault.<domínio>/<nome-da-máquina>/<id>/" "D:\Fotos" "fotos"
+Guardar "rest:https://vault.<domínio>/<nome-da-máquina>/<id>/" "C:\Users\<você>\Documents" "documentos"
 
 if ($Falhou) { exit 1 }
 ```
@@ -105,7 +105,7 @@ $Como = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (Ne
 Register-ScheduledTask -TaskName "Astroverso backup" -Action $Acao -Trigger $Quando -Principal $Quem -Settings $Como
 ```
 
-Um PC desligado por mais de 36 h aparece no `#backup` como "sem backup": é o aviso de que as versões pararam.
+Um PC desligado por mais de 36 h aparece no `#vault` como "sem backup": é o aviso de que as versões pararam.
 
 ## Restaurar
 
@@ -113,7 +113,7 @@ No PowerShell como administrador, com o repositório onde está a versão:
 
 ```powershell
 . C:\ProgramData\Astroverso\backup\ambiente.ps1
-$env:RESTIC_REPOSITORY = "rest:https://backup.<domínio>/<nome-da-máquina>/<id>/"
+$env:RESTIC_REPOSITORY = "rest:https://vault.<domínio>/<nome-da-máquina>/<id>/"
 & $Restic snapshots --tag dados:fotos
 & $Restic restore <id da versão> --target D:\Restaurado
 ```

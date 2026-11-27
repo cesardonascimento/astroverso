@@ -43,7 +43,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | `~/.astroverso/discord.env` (`600`, `DISCORD_URL`, `DISCORD_KEY`) | Liga esta máquina ao bot: é o que o `kit.discord` de todos os apps usa para mandar avisos |
 | Foto do bot trocada pelo logo do Astroverso | Para os avisos aparecerem com a marca do projeto |
 | Unidade do usuário `astroverso-discord-agent.service` (em toda máquina com o app; perguntada, padrão sim, e reversível em Mudanças no sistema) | O agente: publica no bot os comandos desta máquina e roda os que forem pedidos no `/astro` (`astroverso discord action agent`) |
-| Unidades do usuário `astroverso-discord-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` |
+| Unidades do usuário `astroverso-discord-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` |
 
 ## Fora da máquina (passos seus)
 
@@ -63,7 +63,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | Mensagem de teste | Manda um aviso de teste para `#discord` pelo `kit.discord` |
 | Mostrar a chave de um cliente | Endereço e chave, para colar na outra máquina (só na máquina do bot) |
 | Adicionar um cliente | Cria a chave de uma máquina ou projeto novo e reinicia o bot (só na máquina do bot) |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Comandos do `/astro`
 

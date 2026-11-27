@@ -116,7 +116,7 @@ class DiscordAppTest(unittest.TestCase):
             mock.patch.object(server, "health", return_value={"ok": True, "clientes": {"servidor": {"visto_ha_s": 30}}}),
             mock.patch.object(server.time, "sleep"),
             mock.patch.object(app.agent, "install"),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.agent, "remove"),
             mock.patch.object(client.units, "active", return_value=True),
             mock.patch.object(discord, "whoami", side_effect=self.whoami),

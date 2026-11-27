@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, discord, net, ui
 from kit.app import Action
 
@@ -43,13 +43,13 @@ def install(reuse: bool | None = None) -> None:
     else:
         client.install(again)
     agent.install(again)
-    changes.install(APP, [kit_backup.change(APP)], again)
+    changes.install(APP, [vault.change(APP)], again)
     summary()
 
 
 def remove() -> None:
     ui.step("Discord")
-    changes.undo_all([kit_backup.change(APP)])
+    changes.undo_all([vault.change(APP)])
     agent.remove()
     if mode() == "server":
         server.remove()
@@ -100,7 +100,7 @@ def test() -> None:
 
 
 def manage() -> None:
-    changes.manage(APP, agent.items() + [kit_backup.change(APP)])
+    changes.manage(APP, agent.items() + [vault.change(APP)])
 
 
 def actions() -> list[Action]:
@@ -109,8 +109,8 @@ def actions() -> list[Action]:
         Action("changes", "Mudanças no sistema", manage),
         Action("test", "Mensagem de teste", test, remote=True),
         Action("agent", "Agente do Discord", agent.serve, menu=False),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]
     if mode() != "server":
         return common

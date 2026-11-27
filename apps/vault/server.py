@@ -8,14 +8,14 @@ import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, clouds, config, container, discord, disks, folders, routes, run, ui, units, validate
 
-APP = "backup"
-NAME = "astroverso-backup"
+APP = "vault"
+NAME = "astroverso-vault"
 IMAGE = "docker.io/rclone/rclone:1.76.0"
 PORT = 8080
-MAINTENANCE = "astroverso-backup-maintenance"
+MAINTENANCE = "astroverso-vault-maintenance"
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
 
 
@@ -39,16 +39,16 @@ def destinations_file() -> Path:
     return folder() / "destinations.json"
 
 
-def destinations() -> list[kit_backup.Destination]:
+def destinations() -> list[vault.Destination]:
     try:
         items = json.loads(destinations_file().read_text())
     except (OSError, ValueError):
         return []
-    return [kit_backup.Destination(str(item["id"]), str(item["path"]), clouds.mark(Path(str(item["path"]))))
+    return [vault.Destination(str(item["id"]), str(item["path"]), clouds.mark(Path(str(item["path"]))))
             for item in items if isinstance(item, dict) and item.get("id") and item.get("path")] if isinstance(items, list) else []
 
 
-def save_destinations(items: list[kit_backup.Destination]) -> None:
+def save_destinations(items: list[vault.Destination]) -> None:
     temporary = destinations_file().with_suffix(".tmp")
     temporary.write_text(json.dumps([{"id": item.id, "path": item.path} for item in items], ensure_ascii=False, indent=2) + "\n")
     temporary.chmod(0o600)
@@ -64,21 +64,21 @@ def new_id(path: str, taken: set[str]) -> str:
         salt += 1
 
 
-def repository(destination: kit_backup.Destination, name: str) -> Path:
+def repository(destination: vault.Destination, name: str) -> Path:
     return Path(destination.path) / name
 
 
-def available() -> list[kit_backup.Destination]:
+def available() -> list[vault.Destination]:
     return [item for item in destinations() if reachable(item)]
 
 
-def reachable(destination: kit_backup.Destination) -> bool:
+def reachable(destination: vault.Destination) -> bool:
     path = Path(destination.path)
     return disks.available(path) and path.is_dir()
 
 
 def address() -> str:
-    return f"backup.{config.saved_domain()}"
+    return f"vault.{config.saved_domain()}"
 
 
 def spec() -> container.Container:
@@ -166,7 +166,7 @@ def _add_destination() -> None:
     )
     path = folders.pick("pasta de destino", validate=validate_destination)
     items = destinations()
-    items.append(kit_backup.Destination(new_id(path, {item.id for item in items}), path, clouds.mark(Path(path))))
+    items.append(vault.Destination(new_id(path, {item.id for item in items}), path, clouds.mark(Path(path))))
     save_destinations(items)
     ui.ok(f"pasta de destino {path} cadastrada")
 
@@ -176,7 +176,7 @@ def _drop_destinations() -> None:
     chosen = ui.checklist("Quais pastas deixam de ser destino?", [item.path for item in items], cancel=True) or []
     if not chosen:
         return
-    ui.warn("os backups que já estão nelas ficam onde estão; os apps que mandavam para elas param de mandar e avisam no #backup")
+    ui.warn("os backups que já estão nelas ficam onde estão; os apps que mandavam para elas param de mandar e avisam no #vault")
     if not ui.confirm("confirma?", default=False):
         return
     save_destinations([item for i, item in enumerate(items) if i not in chosen])
@@ -209,16 +209,16 @@ def apply_destinations() -> None:
         start()
     sync_local()
     if len(clients()) > 1:
-        ui.info("nas outras máquinas, use a ação Atualizar as pastas de destino do app backup, com o código de Mostrar os dados de uma máquina")
+        ui.info("nas outras máquinas, use a ação Atualizar as pastas de destino do app vault, com o código de Mostrar os dados de uma máquina")
 
 
 def sync_local() -> None:
-    if kit_backup.settings().get("BACKUP_URL") == f"https://{address()}":
-        kit_backup.save_destinations(destinations())
+    if vault.settings().get("VAULT_URL") == f"https://{address()}":
+        vault.save_destinations(destinations())
 
 
 def link_code(name: str) -> str:
-    return kit_backup.link_code(f"https://{address()}", name, destinations())
+    return vault.link_code(f"https://{address()}", name, destinations())
 
 
 def prepare_folders() -> None:
@@ -238,7 +238,7 @@ def start() -> None:
         _write_htpasswd()
     routes.publish(APP, [routes.Route(address(), f"http://{NAME}:{PORT}")])
     if not available():
-        ui.warn("nenhuma pasta de destino disponível (discos desligados?): o servidor de backup fica parado até uma voltar")
+        ui.warn("nenhuma pasta de destino disponível (discos desligados?): o vault fica parado até uma voltar")
         return
     container.prepare()
     container.start(spec())
@@ -252,7 +252,7 @@ def heal() -> None:
         container.start(spec())
     elif installed():
         run.succeeds(["systemctl", "--user", "stop", container.unit(NAME)])
-        ui.warn("nenhuma pasta de destino disponível: servidor de backup parado até uma voltar")
+        ui.warn("nenhuma pasta de destino disponível: vault parado até uma voltar")
 
 
 def restart() -> None:
@@ -363,7 +363,7 @@ def change() -> changes.Change:
     )
 
 
-def free_space(destination: kit_backup.Destination) -> str:
+def free_space(destination: vault.Destination) -> str:
     if not reachable(destination):
         return "indisponível"
     try:

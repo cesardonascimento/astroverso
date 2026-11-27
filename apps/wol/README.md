@@ -22,7 +22,7 @@ local, pela biblioteca padrão do Python) a cada 4 s, por até 3 min, até ela r
 | Mudança | Por quê |
 |---|---|
 | `~/.astroverso/wol/` (`.env`, `machines.json` `600` com nome, IP e MAC de cada máquina) | O cadastro |
-| Unidades do usuário `astroverso-wol-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário do cadastro no servidor de backup (`kit.backup`) |
+| Unidades do usuário `astroverso-wol-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário do cadastro no vault (`kit.vault`) |
 
 Sem porta aberta nem ajuste no firewall: o pacote só sai pela rede local.
 

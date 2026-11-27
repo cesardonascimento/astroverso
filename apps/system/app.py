@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, ui, watch
 from kit.app import Action
 
@@ -25,7 +25,7 @@ def watch_change() -> changes.Change:
 
 
 def items() -> list[changes.Change]:
-    return power.items() + ssh.items() + updates.items() + [watch_change(), kit_backup.change(APP)]
+    return power.items() + ssh.items() + updates.items() + [watch_change(), vault.change(APP)]
 
 
 def status() -> bool:
@@ -47,7 +47,7 @@ def install(reuse: bool | None = None) -> None:
     ssh.install(again)
     ui.step("Atualizações do sistema")
     changes.install(APP, updates.items() + [watch_change()], again)
-    changes.install(APP, [kit_backup.change(APP)], again)
+    changes.install(APP, [vault.change(APP)], again)
     summary()
 
 
@@ -104,6 +104,6 @@ def actions() -> list[Action]:
         Action("keys", "Chaves SSH autorizadas", ssh.manage_keys),
         Action("github", "Chave desta máquina para o GitHub", ssh.github),
         Action("watch", "Verificar agora", check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

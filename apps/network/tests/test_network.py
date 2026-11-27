@@ -125,7 +125,7 @@ class NetworkTest(unittest.TestCase):
             mock.patch.object(tailscale, "net", fake_net),
             mock.patch.object(network, "net", fake_net),
             mock.patch.object(network.watch, "install"),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(network.watch, "remove"),
             mock.patch.object(network.watch, "summary"),
             mock.patch.object(tailscale.time, "sleep"),

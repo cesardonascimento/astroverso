@@ -44,7 +44,7 @@ class N8nTest(unittest.TestCase):
             mock.patch.dict(os.environ, {"HOME": str(self.home)}),
             mock.patch.object(modules, "FOLDER", self.modules),
             mock.patch.object(config, "timezone", return_value="UTC"),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)
@@ -186,7 +186,7 @@ class N8nTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
 
-        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(app.kit_backup, "opened", return_value=Opened()), \
+        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(app.vault, "opened", return_value=Opened()), \
                 mock.patch.object(n8n, "import_file", side_effect=lambda kind, content, *extra: imported.append((kind, json.loads(content), extra)) or (0, "")):
             outcome = run_in_pty(lambda: (app.restore_workflow(), imported)[1], [b"\x1b[B", b"\r", b"\r"], columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
@@ -208,7 +208,7 @@ class N8nTest(unittest.TestCase):
             def __exit__(self, *args):
                 return False
 
-        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(app.kit_backup, "opened", return_value=Opened()), \
+        with mock.patch.object(n8n, "installed", return_value=True), mock.patch.object(app.vault, "opened", return_value=Opened()), \
                 mock.patch.object(n8n, "import_file", side_effect=lambda kind, content, *extra: calls.append(json.loads(content)) or (0, "")), \
                 mock.patch.object(n8n, "cli", side_effect=lambda *args, **k: calls.append(list(args)) or (0, "")):
             outcome = run_in_pty(lambda: (app.restore_workflow(), calls)[1], [b"\r", b"\x1b[B", b"\r", b"s\n"], columns=160)

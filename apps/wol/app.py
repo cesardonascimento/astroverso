@@ -8,7 +8,7 @@ import socket
 import time
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, docs, net, run, ui, validate
 from kit.app import Action
 
@@ -147,7 +147,7 @@ def wake_menu() -> None:
 
 
 def items() -> list[changes.Change]:
-    return [kit_backup.change(APP)]
+    return [vault.change(APP)]
 
 
 def status() -> bool:
@@ -212,8 +212,8 @@ def actions() -> list[Action]:
         Action("wake", "Ligar uma máquina", wake_menu),
         Action("machines", "Máquinas da rede", manage_machines),
         Action("changes", "Mudanças no sistema", manage),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
         *[Action(f"{PREFIX}{item['name']}", f"Ligar {item['name']}", lambda name=item["name"]: _remote(name), remote=True, menu=False)
           for item in machines()],
     ]

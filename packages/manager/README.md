@@ -15,7 +15,7 @@ os seguintes também ficam de fora.
 conta como instalado, mesmo que o `status()` diga que sim: volta para "Instalar apps" com o aviso "instalação
 interrompida" (instalar de novo completa o que faltou) e continua em "Gerenciar apps" para poder ser removido.
 
-**Uso direto**, sem menus, para serviços do systemd e para o pacote `backup` (o código de saída diz se deu certo):
+**Uso direto**, sem menus, para serviços do systemd e para o `kit.vault` (o código de saída diz se deu certo):
 
 ```
 astroverso <app> install | remove | status | backup <pasta> | restore <pasta> | action <id>

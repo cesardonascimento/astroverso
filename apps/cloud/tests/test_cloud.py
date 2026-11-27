@@ -46,7 +46,7 @@ class CloudAppTest(unittest.TestCase):
             mock.patch.object(rclone, "obscure", side_effect=lambda secret: f"obscuro({len(secret)})"),
             mock.patch.object(disks, "mounts", return_value=[]),
             mock.patch.object(jobs, "LOCKS", self.home / "locks"),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)

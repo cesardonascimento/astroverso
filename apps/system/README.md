@@ -37,7 +37,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | Pacote `dnf5-plugin-automatic`, `/etc/dnf/automatic.conf` (`apply_updates = yes`, `reboot = never`) e o timer `dnf5-automatic.timer` ligado (perguntada) | O sistema aplica as atualizações sozinho, todo dia por volta das 6h, sem nunca reiniciar; o reinício pendente é avisado no Discord | |
 | Unidades do usuário `astroverso-system-watch.timer` e `.service` (perguntada) | A verificação de hora em hora (abaixo) | |
 | `~/.astroverso/system/.env` (`CHANGE_<ID>=yes/no`) | As respostas da instalação, para o Reinstalar | |
-| Unidades do usuário `astroverso-system-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
+| Unidades do usuário `astroverso-system-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
 
 ## Fora da máquina (passos seus)
 
@@ -54,7 +54,7 @@ PC autorizado for perdido, entre de outro aparelho com a senha e remova a chave 
 | Chaves SSH autorizadas | Lista, adiciona (cole a chave pública do PC) e remove chaves |
 | Chave desta máquina para o GitHub | Cria a chave (se faltar), mostra a parte pública e confere o acesso |
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no servidor de backup (app `backup`), com uma cópia "antes-da-restauracao" |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
 

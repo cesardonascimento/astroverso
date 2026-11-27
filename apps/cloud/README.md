@@ -36,7 +36,7 @@ Renomear ou mover uma pasta grande, para o rclone, é apagar uma e criar outra: 
 ## Uma via (todo dia às 05:00)
 
 `rclone sync` da pasta da máquina para a da nuvem: o que sai da pasta sai da nuvem. Às 05:00, depois dos backups da
-madrugada (e da manutenção de domingo do app `backup`), para não enviar uma pasta de backups no meio de uma gravação.
+madrugada (e da manutenção de domingo do app `vault`), para não enviar uma pasta de backups no meio de uma gravação.
 Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma ação.
 
 ## Nas duas
@@ -61,7 +61,7 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | Unidades do usuário `astroverso-cloud-sync.timer` e `.service` (perguntada) | As sincronizações de duas vias de hora em hora | ⚠ |
 | Unidades do usuário `astroverso-cloud-send.timer` e `.service` (perguntada) | Os envios às 05:00 | ⚠ |
 | Unidades do usuário `astroverso-cloud-watch.timer` e `.service` (perguntada) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-cloud-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário da configuração (sem as senhas) no servidor de backup | |
+| Unidades do usuário `astroverso-cloud-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário da configuração (sem as senhas) no vault | |
 
 ## Fora da máquina (passos seus)
 

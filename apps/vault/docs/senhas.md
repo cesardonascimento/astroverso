@@ -1,6 +1,6 @@
 # Backup: as senhas e como restaurar do zero
 
-Cada máquina manda os backups dos apps dela para o servidor de backup do Astroverso, num repositório só dela em cada
+Cada máquina manda os backups dos apps dela para o vault do Astroverso, num repositório só dela em cada
 pasta de destino. Ela tem **três** dados de acesso, mostrados pela ação **Adicionar uma máquina** (e pela **Mostrar os
 dados de uma máquina**), junto com o código de ligação (endereço, usuário e pastas de destino, sem segredos):
 
@@ -36,7 +36,7 @@ Uma máquina nova (ou formatada), com o mesmo nome da antiga:
    máquina**. Cole o código de ligação, a senha de acesso e a senha do repositório antiga.
 4. Para cada app que existia na máquina: instale o app e use **Restaurar uma versão**.
 
-Se a máquina perdida era a do **servidor**, instale o app `backup` no modo servidor com as mesmas pastas de destino:
+Se a máquina perdida era a do **servidor**, instale o app `vault` no modo servidor com as mesmas pastas de destino:
 ao achar backups da própria máquina nelas, ele pede a senha do repositório antiga em vez de gerar outra. Depois,
 cadastre as outras máquinas com **Adicionar uma máquina → Está voltando**, cada uma com a senha antiga dela. Sem a
 senha antiga, a máquina recomeça do zero (os backups antigos ficam na pasta, mas ninguém os abre).

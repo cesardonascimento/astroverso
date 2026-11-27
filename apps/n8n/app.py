@@ -4,7 +4,7 @@ import json
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, container, routes, ui, validate, watch
 from kit.app import Action
 from kit.watch import Problem
@@ -26,7 +26,7 @@ def items() -> list[changes.Change]:
             "módulos estão no ar e respondendo, e avisa no Discord quando algo quebra e quando volta.",
             "o n8n",
         ),
-        kit_backup.change(APP),
+        vault.change(APP),
     ]
 
 
@@ -119,7 +119,7 @@ def restore(folder: Path) -> None:
 def restore_workflow() -> None:
     if not n8n.installed():
         ui.fail("o n8n precisa estar no ar")
-    with kit_backup.opened(APP) as opened:
+    with vault.opened(APP) as opened:
         if opened is None:
             return
         folder, moment = opened
@@ -274,6 +274,6 @@ def base_actions() -> list[Action]:
         Action("commands", "Comandos do Discord", manage_commands),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

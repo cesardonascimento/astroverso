@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, net, ui
 from kit.app import Action
 
@@ -26,12 +26,12 @@ def install(reuse: bool | None = None) -> None:
     caddy.install(again)
     ui.step("Verificação de hora em hora")
     watch.install(again)
-    changes.install(APP, [kit_backup.change(APP)], again)
+    changes.install(APP, [vault.change(APP)], again)
     summary()
 
 
 def remove() -> None:
-    changes.undo_all([kit_backup.change(APP)])
+    changes.undo_all([vault.change(APP)])
     watch.remove()
     caddy.remove()
     adguard.remove()
@@ -85,7 +85,7 @@ def summary() -> None:
 
 
 def items() -> list[changes.Change]:
-    return tailscale.items() + adguard.items(config.saved_domain()) + caddy.items() + watch.items() + [kit_backup.change(APP)]
+    return tailscale.items() + adguard.items(config.saved_domain()) + caddy.items() + watch.items() + [vault.change(APP)]
 
 
 def manage() -> None:
@@ -102,6 +102,6 @@ def actions() -> list[Action]:
         Action("reload", "Recarregar os endereços do Caddy", caddy.reload, remote=True),
         Action("router-dns", "Marcar o DNS no roteador como feito", adguard.mark_router),
         Action("watch", "Verificar a rede agora (e avisar no Discord)", watch.check, remote=True),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

@@ -27,7 +27,7 @@ class WolTest(unittest.TestCase):
         ui.set_app("wol")
         for patch in (
             mock.patch.dict(os.environ, {"HOME": temp.name}),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)

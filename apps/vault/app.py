@@ -5,14 +5,14 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, container, distro, docs, net, routes, ui, watch
 from kit.app import Action
 
 from . import server
 
-APP = "backup"
-DESCRIPTION = "Servidor de backup da casa (restic): guarda, criptografados, os backups que os apps de todas as máquinas mandam"
+APP = "vault"
+DESCRIPTION = "O cofre da casa (restic): guarda, criptografadas, as fotografias de backup que os apps de todas as máquinas mandam"
 ORDER = 40
 DOCS = Path(__file__).with_name("docs")
 MODES = ("server", "client")
@@ -24,19 +24,19 @@ def mode() -> str:
 
 
 def status() -> bool:
-    return server.installed() if mode() == "server" else mode() == "client" and kit_backup.configured()
+    return server.installed() if mode() == "server" else mode() == "client" and vault.configured()
 
 
 def _verify(values: dict[str, str]) -> str:
-    for item in kit_backup.destinations():
-        problem = kit_backup.ensure_repository(values, item)
+    for item in vault.destinations():
+        problem = vault.ensure_repository(values, item)
         if problem:
             return f"{item.path}: {problem}"
     return ""
 
 
 def items() -> list[changes.Change]:
-    found = [kit_backup.change(APP)]
+    found = [vault.change(APP)]
     if mode() == "server":
         found = [server.change(), watch.change(
             APP, "Verificar os backups de hora em hora e avisar no Discord",
@@ -72,60 +72,60 @@ def _server(reuse: bool) -> None:
         ui.ok(f"máquina {local} cadastrada no servidor")
     server.start()
     values = server.clients()[local]
-    kit_backup.save(f"https://{server.address()}", local, values["PASSWORD"], values["REPO_PASSWORD"])
+    vault.save(f"https://{server.address()}", local, values["PASSWORD"], values["REPO_PASSWORD"])
     server.sync_local()
     if not reuse:
         ui.note("Esta é a senha do repositório desta máquina. Ela criptografa os backups e não fica em nenhum outro lugar seguro.")
         _show(local, values)
-    problem = _verify(kit_backup.settings())
+    problem = _verify(vault.settings())
     if problem:
         ui.warn(f"o repositório desta máquina ainda não respondeu ({problem}): ele depende do Caddy e do DNS do app network")
 
 
 def _link() -> None:
     ui.note(
-        "Na máquina com o servidor de backup, use a ação Adicionar uma máquina (ou Mostrar os dados de uma máquina) do "
-        "app backup: ela mostra o código de ligação (endereço, usuário e pastas de destino) e as duas senhas."
+        "Na máquina com o vault, use a ação Adicionar uma máquina (ou Mostrar os dados de uma máquina) do "
+        "app vault: ela mostra o código de ligação (endereço, usuário e pastas de destino) e as duas senhas."
     )
     while True:
-        url, user, items = kit_backup.read_code(ui.ask("código de ligação", validate=_code))
+        url, user, items = vault.read_code(ui.ask("código de ligação", validate=_code))
         password = ui.secret("senha de acesso", confirm=False)
         repository = ui.secret("senha do repositório", confirm=False)
-        attempt = dict(zip(kit_backup.KEYS, (url, user, password, repository)))
-        kit_backup.save_destinations(items)
+        attempt = dict(zip(vault.KEYS, (url, user, password, repository)))
+        vault.save_destinations(items)
         problem = _verify(attempt)
         if not problem:
             break
         ui.warn(f"o servidor não aceitou: {problem}")
-    kit_backup.save(url, user, password, repository)
+    vault.save(url, user, password, repository)
     ui.ok(f"esta máquina manda os backups para {url} ({len(items)} pasta(s) de destino)")
 
 
 def _code(value: str) -> str:
-    kit_backup.read_code(value)
+    vault.read_code(value)
     return "".join(value.split())
 
 
 def _client(reuse: bool) -> None:
     distro.install(["restic"])
-    current = kit_backup.settings()
-    if reuse and kit_backup.configured() and not _verify(current):
-        ui.ok("esta máquina continua ligada ao servidor de backup")
+    current = vault.settings()
+    if reuse and vault.configured() and not _verify(current):
+        ui.ok("esta máquina continua ligada ao vault")
         return
     _link()
 
 
 def update_destinations() -> None:
-    values = kit_backup.settings()
-    if not kit_backup.configured():
-        ui.fail("esta máquina ainda não está ligada a um servidor de backup: instale o app backup")
+    values = vault.settings()
+    if not vault.configured():
+        ui.fail("esta máquina ainda não está ligada a um vault: instale o app vault")
     ui.note("Cole o código de ligação desta máquina, de Mostrar os dados de uma máquina no servidor. As senhas continuam as mesmas.")
-    url, user, items = kit_backup.read_code(ui.ask("código de ligação", validate=_code))
-    if (url, user) != (values["BACKUP_URL"], values["BACKUP_USER"]):
-        ui.fail(f"esse código é de {user} em {url}; esta máquina é {values['BACKUP_USER']} em {values['BACKUP_URL']}")
-    kit_backup.save_destinations(items)
+    url, user, items = vault.read_code(ui.ask("código de ligação", validate=_code))
+    if (url, user) != (values["VAULT_URL"], values["VAULT_USER"]):
+        ui.fail(f"esse código é de {user} em {url}; esta máquina é {values['VAULT_USER']} em {values['VAULT_URL']}")
+    vault.save_destinations(items)
     ui.ok("pastas de destino atualizadas: " + ", ".join(item.path for item in items))
-    ui.info("os apps que mandavam para uma pasta que saiu avisam no #backup: desligue e ligue o backup deles para escolher de novo")
+    ui.info("os apps que mandavam para uma pasta que saiu avisam no #vault: desligue e ligue o backup deles para escolher de novo")
 
 
 def install(reuse: bool | None = None) -> None:
@@ -133,12 +133,12 @@ def install(reuse: bool | None = None) -> None:
     ui.step("Backup")
     ui.note(
         "Cada app guarda todo dia a própria configuração (respostas, senhas, bancos) e, se tiver, os próprios dados, "
-        "criptografados, num servidor de backup da casa, e pode ser restaurado de qualquer versão guardada. Uma máquina "
+        "criptografados, num vault da casa, e pode ser restaurado de qualquer versão guardada. Uma máquina "
         "tem o servidor, com as pastas de destino; cada app escolhe para quais pastas manda o backup dele."
     )
     chosen = mode() if again and mode() in MODES else ""
     if not chosen:
-        chosen = MODES[ui.menu("Esta máquina", ["Tem o servidor de backup (guarda os backups de todas as máquinas)",
+        chosen = MODES[ui.menu("Esta máquina", ["Tem o vault (guarda os backups de todas as máquinas)",
                                                 "Só manda os backups dos apps dela para o servidor de outra máquina"])]
     config.save(APP, {"MODE": chosen})
     if chosen == "server":
@@ -158,7 +158,7 @@ def remove() -> None:
         routes.withdraw(APP)
         for item in server.destinations():
             ui.info(f"os backups ficaram em {item.path} (apague à mão, se quiser)")
-    kit_backup.forget()
+    vault.forget()
     config.purge(APP)
 
 
@@ -207,7 +207,7 @@ def add_machine() -> None:
     server.restart()
     ui.ok(f"máquina {name} cadastrada")
     _show(name, values)
-    ui.note("Na outra máquina, instale o app backup, escolha mandar os backups para o servidor de outra máquina e cole os dados acima.")
+    ui.note("Na outra máquina, instale o app vault, escolha mandar os backups para o servidor de outra máquina e cole os dados acima.")
     ui.link("PC com Windows (sem Astroverso): o restic e uma tarefa agendada, com os repositórios acima", docs.link(DOCS / "windows.md"))
 
 
@@ -256,14 +256,14 @@ def summary() -> None:
         ui.table(rows or [[ui.off("nenhum backup ainda"), "-", "-", "-"]], ["Máquina", "Pasta", "App", "Último backup"])
         watch.summary(APP)
     ui.section("Esta máquina")
-    ui.table([["Servidor de backup", kit_backup.settings().get("BACKUP_URL") or ui.pending("não configurado")]]
-             + [["Pasta de destino", item.path] for item in kit_backup.destinations()])
+    ui.table([["Vault", vault.settings().get("VAULT_URL") or ui.pending("não configurado")]]
+             + [["Pasta de destino", item.path] for item in vault.destinations()])
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
     found: dict[str, watch.Problem] = {}
     if not server.installed():
-        found["server"] = watch.Problem("erro", "Servidor de backup parado", "Nenhuma máquina consegue guardar backups até ele voltar.")
+        found["server"] = watch.Problem("erro", "Vault parado", "Nenhuma máquina consegue guardar backups até ele voltar.")
         return found
     now = datetime.now(timezone.utc)
     places = [item for item in server.destinations() if server.reachable(item)]
@@ -288,7 +288,7 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
                 if timedelta(hours=36) < age < timedelta(days=14):
                     found[f"app:{name}:{item.id}:{app_name}"] = watch.Problem(
                         "aviso", f"{app_name} de {name} sem backup em {item.path} há {int(age.total_seconds() // 3600)} h",
-                        "O backup do app está falhando (veja o #backup).", f"app:{name}:{app_name}")
+                        "O backup do app está falhando (veja o #vault).", f"app:{name}:{app_name}")
     try:
         report = json.loads(server.maintenance_file().read_text())
     except (OSError, ValueError):
@@ -304,16 +304,16 @@ def check() -> None:
         try:
             server.heal()
         except SystemExit:
-            ui.warn("o servidor de backup não voltou ao ajustar as pastas de destino")
+            ui.warn("o vault não voltou ao ajustar as pastas de destino")
     watch.run(APP, collect, BUTTONS, "backups em ordem")
 
 
 def backup_now() -> None:
-    kit_backup.run_backup(APP, backup)
+    vault.run_backup(APP, backup)
 
 
 def restore_version() -> None:
-    kit_backup.restore(APP, backup, restore)
+    vault.restore(APP, backup, restore)
 
 
 def manage() -> None:

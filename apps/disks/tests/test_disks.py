@@ -11,7 +11,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "packages"))
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import config, disks, ui
 from kit.testing import run_in_pty
 from manager.apps import load
@@ -44,7 +44,7 @@ class DisksAppTest(unittest.TestCase):
         patch.start()
         self.addCleanup(patch.stop)
         ui.set_app("disks")
-        patch = mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False)))
+        patch = mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False)))
         patch.start()
         self.addCleanup(patch.stop)
 
@@ -149,10 +149,10 @@ class DisksAppTest(unittest.TestCase):
             self.assertFalse(app.status())
 
     def test_folder_backups(self) -> None:
-        local = kit_backup.Destination("aaaa1111", "/srv/backup-1")
-        cloud = kit_backup.Destination("bbbb2222", "/srv/outro/Backups", "drive (duas vias)")
-        kit_backup.save("https://backup.casa.com", "servidor", "a", "r")
-        kit_backup.save_destinations([local, cloud])
+        local = vault.Destination("aaaa1111", "/srv/backup-1")
+        cloud = vault.Destination("bbbb2222", "/srv/outro/Backups", "drive (duas vias)")
+        vault.save("https://vault.casa.com", "servidor", "a", "r")
+        vault.save_destinations([local, cloud])
         disk = self.home / "dados"
         (disk / "fotos").mkdir(parents=True)
         found = [disks.Disk(LUKS, disk, "ext4", "")]
@@ -165,7 +165,7 @@ class DisksAppTest(unittest.TestCase):
             self.assertEqual(outcome.result, [{"path": str(disk / "fotos"), "to": ["aaaa1111", "bbbb2222"]}])
             self.assertIn("ligue em Mudanças no sistema", outcome.screen)
             app.save_backups(outcome.result + [{"path": str(disk / "velha"), "to": ["sumiu"]}])
-            with mock.patch.object(kit_backup, "run_data", return_value=True) as run_data:
+            with mock.patch.object(vault, "run_data", return_value=True) as run_data:
                 self.assertTrue(app.backup_folders())
         first, second = run_data.call_args_list
         self.assertEqual(first.args, ("disks", "dados/fotos", disk / "fotos", [local, cloud], "backup-folders"))

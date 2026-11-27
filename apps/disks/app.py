@@ -4,7 +4,7 @@ import json
 import shutil
 from pathlib import Path
 
-from kit import backup as kit_backup
+from kit import vault
 from kit import changes, config, disks, distro, folders, run, ui
 from kit import watch as kit_watch
 from kit.app import Action
@@ -63,8 +63,8 @@ def data_name(path: str) -> str:
     return str(folder.relative_to(disks.ROOT)) if disks.ROOT in folder.parents else str(folder)
 
 
-def _places(entry: dict) -> tuple[list[kit_backup.Destination], list[str]]:
-    known = {item.id: item for item in kit_backup.destinations()}
+def _places(entry: dict) -> tuple[list[vault.Destination], list[str]]:
+    known = {item.id: item for item in vault.destinations()}
     wanted = [str(item) for item in entry.get("to") or []]
     return [known[item] for item in wanted if item in known], [item for item in wanted if item not in known]
 
@@ -107,7 +107,7 @@ def watch_change() -> changes.Change:
 
 
 def folders_change() -> changes.Change:
-    return kit_backup.data_change(
+    return vault.data_change(
         APP, "folders", "Fazer o backup das pastas dos discos todo dia",
         "Guarda as pastas dos discos escolhidas em Backup das pastas dos discos, cada uma nas próprias pastas de destino. "
         "Disco desligado ou travado fica de fora, com aviso, em vez de virar uma versão vazia.",
@@ -116,7 +116,7 @@ def folders_change() -> changes.Change:
 
 
 def extras() -> list[changes.Change]:
-    return [watch_change(), kit_backup.change(APP), folders_change()]
+    return [watch_change(), vault.change(APP), folders_change()]
 
 
 def items() -> list[changes.Change]:
@@ -287,7 +287,7 @@ def backup_folders() -> bool:
     results = []
     for entry in entries:
         chosen, missing = _places(entry)
-        results.append(kit_backup.run_data(APP, data_name(entry["path"]), Path(entry["path"]), chosen, "backup-folders",
+        results.append(vault.run_data(APP, data_name(entry["path"]), Path(entry["path"]), chosen, "backup-folders",
                                            unshare=True, missing=missing))
     return all(results)
 
@@ -306,7 +306,7 @@ def validate_source(value: str) -> str:
 def _add_folder() -> None:
     ui.note("Uma pasta (ou o disco inteiro) que entra no backup diário. Depois, escolha para quais pastas de destino ela vai.")
     path = folders.pick("pasta com backup", str(disks.mounts()[0].path) if disks.mounts() else "", validate=validate_source)
-    chosen = kit_backup.pick(f"Onde guardar as fotografias de {path}?")
+    chosen = vault.pick(f"Onde guardar as fotografias de {path}?")
     if not chosen:
         ui.info("nada mudou")
         return
@@ -319,7 +319,7 @@ def _change_places() -> None:
     index = ui.menu("Qual pasta?", [entry["path"] for entry in entries] + ["Voltar"])
     if index >= len(entries):
         return
-    chosen = kit_backup.pick(f"Onde guardar as fotografias de {entries[index]['path']}?", _places(entries[index])[0])
+    chosen = vault.pick(f"Onde guardar as fotografias de {entries[index]['path']}?", _places(entries[index])[0])
     if chosen:
         entries[index]["to"] = [item.id for item in chosen]
         save_backups(entries)
@@ -335,8 +335,8 @@ def _drop_folders() -> None:
 
 
 def manage_backups() -> None:
-    if not kit_backup.configured():
-        ui.fail("esta máquina não está ligada a um servidor de backup: instale o app backup")
+    if not vault.configured():
+        ui.fail("esta máquina não está ligada a um vault: instale o app vault")
     while True:
         entries = backups()
         if entries:
@@ -362,7 +362,7 @@ def restore_folder() -> None:
         ui.fail("nenhuma pasta dos discos com backup")
     index = ui.menu("Restaurar qual pasta?", [entry["path"] for entry in entries] + ["Voltar"])
     if index < len(entries):
-        kit_backup.restore_data(APP, data_name(entries[index]["path"]))
+        vault.restore_data(APP, data_name(entries[index]["path"]))
 
 
 def actions() -> list[Action]:
@@ -374,6 +374,6 @@ def actions() -> list[Action]:
         Action("backups", "Backup das pastas dos discos", manage_backups),
         Action("backup-folders", "Fazer backup das pastas agora", backup_folders, remote=True),
         Action("restore-folder", "Restaurar uma pasta de uma versão (numa pasta nova)", restore_folder),
-        Action("backup-now", "Fazer backup agora", lambda: kit_backup.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: kit_backup.restore(APP, backup, restore)),
+        Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
+        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
     ]

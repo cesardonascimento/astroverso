@@ -31,8 +31,8 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | `/etc/fstab.astroverso-bak` e `/etc/crypttab.astroverso-bak` | Cópia de antes da primeira mudança | |
 | `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `backups.json` com as pastas com backup e as pastas de destino de cada uma, `watch.json`) | A configuração | |
 | Unidades do usuário `astroverso-disks-watch.timer` e `.service` (perguntada, padrão sim) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim, com as pastas de destino) | Backup diário da configuração do app no servidor de backup (`kit.backup`), com aviso no `#backup` | |
-| Unidades do usuário `astroverso-disks-backup-folders.timer` e `.service` (perguntada, padrão sim) | Backup diário das pastas escolhidas em **Backup das pastas dos discos**, cada uma nas próprias pastas de destino (`kit.backup.run_data`, marca `dados:<disco>/<pasta>`, por `podman unshare`). Disco desligado ou travado: aquela pasta fica de fora e avisa no `#backup` | |
+| Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim, com as pastas de destino) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
+| Unidades do usuário `astroverso-disks-backup-folders.timer` e `.service` (perguntada, padrão sim) | Backup diário das pastas escolhidas em **Backup das pastas dos discos**, cada uma nas próprias pastas de destino (`kit.vault.run_data`, marca `dados:<disco>/<pasta>`, por `podman unshare`). Disco desligado ou travado: aquela pasta fica de fora e avisa no `#vault` | |
 
 ## Ações
 
@@ -44,7 +44,7 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
 | Backup das pastas dos discos | Os dados que não são de nenhum app: adicionar uma pasta (ou o disco inteiro) pelo seletor de pastas e escolher as pastas de destino dela, trocar as pastas de destino, tirar pastas do backup (as versões guardadas continuam no servidor) |
 | Fazer backup das pastas agora / Restaurar uma pasta de uma versão | O backup das pastas na hora (também no Discord) e a restauração de uma versão numa pasta nova, sem mexer na original |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do servidor de backup. Numa máquina nova, o TPM pede a senha do LUKS de novo |
+| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão do vault. Numa máquina nova, o TPM pede a senha do LUKS de novo |
 
 ## Verificação de hora em hora
 

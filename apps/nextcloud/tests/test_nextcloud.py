@@ -114,7 +114,7 @@ class NextcloudTest(unittest.TestCase):
             mock.patch.object(nextcloud.time, "sleep"),
             mock.patch.object(__import__("kit.disks").disks, "mounts", return_value=[]),
             mock.patch.object(app.accounts, "units", mock.Mock(active=mock.Mock(return_value=False))),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change(
                 "watch", a[1], a[2], lambda: False, lambda: self.host.record("watch_on"), lambda: self.host.record("watch_off"))),
         ):
@@ -254,8 +254,8 @@ class NextcloudTest(unittest.TestCase):
         self.assertEqual([item.id for item in app.items()][-2:], ["backup", "backup-files"])
 
     def test_backup_files(self) -> None:
-        with mock.patch.object(app.kit_backup, "run_data", return_value=True) as run_data, \
-                mock.patch.object(app.kit_backup, "targets", return_value=["x"]):
+        with mock.patch.object(app.vault, "run_data", return_value=True) as run_data, \
+                mock.patch.object(app.vault, "targets", return_value=["x"]):
             self.assertTrue(app.backup_files())
         args, kwargs = run_data.call_args
         self.assertEqual(args, ("nextcloud", "arquivos", nextcloud.files(), ["x"], "backup-files"))

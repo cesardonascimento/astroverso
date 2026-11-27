@@ -160,7 +160,7 @@ class SystemTest(unittest.TestCase):
             mock.patch.object(ssh.run, "output", side_effect=output),
             mock.patch.object(ssh.run, "succeeds", return_value=True),
             mock.patch.object(ssh.getpass, "getuser", return_value="dono"),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)

@@ -15,10 +15,10 @@ from kit import changes, config, discord, disks, net, run, ui, units
 
 COMMAND = Path(__file__).resolve().parents[2] / "astroverso"
 TAG = "astroverso"
-CHANNEL = "backup"
-KEYS = ("BACKUP_URL", "BACKUP_USER", "BACKUP_PASSWORD", "BACKUP_REPO_PASSWORD")
+CHANNEL = "vault"
+KEYS = ("VAULT_URL", "VAULT_USER", "VAULT_PASSWORD", "VAULT_REPO_PASSWORD")
 TARGETS = "BACKUP_TO"
-CODE = "astroverso-backup:"
+CODE = "astroverso-vault:"
 IDENTIFIER = re.compile(r"^[0-9a-f]{8}$")
 USER = re.compile(r"^[a-z][a-z0-9-]*$")
 
@@ -34,11 +34,11 @@ class Destination:
 
 
 def settings_file() -> Path:
-    return config.home() / "backup.env"
+    return config.home() / "vault.env"
 
 
 def destinations_file() -> Path:
-    return config.home() / "backup-destinations.json"
+    return config.home() / "vault-folders.json"
 
 
 def settings() -> dict[str, str]:
@@ -70,7 +70,7 @@ def _dump(items: Sequence[Destination]) -> list[dict[str, str]]:
 
 def save_destinations(items: Sequence[Destination]) -> None:
     config.home().mkdir(mode=0o700, exist_ok=True)
-    temporary = config.home() / ".backup-destinations.json.tmp"
+    temporary = config.home() / ".vault-folders.json.tmp"
     temporary.write_text(json.dumps(_dump(items), ensure_ascii=False, indent=2) + "\n")
     temporary.chmod(0o600)
     temporary.replace(destinations_file())
@@ -112,10 +112,10 @@ def read_code(text: str) -> tuple[str, str, list[Destination]]:
 def environment(destination: Destination, values: dict[str, str] | None = None) -> dict[str, str]:
     values = values or settings()
     return {
-        "RESTIC_REPOSITORY": f"rest:{values['BACKUP_URL']}/{values['BACKUP_USER']}/{destination.id}/",
-        "RESTIC_REST_USERNAME": values["BACKUP_USER"],
-        "RESTIC_REST_PASSWORD": values["BACKUP_PASSWORD"],
-        "RESTIC_PASSWORD": values["BACKUP_REPO_PASSWORD"],
+        "RESTIC_REPOSITORY": f"rest:{values['VAULT_URL']}/{values['VAULT_USER']}/{destination.id}/",
+        "RESTIC_REST_USERNAME": values["VAULT_USER"],
+        "RESTIC_REST_PASSWORD": values["VAULT_PASSWORD"],
+        "RESTIC_PASSWORD": values["VAULT_REPO_PASSWORD"],
     }
 
 
@@ -164,7 +164,7 @@ def pick(question: str, current: Sequence[Destination] = ()) -> list[Destination
         "O backup tira uma fotografia por dia (criptografada) e guarda nas pastas que você marcar, cada dia como uma versão: "
         "um arquivo apagado ou estragado hoje continua nas fotografias dos dias anteriores. Não é um espelho nem uma cópia "
         "que se abre como pasta comum: para recuperar, use \"Restaurar uma versão\". As pastas aparecem aqui depois de "
-        "cadastradas em \"Pastas de destino\" no app backup (ex.: uma pasta num disco só de backup). Marque mais de uma para "
+        "cadastradas em \"Pastas de destino\" no app vault (ex.: uma pasta num disco só de backup). Marque mais de uma para "
         "ter a fotografia em mais lugares."
     )
     items = destinations()
@@ -178,7 +178,7 @@ def pick(question: str, current: Sequence[Destination] = ()) -> list[Destination
 
 def choose(app: str, key: str, what: str) -> bool:
     if not configured():
-        ui.warn("esta máquina não está ligada a um servidor de backup (app backup): ligue o backup depois, em Mudanças no sistema")
+        ui.warn("esta máquina não está ligada a um vault (app vault): ligue o backup depois, em Mudanças no sistema")
         return False
     if targets(app, key) and not lost(app, key):
         return True
@@ -242,8 +242,8 @@ def change(app: str) -> changes.Change:
     return changes.Change(
         "backup", f"Fazer o backup da configuração do {app} todo dia (01:{minute(app):02d})",
         f"Um timer do usuário ({unit(app)}.timer) tira uma fotografia por dia (criptografada) da configuração do {app} e "
-        "guarda nas pastas de destino que você escolher no servidor de backup do Astroverso (app backup), com as versões "
-        "pelo tempo definido no servidor, e avisa no canal #backup do Discord. Se a "
+        "guarda nas pastas de destino que você escolher no vault do Astroverso (app vault), com as versões "
+        "pelo tempo definido no servidor, e avisa no canal #vault do Discord. Se a "
         "máquina estava desligada no horário, o backup roda ao ligar. Para trocar as pastas, desligue e ligue de novo.",
         lambda: units.active(f"{unit(app)}.timer"),
         lambda: _enable(app, TARGETS, f"da configuração do {app}", texts),
@@ -256,8 +256,8 @@ def data_change(app: str, part: str, label: str, why: str, action: str, key: str
     return changes.Change(
         f"backup-{part}", f"{label} (02:{minute(app):02d})",
         f"{why} Um timer do usuário ({unit(app, part)}.timer) tira uma fotografia por dia (criptografada) e guarda no "
-        "servidor de backup do Astroverso (app backup), com as versões pelo tempo definido no servidor, e avisa no canal "
-        "#backup.",
+        "vault do Astroverso (app vault), com as versões pelo tempo definido no servidor, e avisa no canal "
+        "#vault.",
         lambda: units.active(f"{unit(app, part)}.timer"),
         lambda: _enable(app, key, what, texts),
         lambda: _disable(app, key, texts),
@@ -295,7 +295,7 @@ def _lost_problems(missing: Sequence[str]) -> list[str]:
 
 def run_backup(app: str, save_function: Callable[[Path], None], label: str = "", notify: bool = True) -> bool:
     if not configured():
-        ui.info("esta máquina não está ligada a um servidor de backup (instale o app backup): nada a fazer")
+        ui.info("esta máquina não está ligada a um vault (instale o app vault): nada a fazer")
         return False
     what = f"do {app}"
     chosen = targets(app)
@@ -327,7 +327,7 @@ def run_backup(app: str, save_function: Callable[[Path], None], label: str = "",
 def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], retry: str, unshare: bool = False,
              missing: Sequence[str] = (), exclude: Sequence[str] = (), notify: bool = True) -> bool:
     if not configured():
-        ui.info("esta máquina não está ligada a um servidor de backup (instale o app backup): nada a fazer")
+        ui.info("esta máquina não está ligada a um vault (instale o app vault): nada a fazer")
         return False
     what = f"de {name} ({app})"
     problems = _lost_problems(missing)
@@ -392,7 +392,7 @@ def _source(app: str, data: str = "") -> tuple[Destination, dict] | None:
 
 def restore(app: str, save_function: Callable[[Path], None], restore_function: Callable[[Path], None]) -> None:
     if not configured():
-        ui.fail("esta máquina não está ligada a um servidor de backup: instale o app backup")
+        ui.fail("esta máquina não está ligada a um vault: instale o app vault")
     picked = _source(app)
     if picked is None:
         return
@@ -420,7 +420,7 @@ def restore(app: str, save_function: Callable[[Path], None], restore_function: C
 @contextmanager
 def opened(app: str) -> Iterator[tuple[Path, str] | None]:
     if not configured():
-        ui.fail("esta máquina não está ligada a um servidor de backup: instale o app backup")
+        ui.fail("esta máquina não está ligada a um vault: instale o app vault")
     picked = _source(app)
     if picked is None:
         yield None
@@ -450,7 +450,7 @@ def _empty_target(value: str) -> str:
 
 def restore_data(app: str, name: str) -> None:
     if not configured():
-        ui.fail("esta máquina não está ligada a um servidor de backup: instale o app backup")
+        ui.fail("esta máquina não está ligada a um vault: instale o app vault")
     picked = _source(app, name)
     if picked is None:
         return
@@ -469,9 +469,9 @@ def restore_data(app: str, name: str) -> None:
 def summary(app: str, data: Sequence[tuple[str, str, str, str]] = ()) -> None:
     ui.section("Backup")
     if not configured():
-        ui.table([["Servidor de backup", ui.pending("esta máquina não está ligada (app backup)")]])
+        ui.table([["Vault", ui.pending("esta máquina não está ligada (app vault)")]])
         return
-    rows: list[list[str | ui.Cell]] = [["Servidor", settings()["BACKUP_URL"]]]
+    rows: list[list[str | ui.Cell]] = [["Servidor", settings()["VAULT_URL"]]]
     for title, part, key, name in [("Configuração", "", TARGETS, ""), *data]:
         on = units.active(f"{unit(app, part)}.timer")
         rows.append([f"{title}: backup diário", ui.good("ligado") if on else ui.pending("desligado")])

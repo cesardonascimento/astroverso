@@ -154,7 +154,7 @@ class MailAppTest(unittest.TestCase):
             mock.patch.object(mailbox, "container", self.box),
             mock.patch.object(mailbox, "run", fake_run),
             mock.patch.object(app, "units", mock.Mock(active=mock.Mock(return_value=False))),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
             mock.patch.object(app.watch, "change", side_effect=lambda *a, **k: app.changes.Change("watch", a[1], a[2], lambda: False, lambda: None, lambda: None)),
             mock.patch.object(mailbox.time, "sleep"),
         ):

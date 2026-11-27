@@ -31,7 +31,7 @@ Na reinstalação com a configuração salva, não pergunta nada.
 | Serviço `cockpit` fechado no firewall (perguntada) | O painel só abre pelo endereço com cadeado; se o Caddy cair, o caminho de volta é o SSH | |
 | `podman.socket` do usuário ligado (perguntada) | A página de containers enxerga os containers rootless do Astroverso | |
 | `~/.astroverso/cockpit/.env` (o endereço) e `~/.astroverso/routes/cockpit.json` | A configuração e o endereço publicado para o Caddy | |
-| Unidades do usuário `astroverso-cockpit-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário da configuração no servidor de backup (`kit.backup`) | |
+| Unidades do usuário `astroverso-cockpit-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário da configuração no vault (`kit.vault`) | |
 
 ## Armazenamento
 

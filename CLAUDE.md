@@ -61,7 +61,7 @@ o app ou pacote delas for migrado.
 
 ```
 apps/<app>/       serviços autônomos (adguard, nextcloud...)
-packages/<pacote>/ código compartilhado pelos apps (kit, backup...)
+packages/<pacote>/ código compartilhado pelos apps (kit, manager...)
 legacy/           código antigo, só referência
 ```
 
@@ -88,8 +88,8 @@ legacy/           código antigo, só referência
   frase com os valores desta máquina e o link (`ui.link` + `kit.docs.link`). Explicações do próprio Astroverso
   continuam como `ui.note`.
 - **Backup das configurações: cada app manda o seu.** Cada app implementa `backup(pasta)` e `restore(pasta)` e usa o
-  `kit.backup`: a mudança perguntada `kit.backup.change(APP)` (timer diário próprio) e as ações "Fazer backup agora"
-  (`run_backup`) e "Restaurar uma versão" (`restore`). Nenhum app varre os outros. Sem o servidor de backup ligado na
+  `kit.vault`: a mudança perguntada `kit.vault.change(APP)` (timer diário próprio) e as ações "Fazer backup agora"
+  (`run_backup`) e "Restaurar uma versão" (`restore`). Nenhum app varre os outros. Sem o vault ligado na
   máquina, o backup só avisa e segue.
 
 ### App `network`
@@ -140,7 +140,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   sem o disco, e a verificação avisa quando ele some.
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
-- `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.backup`.
+- `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.vault`.
 
 ### App `mail`
 
@@ -154,10 +154,10 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Recursos antigos da Cloudflare não têm nome no código: a ação "Limpar Workers e KV antigos" lista os da conta e
   apaga os marcados.
 
-### App `backup`
+### App `vault`
 
 - Servidor (uma máquina): container `rclone serve restic --append-only --private-repos` publicado em
-  `backup.<domínio>`, manutenção semanal (`forget --prune` + `check`) só no servidor, verificação de hora em hora
+  `vault.<domínio>`, manutenção semanal (`forget --prune` + `check`) só no servidor, verificação de hora em hora
   (36 h sem backup, pasta de destino indisponível).
 - **Pastas de destino:** o servidor só mantém a lista de caminhos (sem nome: decisão do usuário, nome gerava
   confusão), escolhidos pelo `kit.folders` (disco, espaço e marca ☁). Nenhum conceito de local ou nuvem: o usuário
@@ -167,17 +167,17 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Pasta de destino indisponível (disco ausente) fica fora do container, e o servidor sobe com as outras (um volume
   sem origem impede o container inteiro de subir); a verificação de hora em hora refaz o container quando o conjunto
   muda (`server.heal`). O container é `ReadOnly`: backup para pasta ausente falha, em vez de gravar no container.
-- **Quem decide para onde vai o backup é cada app** (decisão do usuário), não o app `backup`: a mudança do
-  `kit.backup` pergunta as pastas ao ligar e guarda no `.env` do app; trocar = desligar e ligar.
-- Cliente (todas as máquinas, inclusive a do servidor): `~/.astroverso/backup.env` + `backup-destinations.json`,
+- **Quem decide para onde vai o backup é cada app** (decisão do usuário), não o app `vault`: a mudança do
+  `kit.vault` pergunta as pastas ao ligar e guarda no `.env` do app; trocar = desligar e ligar.
+- Cliente (todas as máquinas, inclusive a do servidor): `~/.astroverso/vault.env` + `vault-folders.json`,
   vindos do código de ligação (sem segredos) e das duas senhas digitadas.
 - **Backup dos dados nos apps donos:** `nextcloud` (pasta dos arquivos) e `disks` (pastas dos discos), pelo
-  `kit.backup.data_change`/`run_data` (trava pelo `kit.disks.available`, `podman unshare` para arquivos de containers),
+  `kit.vault.data_change`/`run_data` (trava pelo `kit.disks.available`, `podman unshare` para arquivos de containers),
   mesma regra de versões. Restaurar dados vai para uma pasta nova, sem mexer na original.
 - A senha do repositório de cada máquina vai para o gerenciador de senhas do usuário; o backup do próprio app não
   leva as senhas.
-- **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `backup` no modo cliente.
-  Windows: sem script (decisão do usuário): passo a passo em `apps/backup/docs/windows.md` com o restic, dois `.ps1` e
+- **PCs sem Astroverso:** cada máquina manda o seu (nunca o servidor buscando). Linux: o app `vault` no modo cliente.
+  Windows: sem script (decisão do usuário): passo a passo em `apps/vault/docs/windows.md` com o restic, dois `.ps1` e
   uma tarefa agendada como SYSTEM (`--use-fs-snapshot`), etiquetas `app:windows` + `dados:<nome>` para o servidor
   acompanhar. Os endereços dos repositórios aparecem em "Mostrar os dados de uma máquina".
 - Sem prioridade mínima (`Nice`, `ionice`) nos backups e sincronizações: a máquina não divide mais o hardware.
@@ -283,7 +283,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   (`kit.testing`), configuração (`.env`, validadores), camada `distro`, domínio padrão.
 - `manager`: o gerenciador (`./astroverso`): menu de instalar e gerenciar, e o uso direto
   `astroverso <app> <comando>`. Contrato do `app.py` em `apps/README.md`.
-- `kit.backup`: o backup de cada app no servidor do app `backup` (restic), com avisos no `#backup`.
+- `kit.vault`: o backup de cada app no servidor do app `vault` (restic), com avisos no `#vault`.
 - `kit.discord`: avisos dos apps no Discord (o bot é o app `discord`).
 - `kit.disks`: os discos de dados montados pelo app `disks` (só leitura, a partir do `fstab`).
 - `kit.folders` (seletor de pastas de todos os apps) e `kit.clouds` (pastas ligadas a uma nuvem, contrato em

@@ -78,7 +78,7 @@ class CockpitTest(unittest.TestCase):
             mock.patch.object(app.run, "sudo_prepare"),
             mock.patch.object(app.run, "succeeds", return_value=False),
             mock.patch.object(app.run, "cmd", side_effect=lambda args, **k: self.user_socket.append(" ".join(args))),
-            mock.patch.object(__import__("kit.backup").backup, "units", mock.Mock(active=mock.Mock(return_value=False))),
+            mock.patch.object(__import__("kit.vault").vault, "units", mock.Mock(active=mock.Mock(return_value=False))),
         ):
             patch.start()
             self.addCleanup(patch.stop)
