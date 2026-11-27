@@ -179,7 +179,7 @@ def shoot(pair: dict[str, str], force: bool = False) -> str:
 def run_all(force: bool = False, notify: bool = True) -> bool:
     items = pairs()
     if not items:
-        ui.info("nenhuma fotografia cadastrada: adicione em Fotografias dos discos")
+        ui.info("nenhum agendamento de fotografia: crie em Agendamentos de fotografia")
         return True
     known = by_uuid()
     ok = True
@@ -231,7 +231,7 @@ def units_text() -> dict[str, str]:
 def change() -> changes.Change:
     texts = units_text()
     return changes.Change(
-        "photos", "Fotografar os discos toda noite (03:00)",
+        "photos", "Fotografar os discos agendados toda noite (03:00)",
         f"Um timer do usuário ({UNIT}.timer) deixa a pasta {CURRENT}/ de cada disco de fotografias igual ao disco de origem "
         f"(rsync) e guarda em {HISTORY}/<data>/ o que mudou ou foi apagado naquela noite, por {KEEP_DAYS} dias. Não roda com um "
         f"dos discos desligado, e para (avisando no Discord) se fosse tirar mais de {LIMIT}% dos arquivos de uma vez.",
@@ -249,11 +249,12 @@ def add() -> None:
     taken = {uuid for pair in pairs() for uuid in (pair["source"], pair["target"])}
     sources = [disk for disk in _candidates(taken) if not (disk.path / disks.PHOTO).exists()]
     if len(sources) < 1 or len(_candidates(taken)) < 2:
-        ui.fail("a fotografia precisa de dois discos montados e livres (um de origem e um de fotografias): cadastre em Discos da máquina")
+        ui.fail("o agendamento precisa de dois discos montados e livres (um de origem e um de fotografias): cadastre em Discos da máquina")
     ui.note(
-        "A fotografia copia, toda noite, um disco inteiro (a origem) para outro (o disco de fotografias): a pasta "
-        f"{CURRENT}/ fica igual à origem e {HISTORY}/<data>/ guarda o que mudou ou foi apagado em cada noite. Nada mais "
-        "grava no disco de fotografias, e é dele que sai o Resgatar um disco."
+        "Um agendamento faz o Astroverso fotografar, toda noite às 03:00, um disco inteiro (a origem) em outro (o disco "
+        f"de fotografias): a fotografia é a pasta {CURRENT}/, igual à origem, mais {HISTORY}/<data>/ com o que mudou ou foi "
+        "apagado em cada noite. Nada mais grava no disco de fotografias, e é dele que sai o Resgatar um disco. Nada é "
+        "fotografado agora: a primeira fotografia sai à noite (ou em Fotografar agora)."
     )
     source = sources[ui.menu("Qual disco fotografar?", [disk.name for disk in sources])]
     targets = [disk for disk in _candidates(taken | {source.uuid})]
@@ -265,11 +266,11 @@ def add() -> None:
     if (target.path / CURRENT).is_dir():
         ui.info(f"o disco {target.name} já tem uma pasta {CURRENT}/: a primeira fotografia só copia o que mudou")
     ui.warn(f"o disco {target.name} passa a ser só de fotografias: nenhum app grava mais nele (o que já existe nele fica)")
-    if not ui.confirm(f"Fotografar {source.name} em {target.name} toda noite?", default=False):
+    if not ui.confirm(f"Agendar: fotografar {source.name} em {target.name} toda noite?", default=False):
         return
     mark(target, source)
     save_pairs(pairs() + [{"source": source.uuid, "target": target.uuid}])
-    ui.ok(f"fotografia cadastrada: {source.name} → {target.name}")
+    ui.ok(f"agendamento criado: {source.name} → {target.name}, toda noite às 03:00")
     item = change()
     if not item.applied():
         item.apply()
@@ -279,11 +280,11 @@ def add() -> None:
 def drop() -> None:
     items = pairs()
     known = by_uuid()
-    chosen = ui.checklist("Quais discos deixam de ser fotografados?", [f"{label(p['source'], known)} → {label(p['target'], known)}" for p in items],
+    chosen = ui.checklist("Quais agendamentos cancelar?", [f"{label(p['source'], known)} → {label(p['target'], known)}" for p in items],
                           cancel=True) or []
     if not chosen:
         return
-    ui.warn("as fotografias que já estão nos discos ficam; os discos voltam a ser comuns")
+    ui.warn("as fotografias que já estão nos discos ficam; os discos de fotografias voltam a ser comuns")
     if not ui.confirm("confirma?", default=False):
         return
     for index in chosen:
@@ -291,7 +292,7 @@ def drop() -> None:
         if target is not None:
             unmark(target)
     save_pairs([item for i, item in enumerate(items) if i not in chosen])
-    ui.ok("fotografias desligadas: os discos não são mais fotografados")
+    ui.ok("agendamentos cancelados: esses discos não são mais fotografados")
 
 
 def rows() -> list[list[str | ui.Cell]]:
@@ -318,11 +319,11 @@ def manage() -> None:
     while True:
         if pairs():
             ui.table(rows(), ["Origem", "Fotografias em", "Última", "Histórico"])
-        options = ["Fotografar um disco"] + (["Parar de fotografar um disco"] if pairs() else []) + ["Pronto"]
-        choice = options[ui.menu("Fotografias dos discos", options)]
+        options = ["Criar um agendamento"] + (["Cancelar agendamentos"] if pairs() else []) + ["Pronto"]
+        choice = options[ui.menu("Agendamentos de fotografia", options)]
         if choice == "Pronto":
             return
-        if choice == "Fotografar um disco":
+        if choice == "Criar um agendamento":
             add()
         else:
             drop()

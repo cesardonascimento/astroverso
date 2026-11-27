@@ -24,7 +24,9 @@ o app ou pacote delas for migrado.
   | backup | só o conceito de guardar uma cópia de segurança ("backup da configuração", "Fazer backup agora") |
   | vault | o app que liga a máquina à pasta dos backups no Nextcloud |
   | versão | cada backup datado de um app ("Restaurar uma versão") |
-  | fotografia | a cópia noturna de um disco inteiro em outro disco (app `disks`: `atual/` + `versoes/`) |
+  | fotografia | o resultado: a cópia de um disco inteiro gravada no disco de fotografias (app `disks`: `atual/` + `versoes/`) |
+  | fotografar | o ato de tirar a fotografia ("Fotografar agora", toda noite às 03:00) |
+  | agendamento | a configuração "fotografar o disco X no disco Y toda noite" ("Agendamentos de fotografia") |
   | espelho | o `atual/` da fotografia, igual ao disco de origem |
   | sincronização | as duas vias do `cloud` |
   | `legacy/` | o código antigo |

@@ -274,7 +274,7 @@ def actions() -> list[Action]:
         Action("disks", "Discos da máquina", manage_disks),
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora", check, remote=True),
-        Action("photos", "Fotografias dos discos", photos.manage),
+        Action("photos", "Agendamentos de fotografia", photos.manage),
         Action("photos-now", "Fotografar agora", lambda: photos.run_all(), remote=True, confirm=True),
         Action("photos-timer", "Fotografar (timer)", lambda: photos.run_all(), menu=False),
         Action("photos-release", "Liberar a fotografia", photos.release),
