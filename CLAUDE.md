@@ -5,9 +5,9 @@ Regras para desenvolver o Astroverso. O contexto da instalação atual (máquina
 
 ## Situação
 
-O Astroverso está sendo refeito como monorepo. O código antigo (o antigo Astroverso Homelab) fica em `backup/`,
+O Astroverso está sendo refeito como monorepo. O código antigo (o antigo Astroverso Homelab) fica em `legacy/`,
 só como referência: nada roda de lá e nada novo depende dele. Cada parte é migrada para `apps/` ou `packages/`,
-um pedaço por vez. As regras e armadilhas antigas ficam em `backup/CLAUDE.md` e voltam para este arquivo quando
+um pedaço por vez. As regras e armadilhas antigas ficam em `legacy/CLAUDE.md` e voltam para este arquivo quando
 o app ou pacote delas for migrado.
 
 ## Nomes
@@ -62,7 +62,7 @@ o app ou pacote delas for migrado.
 ```
 apps/<app>/       serviços autônomos (adguard, nextcloud...)
 packages/<pacote>/ código compartilhado pelos apps (kit, backup...)
-backup/           código antigo, só referência
+legacy/           código antigo, só referência
 ```
 
 ### Apps
