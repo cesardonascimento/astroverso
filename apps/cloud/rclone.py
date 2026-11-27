@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import configparser
 import io
+import re
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
@@ -9,6 +10,9 @@ from pathlib import Path
 from kit import config, run, ui
 
 APP = "cloud"
+
+
+LOG = re.compile(r"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} (NOTICE|INFO|DEBUG|ERROR|WARNING|CRITICAL)")
 
 
 def conf() -> Path:
@@ -75,7 +79,7 @@ def folders(account: str, path: str) -> list[str] | None:
     if code:
         ui.warn(f"não deu para listar a pasta: {tail(output, 1)}")
         return None
-    return sorted(line.rstrip("/") for line in output.splitlines() if line.strip())
+    return sorted(line.rstrip("/") for line in output.splitlines() if line.strip() and not LOG.match(line))
 
 
 def mkdir(account: str, path: str) -> bool:

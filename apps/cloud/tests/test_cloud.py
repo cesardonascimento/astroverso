@@ -30,7 +30,7 @@ class FakeRclone:
     def __call__(self, args, env=None, unshare=False, timeout=None):
         self.calls.append([*args, *(["<unshare>"] if unshare else []), *[f"{k}={v}" for k, v in (env or {}).items()]])
         if args[0] == "lsf":
-            return 0, {"proton-1:": "Backups/\nFotos/\n", "proton-1:Fotos": "2025/\n"}.get(args[-1], "")
+            return 0, {"proton-1:": "2026/11/27 13:46:07 NOTICE: Time may be set wrong\nBackups/\nFotos/\n", "proton-1:Fotos": "2025/\n"}.get(args[-1], "")
         return self.replies.pop(0) if self.replies else (0, "")
 
 
