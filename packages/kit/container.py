@@ -56,6 +56,12 @@ def _quote(value: str) -> str:
     return text
 
 
+def _raw(value: str) -> str:
+    if "\n" in value:
+        ui.fail(f"valor com quebra de linha não é aceito num container: {value!r}")
+    return value.replace("%", "%%").replace("$", "$$")
+
+
 def render(spec: Container) -> str:
     network = "host" if spec.network == "host" else f"{spec.network}.network"
     lines = ["[Unit]", f"Description={spec.description}"]
@@ -82,7 +88,7 @@ def render(spec: Container) -> str:
     if spec.command:
         lines.append(f"Exec={' '.join(_quote(part) for part in spec.command)}")
     if spec.health:
-        lines += [f"HealthCmd={_quote(spec.health)}", "HealthInterval=30s", f"HealthStartPeriod={spec.health_start}", "HealthRetries=3"]
+        lines += [f"HealthCmd={_raw(spec.health)}", "HealthInterval=30s", f"HealthStartPeriod={spec.health_start}", "HealthRetries=3"]
     lines += ["", "[Service]", "Restart=always", "TimeoutStartSec=600", "", "[Install]", "WantedBy=default.target", ""]
     return "\n".join(lines)
 

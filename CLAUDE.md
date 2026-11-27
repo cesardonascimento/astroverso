@@ -323,6 +323,9 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - Uma rede do Quadlet vira a unidade `<rede>-network.service` (fica ativa depois de criar a rede): ao apagar a rede
   no Podman, parar a unidade antes, senão o systemd não cria a rede de novo e o container falha com "network not
   found". O `kit.container` já faz isso.
+- O Quadlet passa o `HealthCmd=` para o Podman do jeito que está na linha (só tira aspas de fora, sem desfazer `\"`):
+  o `kit.container` grava o comando cru (só `%` e `$` dobrados). Com aspas escapadas, a verificação dava "Syntax error"
+  e o container ficava `unhealthy` para sempre.
 - A imagem do Nextcloud pede `StopSignal=SIGWINCH` (do Apache); o container do cron (`crond`) ignora e é morto em
   10 s, marcando a unidade como falha: o cron usa `stop_signal="SIGTERM"`.
 - Duas unidades que usam a mesma imagem: remover todos os containers antes das imagens.

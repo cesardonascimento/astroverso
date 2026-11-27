@@ -198,7 +198,8 @@ O `Container` aceita `env_file`: um arquivo de variáveis (ex.: com um token, `6
 arquivo da unidade.
 
 - Unidade `<nome>.service`, com `Restart=always` e `WantedBy=default.target`. Logs: `journalctl --user -u <nome>`.
-- Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. Quebra de linha é
+- Valores com espaço ou aspas vão entre aspas, e `%` e `$` são escapados, como o systemd espera. O `HealthCmd` é a
+  exceção: vai cru (só `%` e `$` dobrados), porque o Quadlet não desfaz as aspas escapadas. Quebra de linha é
   recusada.
 
 ## discord

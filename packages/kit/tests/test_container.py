@@ -1,5 +1,6 @@
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -90,10 +91,22 @@ class ContainerTest(unittest.TestCase):
         self.assertIn("PublishPort=8080:80\n", text)
         self.assertIn('Environment="FRASE=com espaço"\n', text)
         self.assertIn('Exec=sh -c "echo $$HOME 100%% > /x"\n', text)
-        self.assertIn('HealthCmd="wget -q --spider http://127.0.0.1/"\n', text)
+        self.assertIn('HealthCmd=wget -q --spider http://127.0.0.1/\n', text)
         self.assertIn("WantedBy=default.target", text)
         host = container.render(container.Container("a", "b", "c", network="host"))
         self.assertIn("Network=host\n", host)
+
+    @unittest.skipUnless(Path("/usr/libexec/podman/quadlet").exists(), "sem quadlet")
+    def test_health_reaches_podman_intact(self) -> None:
+        command = "python -I -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/saude', timeout=5)\""
+        spec = container.Container("claude-teste-saude", "docker.io/library/alpine:3", "teste", network="host", health=command)
+        with tempfile.TemporaryDirectory() as folder:
+            Path(folder, "claude-teste-saude.container").write_text(container.render(spec))
+            done = subprocess.run(["/usr/libexec/podman/quadlet", "-dryrun", "-user"], capture_output=True, text=True,
+                                  env={**os.environ, "QUADLET_UNIT_DIRS": folder})
+        line = next(line for line in done.stdout.splitlines() if line.startswith("ExecStart="))
+        argument = line.split("--health-cmd ", 1)[1].split(" --", 1)[0].split(" docker.io", 1)[0]
+        self.assertEqual(argument.encode().decode("unicode_escape")[1:-1], command)
 
     def test_start(self) -> None:
         fake = self.use(FakeRun(states=["starting", "healthy"]))
