@@ -23,7 +23,7 @@ systemd), e o cron depois do Nextcloud.
 | Endereço do Nextcloud | `nextcloud.<domínio>` |
 | Usuário administrador (só na primeira vez) | `astroverso` |
 | Senha do administrador (só na primeira vez) | sem padrão; se o Nextcloud recusar (curta, comum ou vazada), pede de novo |
-| Pasta dos arquivos (só na primeira vez) | `~/Nextcloud`; vazia ou a de um Nextcloud anterior. Escolhida pelo seletor de pastas (`kit.folders`): os discos do app `disks` com o espaço livre e a marca ☁ das pastas ligadas a uma nuvem. Para guardar tudo num disco de dados, escolha uma pasta nele (ex.: `/srv/<disco>/nextcloud`) |
+| Qual é o disco do Nextcloud? (só na primeira vez) | Um disco do app `disks` (menos os de fotografias) ou o disco do sistema. O Nextcloud assume o disco: os arquivos ficam em `/srv/<disco>/nextcloud` (criada se faltar; vazia ou a de um Nextcloud anterior), e o resto do disco fica como está, para trazer depois com **Trazer uma pasta para o Nextcloud**. No disco do sistema, `~/Nextcloud`. Sem disco de dados montado, não pergunta |
 
 1. Gera a senha do banco e uma senha inicial do administrador em `~/.astroverso/nextcloud/secrets/`, lidas pelos
    containers por arquivo (`*_FILE`): nunca vão para o `.env` nem para argumentos de comando.
@@ -66,7 +66,7 @@ Nextcloud.
 | Podman instalado e *linger* ligado para o usuário | Os containers rodam como serviços do usuário e sobem no boot sem ninguém logado |
 | 4 containers por Quadlet (tabela acima), na rede `astroverso`, sem porta aberta na máquina | O Nextcloud e o que ele precisa; o Caddy chega no `astroverso-nextcloud` pelo nome |
 | `~/.astroverso/nextcloud/` (`html/`, `db/`, `secrets/`, `apache.conf`, `.env`) | O código e a configuração do Nextcloud, o banco, as senhas e as respostas da instalação |
-| `~/Nextcloud` (ou a pasta escolhida), do `www-data` do container | Os arquivos de todos os usuários do Nextcloud |
+| `/srv/<disco>/nextcloud` (ou `~/Nextcloud`), do `www-data` do container | Os arquivos de todos os usuários do Nextcloud |
 | `~/.astroverso/routes/nextcloud.json` | O endereço publicado para o Caddy |
 | Unidades do usuário `astroverso-nextcloud-mailboxes.path` e `.service` (perguntada, padrão sim) | Quando uma caixa de e-mail é publicada ou retirada, a conta no Nextcloud Mail é criada, atualizada ou apagada na hora (`astroverso nextcloud action mailboxes`) |
 | Unidades do usuário `astroverso-nextcloud-watch.timer` e `.service` (perguntada, padrão sim, em **Mudanças no sistema**) | A cada hora, confere o Nextcloud e avisa no Discord quando algo quebra e quando volta ao normal |

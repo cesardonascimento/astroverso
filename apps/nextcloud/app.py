@@ -37,6 +37,28 @@ def status() -> bool:
     return nextcloud.installed()
 
 
+def choose_disk(current: str) -> str:
+    photo = {disk.path for disk in disks.photo_disks()}
+    options = [(disk.name, disk.path / nextcloud.FOLDER) for disk in disks.mounts() if disk.path not in photo]
+    options.append(("Disco do sistema", nextcloud.DEFAULT_FILES))
+    options.sort(key=lambda item: str(item[1]) != current)
+    if len(options) == 1:
+        ui.info(f"nenhum disco de dados montado: os arquivos ficam em {options[0][1]} (cadastre um disco no app disks antes, se quiser)")
+        path = options[0][1]
+    else:
+        ui.note(
+            f"O Nextcloud assume o disco escolhido: os arquivos de todos os usuários ficam na pasta {nextcloud.FOLDER} na raiz "
+            "dele (criada se não existir), e só o Nextcloud mexe nela. O que já está no disco fica como está: traga para "
+            "dentro depois, com Trazer uma pasta para o Nextcloud."
+        )
+        index = ui.menu("Qual é o disco do Nextcloud?", [name for name, _ in options], [f"{path} · {folders.describe(path)}" for _, path in options])
+        path = options[index][1]
+    try:
+        return nextcloud.validate_folder(str(path))
+    except ValueError as problem:
+        ui.fail(f"{path}: {problem}")
+
+
 def _ask(reuse: bool) -> str:
     values = config.load(APP)
     domain = config.domain()
@@ -51,12 +73,7 @@ def _ask(reuse: bool) -> str:
         ui.note("A conta de administrador do Nextcloud. O nome não muda depois da instalação; a senha, sim (Gerenciar → Trocar a senha).")
         answers["ADMIN_USER"] = ui.ask("usuário administrador", default=values.get("ADMIN_USER") or "astroverso", validate=validate.name)
         password = ui.secret(f"senha do administrador {answers['ADMIN_USER']}")
-        ui.note(
-            "A pasta onde ficam os arquivos de todos os usuários do Nextcloud. Ela pertence ao Nextcloud: só ele mexe "
-            "nos arquivos dela."
-        )
-        answers["FILES"] = folders.pick("pasta dos arquivos", values.get("FILES") or str(nextcloud.DEFAULT_FILES),
-                                        validate=nextcloud.validate_folder)
+        answers["FILES"] = choose_disk(values.get("FILES", ""))
     elif values.get("FILES") is None:
         answers["FILES"] = str(nextcloud.files())
     config.save(APP, answers)

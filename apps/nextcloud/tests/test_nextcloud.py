@@ -10,7 +10,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "packages"))
 
-from kit import config, container, routes, ui
+from kit import config, container, disks, routes, ui
 from kit.testing import run_in_pty
 from manager.apps import load
 
@@ -121,8 +121,26 @@ class NextcloudTest(unittest.TestCase):
             patch.start()
             self.addCleanup(patch.stop)
 
+    def test_choose_disk(self) -> None:
+        storage, vault_disk = self.home / "srv" / "storage", self.home / "srv" / "storage-vault"
+        storage.mkdir(parents=True)
+        vault_disk.mkdir(parents=True)
+        (vault_disk / "astroverso-fotografia.json").write_text("{}")
+        found = [disks.Disk("a", storage, "ext4", ""), disks.Disk("b", vault_disk, "ext4", "")]
+        with mock.patch.object(disks, "mounts", return_value=found), mock.patch.object(disks, "responds", return_value=True):
+            outcome = run_in_pty(lambda: app.choose_disk(""), [b"\r"], columns=160)
+            self.assertEqual(outcome.result, str(storage / "nextcloud"), outcome.screen)
+            self.assertIn("Qual é o disco do Nextcloud?", outcome.screen)
+            self.assertNotIn("storage-vault", outcome.screen)
+            outcome = run_in_pty(lambda: app.choose_disk(str(nextcloud.DEFAULT_FILES)), [b"\r"], columns=160)
+            self.assertEqual(outcome.result, str(nextcloud.DEFAULT_FILES))
+            with mock.patch.object(nextcloud, "validate_folder", side_effect=ValueError("essa pasta já tem arquivos")):
+                outcome = run_in_pty(lambda: app.choose_disk(""), [b"\r"], columns=160)
+            self.assertEqual(outcome.code, 1)
+            self.assertIn("nextcloud: essa pasta já tem arquivos", outcome.screen)
+
     def test_fresh_install(self) -> None:
-        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\r", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n", b"\n", b"\n"]
+        keys = [b"\n", b"\n", b"curta\n", b"curta\n", b"\r", b"\n", b"Senha-boa-e-longa-2026\n", b"Senha-boa-e-longa-2026\n", b"\n", b"\n", b"\n"]
         outcome = run_in_pty(lambda: (app.install(reuse=False), self.host.calls)[1], keys, columns=160)
         self.assertEqual(outcome.code, 0, outcome.screen)
         calls = [tuple(call) for call in outcome.result]

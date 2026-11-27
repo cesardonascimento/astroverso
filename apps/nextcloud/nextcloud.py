@@ -22,6 +22,7 @@ REDIS_IMAGE = "docker.io/valkey/valkey:9.1.4-alpine"
 WWW = 33
 SITE = Path(__file__).with_name("apache.conf")
 DEFAULT_FILES = Path.home() / "Nextcloud"
+FOLDER = "nextcloud"
 MARKERS = (".ncdata", ".ocdata")
 
 

@@ -145,9 +145,10 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 - Quatro containers por Quadlet (Nextcloud apache, Postgres, Valkey sem disco, cron com `/cron.sh`), sem porta na
   máquina, endereço pelo `kit.routes`. Sem tema do Astroverso (decisão do usuário: o logo fica só no projeto por
   enquanto).
-- Pasta dos arquivos padrão `~/Nextcloud`, do `www-data` do container (`podman unshare chown 33:33`), escolhida pelo
-  `kit.folders`. **Os arquivos ficam dentro do Nextcloud, num disco de dados se preciso (ex.: `/srv/<disco>/nextcloud`),
-  sem armazenamento externo** (decisão do usuário: os discos não são mais acessados por fora). A ação "Trazer uma pasta
+- **"Qual é o disco do Nextcloud?"** (decisão do usuário: o Nextcloud assume um disco inteiro, sem escolher pasta): os
+  arquivos ficam em `/srv/<disco>/nextcloud` (ou `~/Nextcloud` no disco do sistema), do `www-data` do container
+  (`podman unshare chown 33:33`), **sem armazenamento externo** (os discos não são acessados por fora). Um disco só por
+  enquanto; vários discos ficam para depois. A ação "Trazer uma pasta
   para o Nextcloud" move uma pasta para os arquivos de um usuário e roda o `files:scan` só dela. A instalação para
   sem o disco, e a verificação avisa quando ele some.
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
@@ -199,7 +200,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 
 - Monta os discos de dados em `/srv/<nome>` pelo `fstab`/`crypttab` (linhas depois de `# astroverso <uuid>`), sempre
   só do usuário (decisão do usuário: sem o modo compartilhado do antigo, que existia para o usuário dos jogos).
-  Formatar disco fica no Cockpit.
+  Formatar disco fica no Cockpit (exceto o Resgatar um disco).
 - **Nada pode pedir senha no boot**: LUKS só pelo TPM (PCR 7), com a senha digitada uma vez; sem TPM, o disco fica
   de fora.
 - Cada disco cadastrado (`~/.astroverso/disks/disks.json`) é uma Change ⚠: desfazer só desmonta e tira as linhas;
