@@ -10,12 +10,17 @@ descrição de cada um e a linha "Todos" no topo, e um resumo no fim) e "Gerenci
 instalação, ação ou remoção cancela e volta ao menu, sem desfazer o que já foi feito; numa instalação de vários apps,
 os seguintes também ficam de fora.
 
+**Instalação interrompida.** Antes de chamar o `install()`, o gerenciador cria a marca `~/.astroverso/.installing/<app>`
+(pasta de nenhum app) e só a apaga quando a instalação termina bem; o `remove` também apaga. Com a marca, o app não
+conta como instalado, mesmo que o `status()` diga que sim: volta para "Instalar apps" com o aviso "instalação
+interrompida" (instalar de novo completa o que faltou) e continua em "Gerenciar apps" para poder ser removido.
+
 **Uso direto**, sem menus, para serviços do systemd e para o pacote `backup` (o código de saída diz se deu certo):
 
 ```
 astroverso <app> install | remove | status | backup <pasta> | restore <pasta> | action <id>
 ```
 
-`status` sai com 0 se o app está instalado e 1 se não. Esc ou Ctrl+C sai com 130.
+`status` sai com 0 se o app está instalado e 1 se não (ou com a instalação interrompida). Esc ou Ctrl+C sai com 130.
 
 Testes: `python3 -m unittest discover -s packages -t packages` (todos os pacotes).

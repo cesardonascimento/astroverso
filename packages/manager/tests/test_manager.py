@@ -55,6 +55,10 @@ class ManagerTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.apps = self.root / "apps"
         self.apps.mkdir()
+        (self.root / "home").mkdir()
+        environment = mock.patch.dict(os.environ, {"HOME": str(self.root / "home")})
+        environment.start()
+        self.addCleanup(environment.stop)
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -188,6 +192,31 @@ class ManagerTest(unittest.TestCase):
         outcome = run_in_pty(lambda: cli.main([], self.apps), keys)
         self.assertEqual(outcome.code, 0, outcome.screen)
         self.assertIn("ação Responder pong cancelada", outcome.screen)
+
+    def test_interrupted_install_is_not_installed(self) -> None:
+        state = self.app("metade", install="STATE.write_text('meio'); ui.ask('nome')")
+        marks = self.root / "home" / ".astroverso" / ".installing"
+        outcome = run_in_pty(lambda: cli.main(["metade", "install"], self.apps), [b"\x1b"])
+        self.assertEqual(outcome.result, 130, outcome.screen)
+        self.assertTrue(state.exists())
+        self.assertTrue((marks / "metade").exists())
+        code, out, _ = self.run_cli("metade", "status")
+        self.assertEqual((code, "instalação interrompida" in out), (1, True))
+        keys = [b"\r", b"\x1b", b"\x1b[B", b"\r", b"\x1b", b"\x1b"]
+        screen = run_in_pty(lambda: cli.main([], self.apps), keys).screen
+        self.assertEqual(screen.count("instalação interrompida: App de teste metade"), 2, screen)
+        outcome = run_in_pty(lambda: cli.main(["metade", "install"], self.apps), [b"x\n"])
+        self.assertEqual(outcome.result, 0, outcome.screen)
+        self.assertFalse((marks / "metade").exists())
+        self.assertEqual(self.run_cli("metade", "status")[0], 0)
+
+    def test_failed_install_and_remove_clear(self) -> None:
+        self.app("quebra", install="ui.fail('sem rede')")
+        marks = self.root / "home" / ".astroverso" / ".installing"
+        self.assertEqual(self.run_cli("quebra", "install")[0], 1)
+        self.assertTrue((marks / "quebra").exists())
+        self.assertEqual(self.run_cli("quebra", "remove")[0], 0)
+        self.assertFalse((marks / "quebra").exists())
 
     def test_direct_esc(self) -> None:
         self.app("pergunta", install="ui.ask('nome')")

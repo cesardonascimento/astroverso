@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
-from kit import ui
+from kit import config, ui
 from kit.app import REQUIRED, Action
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +86,36 @@ def call(app: LoadedApp, function: Callable[..., object], *args: object) -> tupl
         ui.set_app("astroverso")
 
 
-def installed(app: LoadedApp) -> bool:
+def _mark(app: LoadedApp) -> Path:
+    return config.home() / ".installing" / app.name
+
+
+def interrupted(app: LoadedApp) -> bool:
+    return _mark(app).exists()
+
+
+def present(app: LoadedApp) -> bool:
     success, result = call(app, app.module.status) if app.module else (False, None)
     return success and bool(result)
+
+
+def installed(app: LoadedApp) -> bool:
+    return not interrupted(app) and present(app)
+
+
+def install(app: LoadedApp) -> tuple[bool, object]:
+    mark = _mark(app)
+    config.home().mkdir(mode=0o700, exist_ok=True)
+    mark.parent.mkdir(exist_ok=True)
+    mark.touch()
+    success, result = call(app, app.module.install)
+    if success:
+        mark.unlink(missing_ok=True)
+    return success, result
+
+
+def remove(app: LoadedApp) -> tuple[bool, object]:
+    success, result = call(app, app.module.remove)
+    if success:
+        _mark(app).unlink(missing_ok=True)
+    return success, result

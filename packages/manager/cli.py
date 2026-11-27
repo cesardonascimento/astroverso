@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from kit import distro, ui
-from manager.apps import APPS, ROOT, LoadedApp, call, discover, installed
+from manager.apps import APPS, ROOT, LoadedApp, call, discover, install, installed, interrupted, present, remove
 
 USAGE = "uso: astroverso [<app> install | remove | status | backup <pasta> | restore <pasta> | action <id>]"
 
@@ -36,9 +36,9 @@ def _stopped(stop: KeyboardInterrupt) -> None:
         sys.stdout.write("\n")
 
 
-def _run(app: LoadedApp, what: str, function: Callable[..., object], *args: object) -> bool | None:
+def _run(app: LoadedApp, what: str, function: Callable[..., tuple[bool, object]], *args: object) -> bool | None:
     try:
-        return call(app, function, *args)[0]
+        return function(*args)[0]
     except KeyboardInterrupt as stop:
         _stopped(stop)
         ui.warn(f"{what} cancelada")
@@ -52,13 +52,17 @@ def _confirm(question: str) -> bool:
         return False
 
 
+def _details(apps: list[LoadedApp]) -> list[str]:
+    return [f"instalação interrompida: {app.description}" if interrupted(app) else app.description for app in apps]
+
+
 def _install(apps: list[LoadedApp]) -> None:
     pending = [app for app in apps if not installed(app)]
     if not pending:
         ui.ok("todos os apps já estão instalados")
         return
     chosen = ui.checklist(
-        "Quais apps instalar?", [app.name for app in pending], all_option=True, cancel=True, details=[app.description for app in pending]
+        "Quais apps instalar?", [app.name for app in pending], all_option=True, cancel=True, details=_details(pending)
     )
     if not chosen:
         return
@@ -69,7 +73,7 @@ def _install(apps: list[LoadedApp]) -> None:
         app = pending[index]
         ui.step(f"Instalando {app.name}")
         ui.note("Esc cancela a instalação e volta ao menu.")
-        success = _run(app, f"instalação do {app.name}", app.module.install)
+        success = _run(app, f"instalação do {app.name}", install, app)
         if success is None:
             skipped = [pending[i].name for i in chosen[position:]]
             break
@@ -91,16 +95,16 @@ def _manage_app(app: LoadedApp) -> None:
         choice = ui.menu(f"Gerenciar {app.name}", labels)
         if choice < len(actions):
             ui.step(actions[choice].label)
-            _run(app, f"ação {actions[choice].label}", actions[choice].run)
+            _run(app, f"ação {actions[choice].label}", call, app, actions[choice].run)
         elif labels[choice] == "Reinstalar":
             ui.step(f"Reinstalando {app.name}")
             ui.note("Esc cancela a instalação e volta ao menu.")
-            if _run(app, f"instalação do {app.name}", app.module.install):
+            if _run(app, f"instalação do {app.name}", install, app):
                 ui.ok(f"{app.name} reinstalado")
         elif labels[choice] == "Remover":
             if _confirm(f"remover o {app.name}?"):
                 ui.step(f"Removendo {app.name}")
-                if _run(app, f"remoção do {app.name}", app.module.remove):
+                if _run(app, f"remoção do {app.name}", remove, app):
                     ui.ok(f"{app.name} removido")
                     return
         else:
@@ -109,16 +113,14 @@ def _manage_app(app: LoadedApp) -> None:
 
 def _manage(apps: list[LoadedApp]) -> None:
     while True:
-        present = [app for app in apps if installed(app)]
-        if not present:
+        shown = [app for app in apps if present(app)]
+        if not shown:
             ui.warn("nenhum app instalado")
             return
-        choice = ui.menu(
-            "Qual app?", [app.name for app in present] + ["Voltar"], details=[app.description for app in present]
-        )
-        if choice == len(present):
+        choice = ui.menu("Qual app?", [app.name for app in shown] + ["Voltar"], details=_details(shown))
+        if choice == len(shown):
             return
-        _manage_app(present[choice])
+        _manage_app(shown[choice])
 
 
 def interactive(folder: Path) -> int:
@@ -150,11 +152,12 @@ def direct(folder: Path, argv: Sequence[str]) -> int:
     if command != "status":
         distro.check()
     if command == "status" and not rest:
-        present = installed(app)
-        ui.info(f"{app.name}: {'instalado' if present else 'não instalado'}")
-        return 0 if present else 1
+        done = installed(app)
+        situation = "instalado" if done else "instalação interrompida" if interrupted(app) else "não instalado"
+        ui.info(f"{app.name}: {situation}")
+        return 0 if done else 1
     if command in ("install", "remove") and not rest:
-        return 0 if call(app, getattr(app.module, command))[0] else 1
+        return 0 if (install if command == "install" else remove)(app)[0] else 1
     if command in ("backup", "restore") and len(rest) == 1:
         return 0 if call(app, getattr(app.module, command), Path(rest[0]))[0] else 1
     if command == "action" and len(rest) == 1:
