@@ -31,7 +31,7 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | `/etc/fstab.astroverso-bak` e `/etc/crypttab.astroverso-bak` | Cópia de antes da primeira mudança | |
 | `~/.astroverso/disks/` (`.env` com as respostas, `disks.json` com os discos cadastrados, `photos.json` com as fotografias, `photos-state.json` com a última de cada uma, `watch.json`) | A configuração | |
 | Unidades do usuário `astroverso-disks-watch.timer` e `.service` (perguntada, padrão sim) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-disks-photos.timer` e `.service` (perguntada, padrão sim) | A fotografia de cada disco às 03:00 (abaixo) | |
+| Unidades do usuário `astroverso-disks-photos.timer` e `.service` (perguntada, padrão sim) | A fotografia de cada disco às 03:00 (abaixo); a instalação tira o antigo `astroverso-disks-backup-folders` | |
 | Por fotografia: `astroverso-fotografia.json` na raiz do disco de fotografias (origem: nome e UUID) | Marca o disco como de fotografias (some dos seletores de pasta) e diz ao Resgatar um disco de onde ele veio | |
 | Unidades do usuário `astroverso-disks-backup.timer` e `.service` (perguntada, padrão sim) | Backup diário da configuração do app no vault (`kit.vault`), com aviso no `#vault` | |
 

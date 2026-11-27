@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 from kit import vault
-from kit import changes, config, disks, distro, run, ui
+from kit import changes, config, disks, distro, run, ui, units
 from kit import watch as kit_watch
 from kit.app import Action
 from kit.watch import Problem
@@ -18,6 +18,7 @@ ORDER = 20
 PACKAGES = ["cryptsetup", "tpm2-tss", "rsync"]
 BUTTONS = (("Resumo dos discos", "disks:summary"), ("Verificar de novo", "disks:watch"))
 FULL = 90
+OLD_FOLDERS = "astroverso-disks-backup-folders"
 
 
 def registry_file() -> Path:
@@ -151,6 +152,7 @@ def install(reuse: bool | None = None) -> None:
     distro.install(PACKAGES)
     ui.step("Discos da máquina")
     config.save(APP, {})
+    units.remove([f"{OLD_FOLDERS}.timer", f"{OLD_FOLDERS}.service"])
     if again and registry():
         for entry in registry():
             if changes.wanted(APP, disk_change(entry)) is not False:
