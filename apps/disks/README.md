@@ -43,7 +43,7 @@ Na reinstalação com a configuração salva, monta de novo os discos cadastrado
 | Discos da máquina | Checklist com os discos encontrados (e os cadastrados que estão desligados): marcar monta, desmarcar desmonta (com confirmação), tira do `fstab` e descadastra o TPM. Os dados continuam no disco |
 | Mudanças no sistema | Desmonta e monta de novo cada disco cadastrado (sem descadastrar o TPM), liga e desliga a verificação e os backups |
 | Verificar agora | A verificação de hora em hora na hora (também no Discord) |
-| Fotografias dos discos | Adicionar (disco de origem e disco de fotografias, com confirmação) e tirar fotografias. Os dados que já estão nos discos ficam |
+| Fotografias dos discos | Fotografar um disco (disco de origem e disco de fotografias, com confirmação) e Parar de fotografar um disco. As fotografias que já estão nos discos ficam |
 | Fotografar agora | Todas as fotografias na hora (também no Discord, com confirmação) |
 | Resgatar um disco | Recria um disco que morreu a partir da fotografia (abaixo) |
 | Liberar a fotografia | Uma fotografia parada pela trava de exclusões: mostra quantos e quais arquivos sairiam do `atual/` e roda sem a trava |

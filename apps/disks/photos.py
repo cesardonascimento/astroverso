@@ -231,7 +231,7 @@ def units_text() -> dict[str, str]:
 def change() -> changes.Change:
     texts = units_text()
     return changes.Change(
-        "photos", "Tirar a fotografia dos discos toda noite (03:00)",
+        "photos", "Fotografar os discos toda noite (03:00)",
         f"Um timer do usuário ({UNIT}.timer) deixa a pasta {CURRENT}/ de cada disco de fotografias igual ao disco de origem "
         f"(rsync) e guarda em {HISTORY}/<data>/ o que mudou ou foi apagado naquela noite, por {KEEP_DAYS} dias. Não roda com um "
         f"dos discos desligado, e para (avisando no Discord) se fosse tirar mais de {LIMIT}% dos arquivos de uma vez.",
@@ -279,7 +279,7 @@ def add() -> None:
 def drop() -> None:
     items = pairs()
     known = by_uuid()
-    chosen = ui.checklist("Quais fotografias tirar?", [f"{label(p['source'], known)} → {label(p['target'], known)}" for p in items],
+    chosen = ui.checklist("Quais discos deixam de ser fotografados?", [f"{label(p['source'], known)} → {label(p['target'], known)}" for p in items],
                           cancel=True) or []
     if not chosen:
         return
@@ -291,7 +291,7 @@ def drop() -> None:
         if target is not None:
             unmark(target)
     save_pairs([item for i, item in enumerate(items) if i not in chosen])
-    ui.ok("fotografias tiradas")
+    ui.ok("fotografias desligadas: os discos não são mais fotografados")
 
 
 def rows() -> list[list[str | ui.Cell]]:
@@ -318,11 +318,11 @@ def manage() -> None:
     while True:
         if pairs():
             ui.table(rows(), ["Origem", "Fotografias em", "Última", "Histórico"])
-        options = ["Adicionar uma fotografia"] + (["Tirar fotografias"] if pairs() else []) + ["Pronto"]
+        options = ["Fotografar um disco"] + (["Parar de fotografar um disco"] if pairs() else []) + ["Pronto"]
         choice = options[ui.menu("Fotografias dos discos", options)]
         if choice == "Pronto":
             return
-        if choice.startswith("Adicionar"):
+        if choice == "Fotografar um disco":
             add()
         else:
             drop()
