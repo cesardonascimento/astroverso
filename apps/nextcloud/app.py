@@ -249,7 +249,7 @@ def actions() -> list[Action]:
         Action("bring", "Trazer uma pasta para o Nextcloud", bring_folder),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
         Action("backup-files", "Fazer backup dos arquivos agora", backup_files, remote=True),
         Action("restore-files", "Restaurar os arquivos de uma versão (numa pasta nova)", lambda: vault.restore_data(APP, FILES_DATA)),
     ]

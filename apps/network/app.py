@@ -103,5 +103,5 @@ def actions() -> list[Action]:
         Action("router-dns", "Marcar o DNS no roteador como feito", adguard.mark_router),
         Action("watch", "Verificar a rede agora (e avisar no Discord)", watch.check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
     ]

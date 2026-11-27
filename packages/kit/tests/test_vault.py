@@ -93,10 +93,10 @@ class BackupTest(unittest.TestCase):
         self.assertEqual((env["RESTIC_REST_PASSWORD"], env["RESTIC_PASSWORD"]), ("acesso", "repo"))
         with mock.patch.object(sys, "stdout", io.StringIO()):
             self.assertFalse(vault.run_backup("nuvem", lambda folder: None))
-            self.assertIn("nenhuma pasta de destino escolhida", self.sent[-1][0][3])
+            self.assertIn("nenhuma pasta do vault escolhida", self.sent[-1][0][3])
             config.save("nuvem", {vault.TARGETS: "bbbb2222,sumiu"})
             self.assertFalse(vault.run_backup("nuvem", lambda folder: (folder / "config.txt").write_text("v1")))
-        self.assertIn("a pasta de destino sumiu não existe mais", self.sent[-1][0][3])
+        self.assertIn("a pasta do vault sumiu não existe mais", self.sent[-1][0][3])
         self.assertEqual([call[0] for call in self.restic.calls], ["bbbb2222"])
         call = self.restic.calls[0][2:]
         self.assertEqual([call[i + 1] for i, item in enumerate(call) if item == "--tag"], ["astroverso", "app:nuvem"])

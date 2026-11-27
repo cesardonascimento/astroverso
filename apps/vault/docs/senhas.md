@@ -1,8 +1,8 @@
 # Backup: as senhas e como restaurar do zero
 
 Cada máquina manda os backups dos apps dela para o vault do Astroverso, num repositório só dela em cada
-pasta de destino. Ela tem **três** dados de acesso, mostrados pela ação **Adicionar uma máquina** (e pela **Mostrar os
-dados de uma máquina**), junto com o código de ligação (endereço, usuário e pastas de destino, sem segredos):
+pasta do vault. Ela tem **três** dados de acesso, mostrados pela ação **Adicionar uma máquina** (e pela **Mostrar os
+dados de uma máquina**), junto com o código de ligação (endereço, usuário e pastas do vault, sem segredos):
 
 | Dado | Para que serve | Se perder |
 |---|---|---|
@@ -18,9 +18,9 @@ o gerenciador de senhas que salva os backups.
 
 ## Restaurar um app
 
-Em qualquer app, **Gerenciar → <app> → Restaurar uma versão**:
+Em qualquer app, **Gerenciar → <app> → Restaurar uma fotografia**:
 
-1. Escolha a pasta de destino (se houver mais de uma) e a data da versão.
+1. Escolha a pasta do vault (se houver mais de uma) e a data da versão.
 2. Antes de trocar, o app guarda a situação atual como uma versão "antes-da-restauracao" (dá para voltar atrás).
 3. O app traz a configuração daquela data e se reinstala com as respostas salvas.
 
@@ -34,9 +34,9 @@ Uma máquina nova (ou formatada), com o mesmo nome da antiga:
    servidor confere que ela abre os backups que já existem e só gera uma senha de acesso nova.
 3. Na máquina, instale o app **backup** e escolha **Só manda os backups dos apps dela para o servidor de outra
    máquina**. Cole o código de ligação, a senha de acesso e a senha do repositório antiga.
-4. Para cada app que existia na máquina: instale o app e use **Restaurar uma versão**.
+4. Para cada app que existia na máquina: instale o app e use **Restaurar uma fotografia**.
 
-Se a máquina perdida era a do **servidor**, instale o app `vault` no modo servidor com as mesmas pastas de destino:
+Se a máquina perdida era a do **servidor**, instale o app `vault` no modo servidor com as mesmas pastas do vault:
 ao achar backups da própria máquina nelas, ele pede a senha do repositório antiga em vez de gerar outra. Depois,
 cadastre as outras máquinas com **Adicionar uma máquina → Está voltando**, cada uma com a senha antiga dela. Sem a
 senha antiga, a máquina recomeça do zero (os backups antigos ficam na pasta, mas ninguém os abre).
@@ -46,8 +46,8 @@ senha antiga, a máquina recomeça do zero (os backups antigos ficam na pasta, m
 Os repositórios são do [restic](https://restic.net), um programa livre. Com ele instalado, na máquina do servidor:
 
 ```sh
-restic -r <pasta de destino>/<nome-da-máquina> snapshots
-restic -r <pasta de destino>/<nome-da-máquina> restore <id> --target /tmp/restaurado
+restic -r <pasta do vault>/<nome-da-máquina> snapshots
+restic -r <pasta do vault>/<nome-da-máquina> restore <id> --target /tmp/restaurado
 ```
 
 O restic pede a senha do repositório.

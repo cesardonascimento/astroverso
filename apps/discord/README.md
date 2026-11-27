@@ -63,7 +63,7 @@ O "Reinstalar" pode reaproveitar as respostas salvas.
 | Mensagem de teste | Manda um aviso de teste para `#discord` pelo `kit.discord` |
 | Mostrar a chave de um cliente | Endereço e chave, para colar na outra máquina (só na máquina do bot) |
 | Adicionar um cliente | Cria a chave de uma máquina ou projeto novo e reinicia o bot (só na máquina do bot) |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
+| Fazer backup agora / Restaurar uma fotografia | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Comandos do `/astro`
 

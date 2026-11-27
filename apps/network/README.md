@@ -104,7 +104,7 @@ frase e o link para o doc no GitHub, para abrir no navegador.
 | Endereços de aparelhos da rede | Lista, cria e remove endereços `https://<nome>.<domínio>` para painéis de aparelhos da casa (IP, porta, HTTP ou HTTPS); o Caddy recarrega sem reiniciar |
 | Verificar a rede agora (e avisar no Discord) | Roda na hora a verificação de hora em hora (abaixo) |
 | Recarregar os endereços do Caddy | Regera o Caddyfile (inclusive com os endereços publicados por outros apps em `~/.astroverso/routes/`) e recarrega. Normalmente não é preciso: a unidade `astroverso-network-routes.path` faz isso sozinha |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
+| Fazer backup agora / Restaurar uma fotografia | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
 

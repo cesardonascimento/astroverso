@@ -107,7 +107,7 @@ o subdomínio `workers.dev` da conta (se faltava) e a regra do endereço.
 | Limpar Workers e KV antigos da Cloudflare | Lista os da conta, menos os deste app, e apaga os marcados |
 | Enviar um e-mail de teste | Pelo `kit.mail`, para um destinatário confirmado (em qualquer modo) |
 | Mudanças no sistema / Verificar agora | Como nos outros apps |
-| Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
+| Fazer backup agora / Restaurar uma fotografia | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
 

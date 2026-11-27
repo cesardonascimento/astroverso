@@ -513,6 +513,6 @@ def actions() -> list[Action]:
         Action("changes", "Mudanças no sistema", manage),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
     ]
 

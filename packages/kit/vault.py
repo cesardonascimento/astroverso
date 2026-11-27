@@ -103,9 +103,9 @@ def read_code(text: str) -> tuple[str, str, list[Destination]]:
     except (ValueError, KeyError, TypeError, AttributeError):
         raise ValueError("código incompleto: copie de novo, inteiro") from None
     if not url.startswith("https://") or not USER.match(user) or not items:
-        raise ValueError("código sem endereço, usuário ou pastas de destino: copie de novo do servidor")
+        raise ValueError("código sem endereço, usuário ou pastas do vault: copie de novo do servidor")
     if not all(IDENTIFIER.match(item.id) for item in items):
-        raise ValueError("código com uma pasta de destino inválida: copie de novo do servidor")
+        raise ValueError("código com uma pasta do vault inválida: copie de novo do servidor")
     return url, user, items
 
 
@@ -163,8 +163,8 @@ def pick(question: str, current: Sequence[Destination] = ()) -> list[Destination
     ui.note(
         "O backup tira uma fotografia por dia (criptografada) e guarda nas pastas que você marcar, cada dia como uma versão: "
         "um arquivo apagado ou estragado hoje continua nas fotografias dos dias anteriores. Não é um espelho nem uma cópia "
-        "que se abre como pasta comum: para recuperar, use \"Restaurar uma versão\". As pastas aparecem aqui depois de "
-        "cadastradas em \"Pastas de destino\" no app vault (ex.: uma pasta num disco só de backup). Marque mais de uma para "
+        "que se abre como pasta comum: para recuperar, use \"Restaurar uma fotografia\". As pastas aparecem aqui depois de "
+        "cadastradas em \"Pastas do vault\" no app vault (ex.: uma pasta num disco só de backup). Marque mais de uma para "
         "ter a fotografia em mais lugares."
     )
     items = destinations()
@@ -242,7 +242,7 @@ def change(app: str) -> changes.Change:
     return changes.Change(
         "backup", f"Fazer o backup da configuração do {app} todo dia (01:{minute(app):02d})",
         f"Um timer do usuário ({unit(app)}.timer) tira uma fotografia por dia (criptografada) da configuração do {app} e "
-        "guarda nas pastas de destino que você escolher no vault do Astroverso (app vault), com as versões "
+        "guarda nas pastas do vault que você escolher no vault do Astroverso (app vault), com as versões "
         "pelo tempo definido no servidor, e avisa no canal #vault do Discord. Se a "
         "máquina estava desligada no horário, o backup roda ao ligar. Para trocar as pastas, desligue e ligue de novo.",
         lambda: units.active(f"{unit(app)}.timer"),
@@ -290,7 +290,7 @@ def _report(app: str, what: str, problems: list[str], seconds: int, retry: str, 
 
 
 def _lost_problems(missing: Sequence[str]) -> list[str]:
-    return [f"a pasta de destino {item} não existe mais no servidor: escolha de novo" for item in missing]
+    return [f"a pasta do vault {item} não existe mais no servidor: escolha de novo" for item in missing]
 
 
 def run_backup(app: str, save_function: Callable[[Path], None], label: str = "", notify: bool = True) -> bool:
@@ -301,7 +301,7 @@ def run_backup(app: str, save_function: Callable[[Path], None], label: str = "",
     chosen = targets(app)
     problems = _lost_problems(lost(app))
     if not chosen:
-        return _report(app, what, problems or ["nenhuma pasta de destino escolhida: ligue o backup em Mudanças no sistema"],
+        return _report(app, what, problems or ["nenhuma pasta do vault escolhida: ligue o backup em Mudanças no sistema"],
                        0, "backup-now", notify, [])
     started = time.monotonic()
     folder = _stage(app)
@@ -332,7 +332,7 @@ def run_data(app: str, name: str, path: Path, chosen: Sequence[Destination], ret
     what = f"de {name} ({app})"
     problems = _lost_problems(missing)
     if not chosen:
-        return _report(app, what, problems or ["nenhuma pasta de destino escolhida"], 0, retry, notify, [])
+        return _report(app, what, problems or ["nenhuma pasta do vault escolhida"], 0, retry, notify, [])
     if not path.is_dir() or not disks.available(path):
         return _report(app, what, [f"{path} indisponível (disco desligado, travado ou pasta apagada): nada foi guardado"],
                        0, retry, notify, [])
@@ -377,7 +377,7 @@ def label(item: dict) -> str:
 def _source(app: str, data: str = "") -> tuple[Destination, dict] | None:
     items = destinations()
     if len(items) > 1:
-        index = ui.menu("De qual pasta de destino?", [item.path for item in items] + ["Voltar"], [item.detail() for item in items])
+        index = ui.menu("De qual pasta do vault?", [item.path for item in items] + ["Voltar"], [item.detail() for item in items])
         if index >= len(items):
             return None
         place = items[index]

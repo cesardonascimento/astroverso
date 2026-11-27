@@ -105,5 +105,5 @@ def actions() -> list[Action]:
         Action("github", "Chave desta máquina para o GitHub", ssh.github),
         Action("watch", "Verificar agora", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
     ]

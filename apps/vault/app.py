@@ -66,7 +66,7 @@ def _server(reuse: bool) -> None:
     if local not in server.clients():
         old = ""
         if server.existing(local):
-            ui.note(f"As pastas de destino já têm backups de {local}. Para continuar com eles, use a senha do repositório antiga (do gerenciador de senhas).")
+            ui.note(f"As pastas do vault já têm backups de {local}. Para continuar com eles, use a senha do repositório antiga (do gerenciador de senhas).")
             old = _old_password(local)
         server.add(local, old)
         ui.ok(f"máquina {local} cadastrada no servidor")
@@ -85,7 +85,7 @@ def _server(reuse: bool) -> None:
 def _link() -> None:
     ui.note(
         "Na máquina com o vault, use a ação Adicionar uma máquina (ou Mostrar os dados de uma máquina) do "
-        "app vault: ela mostra o código de ligação (endereço, usuário e pastas de destino) e as duas senhas."
+        "app vault: ela mostra o código de ligação (endereço, usuário e pastas do vault) e as duas senhas."
     )
     while True:
         url, user, items = vault.read_code(ui.ask("código de ligação", validate=_code))
@@ -124,7 +124,7 @@ def update_destinations() -> None:
     if (url, user) != (values["VAULT_URL"], values["VAULT_USER"]):
         ui.fail(f"esse código é de {user} em {url}; esta máquina é {values['VAULT_USER']} em {values['VAULT_URL']}")
     vault.save_destinations(items)
-    ui.ok("pastas de destino atualizadas: " + ", ".join(item.path for item in items))
+    ui.ok("pastas do vault atualizadas: " + ", ".join(item.path for item in items))
     ui.info("os apps que mandavam para uma pasta que saiu avisam no #vault: desligue e ligue o backup deles para escolher de novo")
 
 
@@ -134,7 +134,7 @@ def install(reuse: bool | None = None) -> None:
     ui.note(
         "Cada app guarda todo dia a própria configuração (respostas, senhas, bancos) e, se tiver, os próprios dados, "
         "criptografados, num vault da casa, e pode ser restaurado de qualquer versão guardada. Uma máquina "
-        "tem o servidor, com as pastas de destino; cada app escolhe para quais pastas manda o backup dele."
+        "tem o servidor, com as pastas do vault; cada app escolhe para quais pastas manda o backup dele."
     )
     chosen = mode() if again and mode() in MODES else ""
     if not chosen:
@@ -201,7 +201,7 @@ def add_machine() -> None:
     )
     if ui.menu("Essa máquina", ["É nova (gera as duas senhas)", "Está voltando (usa a senha do repositório antiga)"]) == 1:
         if not server.existing(name):
-            ui.warn(f"não há backups de {name} nas pastas de destino: confira o nome (a senha antiga só é conferida se houver)")
+            ui.warn(f"não há backups de {name} nas pastas do vault: confira o nome (a senha antiga só é conferida se houver)")
         old = _old_password(name)
     values = server.add(name, old)
     server.restart()
@@ -220,7 +220,7 @@ def remove_machine() -> None:
     for index in chosen:
         name = names[index]
         (server.clients_folder() / f"{name}.env").unlink()
-        ui.ok(f"{name} não manda mais backups (os repositórios dela ficaram nas pastas de destino)")
+        ui.ok(f"{name} não manda mais backups (os repositórios dela ficaram nas pastas do vault)")
     if chosen:
         server._write_htpasswd()
         server.restart()
@@ -242,7 +242,7 @@ def summary() -> None:
             ["Endereço", f"https://{server.address()}"],
             ["Regra", f"{config.load(APP).get('KEEP_DAILY', '30')} diárias e {config.load(APP).get('KEEP_MONTHLY', '12')} mensais"],
         ])
-        ui.section("Pastas de destino")
+        ui.section("Pastas do vault")
         ui.table([[item.path, server.free_space(item) if server.reachable(item) else ui.bad("indisponível"), item.detail()]
                   for item in server.destinations()] or [[ui.off("nenhuma"), "-", "-"]], ["Pasta", "Espaço", "Nuvem"])
         rows: list[list[str | ui.Cell]] = []
@@ -257,7 +257,7 @@ def summary() -> None:
         watch.summary(APP)
     ui.section("Esta máquina")
     ui.table([["Vault", vault.settings().get("VAULT_URL") or ui.pending("não configurado")]]
-             + [["Pasta de destino", item.path] for item in vault.destinations()])
+             + [["Pasta do vault", item.path] for item in vault.destinations()])
 
 
 def collect(previous: watch.State) -> dict[str, watch.Problem]:
@@ -270,7 +270,7 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
     for item in server.destinations():
         if item not in places:
             found[f"destination:{item.id}"] = watch.Problem(
-                "erro", f"Pasta de destino indisponível: {item.path}",
+                "erro", f"Pasta do vault indisponível: {item.path}",
                 "O disco está desligado ou travado (veja o app disks): os backups para ela falham até ele voltar.", "destination")
     for name, values in server.clients().items():
         latest = {item: server.latest(server.snapshots(server.repository(item, name), values)) for item in places}
@@ -304,7 +304,7 @@ def check() -> None:
         try:
             server.heal()
         except SystemExit:
-            ui.warn("o vault não voltou ao ajustar as pastas de destino")
+            ui.warn("o vault não voltou ao ajustar as pastas do vault")
     watch.run(APP, collect, BUTTONS, "backups em ordem")
 
 
@@ -325,12 +325,12 @@ def actions() -> list[Action]:
         Action("summary", "Resumo dos backups", summary, remote=True),
         Action("changes", "Mudanças no sistema", manage),
         Action("backup-now", "Fazer backup agora", backup_now, remote=True),
-        Action("restore-version", "Restaurar uma versão", restore_version),
+        Action("restore-version", "Restaurar uma fotografia", restore_version),
     ]
     if mode() != "server":
-        return common + [Action("update-destinations", "Atualizar as pastas de destino", update_destinations)]
+        return common + [Action("update-destinations", "Atualizar as pastas do vault", update_destinations)]
     return common + [
-        Action("destinations", "Pastas de destino", server.manage_destinations),
+        Action("destinations", "Pastas do vault", server.manage_destinations),
         Action("add-machine", "Adicionar uma máquina", add_machine),
         Action("show-machine", "Mostrar os dados de uma máquina", show_machine),
         Action("remove-machine", "Descadastrar máquinas", remove_machine),

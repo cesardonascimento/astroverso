@@ -109,7 +109,7 @@ def watch_change() -> changes.Change:
 def folders_change() -> changes.Change:
     return vault.data_change(
         APP, "folders", "Fazer o backup das pastas dos discos todo dia",
-        "Guarda as pastas dos discos escolhidas em Backup das pastas dos discos, cada uma nas próprias pastas de destino. "
+        "Guarda as pastas dos discos escolhidas em Backup das pastas dos discos, cada uma nas próprias pastas do vault. "
         "Disco desligado ou travado fica de fora, com aviso, em vez de virar uma versão vazia.",
         "backup-folders", None, "das pastas dos discos",
     )
@@ -240,8 +240,8 @@ def summary() -> None:
     else:
         ui.info("nenhum disco cadastrado: escolha em Discos da máquina")
     ui.section("Backup das pastas dos discos")
-    ui.table([[entry["path"], ", ".join(item.path for item in _places(entry)[0]) or ui.bad("nenhuma pasta de destino")]
-              for entry in backups()] or [[ui.off("nenhuma pasta"), "-"]], ["Pasta", "Pastas de destino"])
+    ui.table([[entry["path"], ", ".join(item.path for item in _places(entry)[0]) or ui.bad("nenhuma pasta do vault")]
+              for entry in backups()] or [[ui.off("nenhuma pasta"), "-"]], ["Pasta", "Pastas do vault"])
     ui.section("Mudanças no sistema")
     ui.table(changes.rows(items()), ["Mudança", "Situação"])
     kit_watch.summary(APP)
@@ -304,7 +304,7 @@ def validate_source(value: str) -> str:
 
 
 def _add_folder() -> None:
-    ui.note("Uma pasta (ou o disco inteiro) que entra no backup diário. Depois, escolha para quais pastas de destino ela vai.")
+    ui.note("Uma pasta (ou o disco inteiro) que entra no backup diário. Depois, escolha para quais pastas do vault ela vai.")
     path = folders.pick("pasta com backup", str(disks.mounts()[0].path) if disks.mounts() else "", validate=validate_source)
     chosen = vault.pick(f"Onde guardar as fotografias de {path}?")
     if not chosen:
@@ -323,7 +323,7 @@ def _change_places() -> None:
     if chosen:
         entries[index]["to"] = [item.id for item in chosen]
         save_backups(entries)
-        ui.ok("pastas de destino trocadas")
+        ui.ok("pastas do vault trocadas")
 
 
 def _drop_folders() -> None:
@@ -341,8 +341,8 @@ def manage_backups() -> None:
         entries = backups()
         if entries:
             ui.table([[entry["path"], ", ".join(item.path for item in _places(entry)[0]) or ui.bad("nenhuma")] for entry in entries],
-                     ["Pasta", "Pastas de destino"])
-        options = ["Adicionar uma pasta"] + (["Trocar as pastas de destino de uma pasta", "Tirar pastas do backup"] if entries else []) + ["Pronto"]
+                     ["Pasta", "Pastas do vault"])
+        options = ["Adicionar uma pasta"] + (["Trocar as pastas do vault de uma pasta", "Tirar pastas do backup"] if entries else []) + ["Pronto"]
         choice = options[ui.menu("Backup das pastas dos discos", options)]
         if choice == "Adicionar uma pasta":
             _add_folder()
@@ -375,5 +375,5 @@ def actions() -> list[Action]:
         Action("backup-folders", "Fazer backup das pastas agora", backup_folders, remote=True),
         Action("restore-folder", "Restaurar uma pasta de uma versão (numa pasta nova)", restore_folder),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
     ]

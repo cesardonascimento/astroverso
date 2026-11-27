@@ -17,6 +17,17 @@ o app ou pacote delas for migrado.
   sistema, sufixo `.astroverso-bak`, recursos da Cloudflare, prefixo `[astroverso]` dos logs e rótulos dos menus.
 - **`astro` é só o bot do Discord**: o nome do bot, o comando `/astro`, o `custom_id` `astro|...` e o canal do bot.
   Todo o resto é `astroverso`, inclusive o usuário padrão dos apps.
+- **Vocabulário das cópias** (decisão do usuário: uma palavra, um sentido; nada de "backup" para outra coisa):
+
+  | Termo | Sentido |
+  |---|---|
+  | backup | só o conceito de guardar uma cópia de segurança ("backup da configuração", "Fazer backup agora") |
+  | vault | o app que guarda as cópias de todas as máquinas (o cofre) |
+  | pastas do vault | onde o vault guarda as cópias |
+  | fotografia | cada cópia datada (o *snapshot* do restic); "Restaurar uma fotografia" |
+  | espelho | o envio de uma via do `cloud` (não é backup: o que sai da origem sai do destino) |
+  | sincronização | as duas vias do `cloud` |
+  | `legacy/` | o código antigo |
 
 ## Como trabalhar
 
@@ -89,7 +100,7 @@ legacy/           código antigo, só referência
   continuam como `ui.note`.
 - **Backup das configurações: cada app manda o seu.** Cada app implementa `backup(pasta)` e `restore(pasta)` e usa o
   `kit.vault`: a mudança perguntada `kit.vault.change(APP)` (timer diário próprio) e as ações "Fazer backup agora"
-  (`run_backup`) e "Restaurar uma versão" (`restore`). Nenhum app varre os outros. Sem o vault ligado na
+  (`run_backup`) e "Restaurar uma fotografia" (`restore`). Nenhum app varre os outros. Sem o vault ligado na
   máquina, o backup só avisa e segue.
 
 ### App `network`
@@ -158,13 +169,13 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
 
 - Servidor (uma máquina): container `rclone serve restic --append-only --private-repos` publicado em
   `vault.<domínio>`, manutenção semanal (`forget --prune` + `check`) só no servidor, verificação de hora em hora
-  (36 h sem backup, pasta de destino indisponível).
-- **Pastas de destino:** o servidor só mantém a lista de caminhos (sem nome: decisão do usuário, nome gerava
+  (36 h sem backup, pasta do vault indisponível).
+- **Pastas do vault:** o servidor só mantém a lista de caminhos (sem nome: decisão do usuário, nome gerava
   confusão), escolhidos pelo `kit.folders` (disco, espaço e marca ☁). Nenhum conceito de local ou nuvem: o usuário
   escolhe uma pasta ligada à nuvem se quiser que vá para a nuvem. Sem validação nem regra automática de destino.
 - Um repositório por máquina em cada pasta (`<pasta>/<máquina>`), montado no container em `/<máquina>/<id>` (o
   `--private-repos` continua separando as máquinas). Os apps da máquina dividem o repositório, separados por marca.
-- Pasta de destino indisponível (disco ausente) fica fora do container, e o servidor sobe com as outras (um volume
+- Pasta do vault indisponível (disco ausente) fica fora do container, e o servidor sobe com as outras (um volume
   sem origem impede o container inteiro de subir); a verificação de hora em hora refaz o container quando o conjunto
   muda (`server.heal`). O container é `ReadOnly`: backup para pasta ausente falha, em vez de gravar no container.
 - **Quem decide para onde vai o backup é cada app** (decisão do usuário), não o app `vault`: a mudança do
@@ -209,7 +220,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   descadastrar em "Discos da máquina" também descadastra o TPM.
 - Os outros apps leem pelo `kit.disks` (o `fstab` é o contrato): `mounts()`, `available(pasta)`.
 - Verificação de hora em hora: não montado, preso (não responde) e 90% ocupado.
-- Backup das pastas dos discos (dados que não são de nenhum app): cada pasta com as próprias pastas de destino, em
+- Backup das pastas dos discos (dados que não são de nenhum app): cada pasta com as próprias pastas do vault, em
   `backups.json`.
 
 ### App `n8n`
@@ -218,7 +229,7 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   Quadlet: `astroverso-n8n` e `astroverso-n8n-runners` (imagens oficiais, mesma versão), SQLite, `n8n.<domínio>`,
   administrador mantido pela instalação (hash bcrypt), isolado da empresa.
 - **Rotinas só no banco do n8n** (fonte de verdade, sem sincronizar código; nada pessoal no repositório). Versões: o
-  histórico do n8n, "Restaurar uma rotina" (uma rotina de um backup, como cópia ou substituindo) e "Restaurar uma versão".
+  histórico do n8n, "Restaurar uma rotina" (uma rotina de um backup, como cópia ou substituindo) e "Restaurar uma fotografia".
   O backup leva o `export:entities` e cada rotina num JSON separado.
 - **Módulos** (`apps/n8n/modules/<módulo>/`): APIs em Python, um container cada (`astroverso-n8n-<módulo>:8080`, sem
   porta nem endereço), rotas `/v1/...` versionadas e `/v1/saude`. Não aparecem no instalador: todos sobem sozinhos, e a

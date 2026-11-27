@@ -137,7 +137,7 @@ def validate_destination(value: str) -> str:
     if resolved in (Path.home().resolve(), Path("/")) or resolved == config.home().resolve() or config.home().resolve() in resolved.parents:
         raise ValueError("escolha uma pasta só para os backups (fora do ~/.astroverso)")
     if str(path) in [item.path for item in destinations()]:
-        raise ValueError("essa pasta já é uma pasta de destino")
+        raise ValueError("essa pasta já é uma pasta do vault")
     return str(path)
 
 
@@ -161,14 +161,14 @@ def ask(reuse: bool) -> None:
 
 def _add_destination() -> None:
     ui.note(
-        "Uma pasta de destino guarda os backups das máquinas, uma subpasta (repositório criptografado) por máquina. "
+        "Uma pasta do vault guarda os backups das máquinas, uma subpasta (repositório criptografado) por máquina. "
         "Cada app escolhe para quais pastas vai o backup dele. A marca ☁ só mostra que a pasta está ligada a uma nuvem."
     )
-    path = folders.pick("pasta de destino", validate=validate_destination)
+    path = folders.pick("pasta do vault", validate=validate_destination)
     items = destinations()
     items.append(vault.Destination(new_id(path, {item.id for item in items}), path, clouds.mark(Path(path))))
     save_destinations(items)
-    ui.ok(f"pasta de destino {path} cadastrada")
+    ui.ok(f"pasta do vault {path} cadastrada")
 
 
 def _drop_destinations() -> None:
@@ -189,9 +189,9 @@ def manage_destinations() -> None:
     while True:
         items = destinations()
         if items:
-            ui.table([[item.path, free_space(item), item.detail()] for item in items], ["Pasta de destino", "Espaço", "Nuvem"])
+            ui.table([[item.path, free_space(item), item.detail()] for item in items], ["Pasta do vault", "Espaço", "Nuvem"])
         options = ["Adicionar uma pasta"] + (["Tirar pastas"] if items else []) + ["Pronto"]
-        choice = options[ui.menu("Pastas de destino", options)]
+        choice = options[ui.menu("Pastas do vault", options)]
         if choice == "Adicionar uma pasta":
             _add_destination()
         elif choice == "Tirar pastas":
@@ -199,7 +199,7 @@ def manage_destinations() -> None:
         elif items:
             break
         else:
-            ui.warn("cadastre pelo menos uma pasta de destino")
+            ui.warn("cadastre pelo menos uma pasta do vault")
     if destinations() != before:
         apply_destinations()
 
@@ -209,7 +209,7 @@ def apply_destinations() -> None:
         start()
     sync_local()
     if len(clients()) > 1:
-        ui.info("nas outras máquinas, use a ação Atualizar as pastas de destino do app vault, com o código de Mostrar os dados de uma máquina")
+        ui.info("nas outras máquinas, use a ação Atualizar as pastas do vault do app vault, com o código de Mostrar os dados de uma máquina")
 
 
 def sync_local() -> None:
@@ -226,7 +226,7 @@ def prepare_folders() -> None:
         if disks.available(Path(item.path)):
             Path(item.path).mkdir(parents=True, exist_ok=True, mode=0o700)
         if not reachable(item):
-            ui.warn(f"pasta de destino indisponível: {item.path} (disco desligado ou travado?)")
+            ui.warn(f"pasta do vault indisponível: {item.path} (disco desligado ou travado?)")
             continue
         for name in clients():
             repository(item, name).mkdir(exist_ok=True, mode=0o700)
@@ -238,7 +238,7 @@ def start() -> None:
         _write_htpasswd()
     routes.publish(APP, [routes.Route(address(), f"http://{NAME}:{PORT}")])
     if not available():
-        ui.warn("nenhuma pasta de destino disponível (discos desligados?): o vault fica parado até uma voltar")
+        ui.warn("nenhuma pasta do vault disponível (discos desligados?): o vault fica parado até uma voltar")
         return
     container.prepare()
     container.start(spec())
@@ -252,7 +252,7 @@ def heal() -> None:
         container.start(spec())
     elif installed():
         run.succeeds(["systemctl", "--user", "stop", container.unit(NAME)])
-        ui.warn("nenhuma pasta de destino disponível: vault parado até uma voltar")
+        ui.warn("nenhuma pasta do vault disponível: vault parado até uma voltar")
 
 
 def restart() -> None:

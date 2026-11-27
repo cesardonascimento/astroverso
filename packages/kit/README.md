@@ -236,18 +236,18 @@ As mudanças que um app faz no sistema, uma a uma (regra de todo app: veja `apps
 
 O backup de cada app no servidor do app `vault` (restic por HTTPS). A máquina fica ligada ao servidor por
 `~/.astroverso/vault.env` (`VAULT_URL`, `VAULT_USER`, `VAULT_PASSWORD`, `VAULT_REPO_PASSWORD`, `600`) e
-`~/.astroverso/vault-folders.json` (as pastas de destino do servidor: `Destination(id, path, cloud)`). Cada
-pasta de destino é um repositório: `rest:<url>/<máquina>/<id>/`. **Quem escolhe as pastas é o app**, guardadas no
+`~/.astroverso/vault-folders.json` (as pastas do vault do servidor: `Destination(id, path, cloud)`). Cada
+pasta do vault é um repositório: `rest:<url>/<máquina>/<id>/`. **Quem escolhe as pastas é o app**, guardadas no
 `.env` dele (`BACKUP_TO` para a configuração; outra chave para cada parte dos dados).
 
 | Nome | O que faz |
 |---|---|
-| `change(app)` | A mudança perguntada do backup diário: ao ligar, pergunta as pastas de destino (`choose`) e instala o timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now`. Desfazer tira o timer e esquece as pastas |
+| `change(app)` | A mudança perguntada do backup diário: ao ligar, pergunta as pastas do vault (`choose`) e instala o timer `astroverso-<app>-backup` às 01:MM (o minuto vem do nome do app), `Persistent`, que roda `astroverso <app> action backup-now`. Desfazer tira o timer e esquece as pastas |
 | `data_change(app, parte, rótulo, porquê, ação, chave, o_quê)` | Igual, para dados: timer `astroverso-<app>-backup-<parte>` às 02:MM, que roda a ação dada; com `chave=None`, o app guarda as pastas de cada item do jeito dele |
 | `run_backup(app, backup, label="", notify=True)` | Chama `backup(pasta)` do app numa pasta temporária, manda pelo `restic backup` para cada pasta escolhida (marcas `astroverso`, `app:<app>` e o rótulo), apaga a pasta e avisa no `#vault` (falha com o botão "Tentar de novo"). Sem servidor, só avisa; sem pasta escolhida ou com pasta que saiu do servidor, avisa o erro |
 | `run_data(app, nome, caminho, pastas, ação, unshare=, missing=, exclude=)` | Manda uma pasta de dados direto (marca `dados:<nome>`), com `podman unshare` para os arquivos de containers; `missing` são as pastas escolhidas que saíram do servidor (avisadas como erro). Pasta num disco desligado ou travado (`kit.disks.available`): não guarda nada e avisa |
-| `restore(app, backup, restore)` | Escolhe a pasta de destino e a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
-| `opened(app)` | Contexto: escolhe a pasta de destino e a versão da configuração e entrega `(pasta, data)` com o conteúdo daquela versão (ou `None` se voltar), apagada no fim. Para restaurar só uma parte (ex.: uma rotina do n8n) |
+| `restore(app, backup, restore)` | Escolhe a pasta do vault e a versão, guarda antes uma versão "antes-da-restauracao", traz a pasta daquela versão e chama `restore(pasta)` do app |
+| `opened(app)` | Contexto: escolhe a pasta do vault e a versão da configuração e entrega `(pasta, data)` com o conteúdo daquela versão (ou `None` se voltar), apagada no fim. Para restaurar só uma parte (ex.: uma rotina do n8n) |
 | `restore_data(app, nome)` | Traz uma versão dos dados numa pasta nova e vazia (padrão `~/Restaurado/<app>-<nome>-<data>`), sem mexer na original |
 | `targets(app, chave)` / `choose(app, chave, o_quê)` / `pick(pergunta, atuais)` | As pastas escolhidas por um app e a pergunta "Onde guardar as fotografias …?" (checklist com a marca ☁), depois de explicar que o backup é uma fotografia por dia, com versões, e não um espelho |
 | `versions(app, pasta, dados="")` / `summary(app, dados=)` | As versões do app nesta máquina numa pasta (as de configuração, ou as de uma parte dos dados) e a tabela para o resumo |

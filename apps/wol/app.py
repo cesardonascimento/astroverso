@@ -213,7 +213,7 @@ def actions() -> list[Action]:
         Action("machines", "Máquinas da rede", manage_machines),
         Action("changes", "Mudanças no sistema", manage),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
-        Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),
+        Action("restore-version", "Restaurar uma fotografia", lambda: vault.restore(APP, backup, restore)),
         *[Action(f"{PREFIX}{item['name']}", f"Ligar {item['name']}", lambda name=item["name"]: _remote(name), remote=True, menu=False)
           for item in machines()],
     ]

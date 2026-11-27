@@ -61,7 +61,7 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | Unidades do usuário `astroverso-cloud-sync.timer` e `.service` (perguntada) | As sincronizações de duas vias de hora em hora | ⚠ |
 | Unidades do usuário `astroverso-cloud-send.timer` e `.service` (perguntada) | Os envios às 05:00 | ⚠ |
 | Unidades do usuário `astroverso-cloud-watch.timer` e `.service` (perguntada) | A verificação de hora em hora | |
-| Unidades do usuário `astroverso-cloud-backup.timer` e `.service` (perguntada, com as pastas de destino) | Backup diário da configuração (sem as senhas) no vault | |
+| Unidades do usuário `astroverso-cloud-backup.timer` e `.service` (perguntada, com as pastas do vault) | Backup diário da configuração (sem as senhas) no vault | |
 
 ## Fora da máquina (passos seus)
 
@@ -79,7 +79,7 @@ Trava em 5% dos arquivos da pasta (mínimo 10) para apagar, liberada pela mesma 
 | Sincronizações e envios | Adicionar e tirar (tirar não apaga nada, nem na máquina nem na nuvem) |
 | Sincronizar agora / Enviar agora | Uma rodada na hora (também no Discord) |
 | Liberar exclusões | Para uma rodada travada nos 5%: mostra o que seria apagado e, com confirmação, roda liberando |
-| Mudanças no sistema / Verificar agora / Fazer backup agora / Restaurar uma versão | Como nos outros apps. O backup leva as contas (provedor e e-mail), as sincronizações e os envios, sem as senhas: na restauração, cada conta pede o login de novo |
+| Mudanças no sistema / Verificar agora / Fazer backup agora / Restaurar uma fotografia | Como nos outros apps. O backup leva as contas (provedor e e-mail), as sincronizações e os envios, sem as senhas: na restauração, cada conta pede o login de novo |
 
 ## Verificação de hora em hora
 

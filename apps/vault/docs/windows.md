@@ -13,7 +13,7 @@ No gerenciador do Astroverso, na máquina do servidor: **backup → Adicionar um
 - a **senha de acesso** e a **senha do repositório** (guarde as duas no gerenciador de senhas: veja
   [senhas.md](senhas.md));
 - as linhas **repositório em `<pasta>`: `rest:https://vault.<domínio>/<nome-da-máquina>/<id>/`**, uma por pasta de
-  destino. Cada pasta do PC vai para o repositório da pasta de destino que você escolher.
+  destino. Cada pasta do PC vai para o repositório da pasta do vault que você escolher.
 
 Os mesmos dados aparecem depois em **Mostrar os dados de uma máquina**.
 
@@ -74,7 +74,7 @@ Guardar "rest:https://vault.<domínio>/<nome-da-máquina>/<id>/" "C:\Users\<voc�
 if ($Falhou) { exit 1 }
 ```
 
-- **O repositório** é uma das linhas do passo 1: escolha, para cada pasta, a pasta de destino dela. A mesma pasta do
+- **O repositório** é uma das linhas do passo 1: escolha, para cada pasta, a pasta do vault dela. A mesma pasta do
   PC pode ir para mais de uma (uma linha `Guardar` para cada repositório).
 - **O nome** (`fotos`, `documentos`) vira a etiqueta `dados:<nome>`: cada pasta é uma série de versões própria, e o
   resumo do servidor mostra `windows (fotos)`. Use um nome sem vírgula e não troque depois (trocar começa uma série
@@ -134,4 +134,4 @@ Remove-Item -Recurse -Force C:\ProgramData\Astroverso\backup
 ```
 
 Isso apaga a tarefa, o restic e as senhas do PC. Os backups continuam no servidor. Para o servidor parar de esperar
-o PC: **backup → Descadastrar máquinas** (os repositórios dele ficam nas pastas de destino).
+o PC: **backup → Descadastrar máquinas** (os repositórios dele ficam nas pastas do vault).
