@@ -8,7 +8,7 @@ from kit import vault
 from kit import changes, config, container, disks, docs, folders, routes, ui, validate, watch
 from kit.app import Action
 
-from . import accounts
+from . import accounts, drives
 from . import backup as copies
 from . import nextcloud
 
@@ -77,6 +77,7 @@ def _ask(reuse: bool) -> str:
     elif values.get("FILES") is None:
         answers["FILES"] = str(nextcloud.files())
     config.save(APP, answers)
+    drives.choose()
     return password
 
 
@@ -94,12 +95,15 @@ def install(reuse: bool | None = None) -> None:
     container.prepare()
     nextcloud.prepare_secrets()
     nextcloud.prepare_files(nextcloud.files())
+    if nextcloud.drives():
+        nextcloud.save_drives(drives.refreshed(nextcloud.drives()))
     nextcloud.render_site(nextcloud.host())
     nextcloud.start()
     nextcloud.wait_ready()
     if password:
         nextcloud.change_password(nextcloud.admin(), password)
     nextcloud.tune(nextcloud.host(), first)
+    drives.sync()
     nextcloud.publish(nextcloud.host())
     changes.install(APP, items(), again)
     accounts.sync()
@@ -112,6 +116,8 @@ def remove() -> None:
     ui.step("Nextcloud")
     path = nextcloud.files()
     changes.undo_all(items())
+    if nextcloud.installed():
+        drives.forget()
     nextcloud.remove_containers()
     routes.withdraw(APP)
     if path.exists() and ui.confirm(f"Apagar também a pasta dos arquivos ({path}), com os arquivos de todos os usuários?", default=False):
@@ -183,6 +189,8 @@ def summary() -> None:
         ["Administrador", nextcloud.admin()],
         ["Pasta dos arquivos", str(nextcloud.files())],
         ["Espaço", nextcloud.free_space(nextcloud.files())],
+        ["Outros discos", ", ".join(f"{name} (só leitura)" if readonly else name for name, readonly in nextcloud.drives())
+         + f" · em /{drives.FOLDER}" if nextcloud.drives() else "-"],
     ]
     if state:
         cron = nextcloud.last_cron()
@@ -207,6 +215,9 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
         found["disk"] = watch.Problem("erro", "Disco dos arquivos do Nextcloud indisponível",
                                       f"{nextcloud.files()} está num disco desligado ou travado: o Nextcloud não abre os arquivos até ele voltar.")
         return found
+    for name in drives.missing():
+        found[f"drive:{name}"] = watch.Problem("aviso", f"Disco {name} indisponível no Nextcloud",
+                                               f"/{drives.FOLDER}/{name} aparece vazia no Nextcloud até o disco voltar.")
     state = nextcloud.status()
     if state.get("maintenance"):
         found["maintenance"] = watch.Problem("aviso", "Nextcloud em manutenção", "Ninguém consegue usar o Nextcloud até sair da manutenção.")
@@ -222,6 +233,7 @@ def collect(previous: watch.State) -> dict[str, watch.Problem]:
 
 
 def check() -> None:
+    drives.heal()
     watch.run(APP, collect, BUTTONS, "Nextcloud em ordem")
 
 
@@ -238,6 +250,17 @@ def password() -> None:
     nextcloud.change_password(nextcloud.admin(), new)
 
 
+def choose_drives() -> None:
+    if not nextcloud.installed():
+        ui.fail("o Nextcloud precisa estar no ar")
+    if drives.choose():
+        nextcloud.start()
+        nextcloud.wait_ready()
+    drives.sync()
+    if not nextcloud.drives():
+        ui.info("nenhum outro disco no Nextcloud")
+
+
 def manage() -> None:
     changes.manage(APP, items())
 
@@ -250,6 +273,7 @@ def actions() -> list[Action]:
         Action("repair", "Reparar o Nextcloud", repair, remote=True, confirm=True),
         Action("mailboxes", "Atualizar as contas de e-mail", accounts.sync, remote=True),
         Action("bring", "Trazer uma pasta para o Nextcloud", bring_folder),
+        Action("drives", "Discos no Nextcloud", choose_drives),
         Action("watch", "Verificar agora (e avisar no Discord)", check, remote=True),
         Action("backup-now", "Fazer backup agora", lambda: vault.run_backup(APP, backup), remote=True),
         Action("restore-version", "Restaurar uma versão", lambda: vault.restore(APP, backup, restore)),

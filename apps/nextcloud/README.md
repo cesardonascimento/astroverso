@@ -24,6 +24,7 @@ systemd), e o cron depois do Nextcloud.
 | Usuário administrador (só na primeira vez) | `astroverso` |
 | Senha do administrador (só na primeira vez) | sem padrão; se o Nextcloud recusar (curta, comum ou vazada), pede de novo |
 | Qual é o disco do Nextcloud? (só na primeira vez) | Um disco do app `disks` (menos os de fotografias) ou o disco do sistema. O Nextcloud assume o disco: os arquivos ficam em `/srv/<disco>/nextcloud` (criada se faltar; vazia ou a de um Nextcloud anterior), e o resto do disco fica como está, para trazer depois com **Trazer uma pasta para o Nextcloud**. No disco do sistema, `~/Nextcloud`. Sem disco de dados montado, não pergunta |
+| Quais discos mostrar no Nextcloud? | Nenhum. Os outros discos montados do app `disks` (menos o do próprio Nextcloud), para aparecerem em `/Discos` (veja "Outros discos") |
 
 1. Gera a senha do banco e uma senha inicial do administrador em `~/.astroverso/nextcloud/secrets/`, lidas pelos
    containers por arquivo (`*_FILE`): nunca vão para o `.env` nem para argumentos de comando.
@@ -59,6 +60,25 @@ Nextcloud.
 - Sincronizar uma pasta do Nextcloud com uma nuvem (ex.: Proton Drive) é pelo app `cloud`, com o Nextcloud como conta
   (WebDAV), nunca gravando direto na pasta dos arquivos.
 
+## Outros discos
+
+Os outros discos da máquina aparecem no Nextcloud do administrador, na pasta `/Discos`, um por pasta (ex.:
+`/Discos/studio`), pelo **armazenamento externo do tipo Local** (app `files_external` do Nextcloud). Os arquivos ficam
+onde estão e continuam sendo usados por outros programas: o Nextcloud confere o disco a cada acesso.
+
+- Cada disco escolhido é montado nos containers `astroverso-nextcloud` e `-cron` em `/srv/<disco>`, sem reetiquetar
+  (os discos já montam com o rótulo de container do SELinux), e registrado pelo `occ files_external:create`, só para o
+  administrador (`files_external:applicable`). Os donos não mudam: o app `disks` já dá acesso ao `www-data` do container
+  por ACL.
+- **O disco de fotografias entra só para leitura**, na montagem (`ro`) e no Nextcloud (`readonly`): serve para buscar um
+  arquivo antigo em `atual/` ou `versoes/`, e nada grava nele.
+- Sem versões do Nextcloud nesses discos (só a lixeira): o histórico é o da fotografia. Pastas com muitos arquivos
+  demoram mais para abrir que as da raiz.
+- A escolha fica em `DRIVES` no `.env` do app (entra no backup). A ação **Discos no Nextcloud** muda a escolha: refaz os
+  containers e acerta os registros; registros em `/Discos` que não foram escolhidos são apagados.
+- Um disco que volta depois que o container subiu (gaveta USB, resgate) não aparece dentro dele: a verificação de hora
+  em hora compara o disco dentro e fora do container e reinicia o Nextcloud quando eles diferem.
+
 ## Mudanças na máquina
 
 | Mudança | Por quê |
@@ -67,6 +87,7 @@ Nextcloud.
 | 4 containers por Quadlet (tabela acima), na rede `astroverso`, sem porta aberta na máquina | O Nextcloud e o que ele precisa; o Caddy chega no `astroverso-nextcloud` pelo nome |
 | `~/.astroverso/nextcloud/` (`html/`, `db/`, `secrets/`, `apache.conf`, `.env`) | O código e a configuração do Nextcloud, o banco, as senhas e as respostas da instalação |
 | `/srv/<disco>/nextcloud` (ou `~/Nextcloud`), do `www-data` do container | Os arquivos de todos os usuários do Nextcloud |
+| Os outros discos escolhidos montados nos containers em `/srv/<disco>` (o de fotografias só leitura), o app `files_external` ligado e um armazenamento externo por disco em `/Discos/<disco>`, só do administrador | Ver e usar os outros discos da máquina pelo Nextcloud (veja "Outros discos") |
 | `~/.astroverso/routes/nextcloud.json` | O endereço publicado para o Caddy |
 | Unidades do usuário `astroverso-nextcloud-mailboxes.path` e `.service` (perguntada, padrão sim) | Quando uma caixa de e-mail é publicada ou retirada, a conta no Nextcloud Mail é criada, atualizada ou apagada na hora (`astroverso nextcloud action mailboxes`) |
 | Unidades do usuário `astroverso-nextcloud-watch.timer` e `.service` (perguntada, padrão sim, em **Mudanças no sistema**) | A cada hora, confere o Nextcloud e avisa no Discord quando algo quebra e quando volta ao normal |
@@ -89,6 +110,7 @@ Nextcloud.
 | Reparar o Nextcloud | Índices do banco, reparos e a reverificação dos arquivos (`occ files:scan --all`), útil depois de copiar arquivos por fora. Também no Discord, com confirmação |
 | Verificar agora | Roda a verificação de hora em hora na hora |
 | Trazer uma pasta para o Nextcloud | Move uma pasta da máquina para os arquivos de um usuário e a cataloga (veja "Os arquivos num disco") |
+| Discos no Nextcloud | Escolhe os outros discos que aparecem em `/Discos`, refaz os containers e acerta os registros (veja "Outros discos") |
 | Fazer backup agora / Restaurar uma versão | Backup da configuração na hora (também no Discord) e restauração de uma versão guardada no vault (app `vault`), com uma cópia "antes-da-restauracao" |
 
 ## Verificação de hora em hora
@@ -103,6 +125,8 @@ Nextcloud** e **Verificar de novo**:
 | Erro na verificação do próprio Nextcloud (`occ setupchecks`) | aviso, um por erro |
 | Pasta dos arquivos com menos de 10% livre | aviso |
 | Disco da pasta dos arquivos desligado ou travado (`kit.disks`) | erro |
+| Um dos outros discos (`/Discos`) desligado ou travado | aviso, um por disco |
+| Um dos outros discos voltou depois que o container subiu | reinicia o Nextcloud e o cron, sem aviso |
 
 ## Backup
 
@@ -119,7 +143,7 @@ usuários não entram: ficam protegidos pela fotografia do disco (app `disks`).
 
 ## Remover
 
-Desfaz a verificação, remove os containers e as imagens, retira o endereço do Caddy e apaga `~/.astroverso/nextcloud`.
+Desfaz a verificação, apaga os registros de `/Discos`, remove os containers e as imagens, retira o endereço do Caddy e apaga `~/.astroverso/nextcloud`.
 A pasta dos arquivos só é apagada se você confirmar (padrão não), e só se for mesmo uma pasta de dados do Nextcloud.
 
 Testes: `python3 -m unittest discover -s apps/nextcloud/tests`.

@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kit import config, container, routes, run, ui, validate
+from kit import config, container, disks, routes, run, ui, validate
 
 APP = "nextcloud"
 NAME = "astroverso-nextcloud"
@@ -24,6 +24,7 @@ SITE = Path(__file__).with_name("apache.conf")
 DEFAULT_FILES = Path.home() / "Nextcloud"
 FOLDER = "nextcloud"
 MARKERS = (".ncdata", ".ocdata")
+DRIVES = "DRIVES"
 
 
 def folder() -> Path:
@@ -58,6 +59,23 @@ def admin() -> str:
     return config.load(APP).get("ADMIN_USER") or "astroverso"
 
 
+def drives() -> list[tuple[str, bool]]:
+    found: list[tuple[str, bool]] = []
+    for item in (config.load(APP).get(DRIVES) or "").split(","):
+        name, _, mode = item.strip().partition(":")
+        if name:
+            found.append((name, mode == "ro"))
+    return found
+
+
+def save_drives(items: list[tuple[str, bool]]) -> None:
+    config.save(APP, {DRIVES: ",".join(f"{name}:ro" if readonly else name for name, readonly in items)})
+
+
+def drive(name: str) -> Path:
+    return disks.ROOT / name
+
+
 def installed() -> bool:
     return container.active(NAME)
 
@@ -88,6 +106,7 @@ def _volumes() -> list[container.Volume]:
         container.Volume(files(), "/var/www/html/data", "z"),
         container.Volume(secrets_folder(), "/run/secrets", "ro,z"),
         container.Volume(site_file(), "/etc/apache2/sites-enabled/000-default.conf", "ro,z"),
+        *(container.Volume(drive(name), f"/srv/{name}", "ro" if readonly else "rw") for name, readonly in drives() if drive(name).is_dir()),
     ]
 
 

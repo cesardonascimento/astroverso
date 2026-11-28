@@ -148,10 +148,14 @@ Tailscale, AdGuard e Caddy num app só, sempre os três juntos (`apps/network/`,
   enquanto).
 - **"Qual é o disco do Nextcloud?"** (decisão do usuário: o Nextcloud assume um disco inteiro, sem escolher pasta): os
   arquivos ficam em `/srv/<disco>/nextcloud` (ou `~/Nextcloud` no disco do sistema), do `www-data` do container
-  (`podman unshare chown 33:33`), **sem armazenamento externo** (os discos não são acessados por fora). Um disco só por
-  enquanto; vários discos ficam para depois. A ação "Trazer uma pasta
+  (`podman unshare chown 33:33`), sem armazenamento externo para eles. A ação "Trazer uma pasta
   para o Nextcloud" move uma pasta para os arquivos de um usuário e roda o `files:scan` só dela. A instalação para
   sem o disco, e a verificação avisa quando ele some.
+- **Outros discos** (`drives.py`, decisão do usuário): os outros discos montados aparecem em `/Discos/<disco>` só para o
+  administrador, por armazenamento externo Local (`files_external`), montados nos containers em `/srv/<disco>` sem `z`
+  (o `context=` do `fstab` já põe o rótulo; reetiquetar o disco inteiro seria lento). O disco de fotografias entra só
+  leitura (montagem `ro` + `readonly`). A verificação reinicia o Nextcloud quando um disco voltou depois do container
+  (o `st_dev` dentro e fora difere).
 - Senhas por arquivo (`*_FILE`) em `~/.astroverso/nextcloud/secrets/` (`644` dentro de pasta `700`: o Postgres lê
   como outro usuário do container). A senha do administrador entra por `occ user:resetpassword --password-from-env`.
 - `backup`/`restore` implementados (dump SQL + `config/`), mandados pelo `kit.vault`.
@@ -314,6 +318,8 @@ Cada pacote e cada app tem a própria etapa de arquitetura antes de ser escrito.
 - A instalação antiga roda a partir de `~/Projects/astroverso-homelab`: não mexer naquela pasta.
 - `sudo` não funciona na sessão do Claude (sem TTY). Instalações que pedem `sudo` rodam em um terminal normal.
 - Para testar menus e prompts, usar um pseudo-terminal em Python (`pty.fork`) enviando as teclas.
+- Nos testes, trocar o `container` e o `run` de **cada** módulo que os importa (ex.: `app.drives.container`): um módulo
+  esquecido chama o `systemctl` de verdade e reinicia o container real.
 - Não pedir nem aceitar segredos (tokens, senhas) no chat: eles entram pela instalação.
 - Teste real de containers por Quadlet: `HOME` temporário, mas `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e
   `XDG_RUNTIME_DIR` reais e o `container.quadlets` apontando para a pasta real (o systemd do usuário só lê de lá);

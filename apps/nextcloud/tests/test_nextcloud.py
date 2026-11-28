@@ -52,6 +52,9 @@ class FakeHost:
     def remove_image(self, image):
         self.record("remove_image", image)
 
+    def restart(self, spec, timeout=180):
+        self.record("restart", spec.name)
+
     def exec(self, name, args, user="", input=None):
         self.record("exec", *args[2:])
         return ""
@@ -92,6 +95,9 @@ class FakeRun:
     def succeeds(self, args, **_):
         return False
 
+    def output(self, args, timeout=None, env=None, input=None):
+        return 1, ""
+
 
 class NextcloudTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -108,6 +114,8 @@ class NextcloudTest(unittest.TestCase):
         for patch in (
             mock.patch.object(nextcloud, "container", self.host),
             mock.patch.object(app, "container", self.host),
+            mock.patch.object(app.drives, "container", self.host),
+            mock.patch.object(app.drives, "run", FakeRun(self.host)),
             mock.patch.object(app.accounts, "container", self.host),
             mock.patch.object(nextcloud, "run", FakeRun(self.host)),
             mock.patch.object(nextcloud, "DEFAULT_FILES", self.home / "Nextcloud"),
@@ -265,9 +273,78 @@ class NextcloudTest(unittest.TestCase):
         self.assertIn(("mail:account:delete", "7"), calls)
         self.assertNotIn(("mail:account:delete", "8"), calls)
 
+    def _disks(self) -> tuple[Path, list]:
+        srv = self.home / "srv"
+        for name in ("storage", "studio", "storage-vault"):
+            (srv / name).mkdir(parents=True)
+        (srv / "storage-vault" / "astroverso-fotografia.json").write_text("{}")
+        config.save("nextcloud", {"FILES": str(srv / "storage" / "nextcloud"), "ADMIN_USER": "dono"})
+        found = [disks.Disk(name, srv / name, "ext4", "") for name in ("storage", "studio", "storage-vault")]
+        for patch in (mock.patch.object(disks, "ROOT", srv), mock.patch.object(disks, "mounts", return_value=found),
+                      mock.patch.object(disks, "mounted", return_value=True)):
+            patch.start()
+            self.addCleanup(patch.stop)
+        return srv, found
+
+    def test_drives_choose_and_specs(self) -> None:
+        srv, _ = self._disks()
+        outcome = run_in_pty(lambda: (app.drives.choose(), nextcloud.drives())[1], [b" ", b"\x1b[B", b" ", b"\r"], columns=160)
+        self.assertEqual(outcome.code, 0, outcome.screen)
+        self.assertEqual(outcome.result, [["studio", False], ["storage-vault", True]], outcome.screen)
+        self.assertIn("Quais discos mostrar no Nextcloud?", outcome.screen)
+        self.assertIn("storage-vault  (só leitura)", outcome.screen)
+        self.assertNotIn("  storage\n", outcome.screen)
+        self.assertEqual(config.load("nextcloud")["DRIVES"], "studio,storage-vault:ro")
+        main = nextcloud.specs()[2]
+        self.assertIn(container.Volume(srv / "studio", "/srv/studio", "rw"), main.volumes)
+        self.assertIn(container.Volume(srv / "storage-vault", "/srv/storage-vault", "ro"), main.volumes)
+        self.assertIn(f"Volume={srv / 'storage-vault'}:/srv/storage-vault:ro", container.render(main))
+        self.assertEqual(nextcloud.specs()[3].volumes, main.volumes)
+
+    def test_drives_sync(self) -> None:
+        self._disks()
+        nextcloud.save_drives([("studio", False), ("storage-vault", True)])
+        listed = [{"mount_id": 3, "mount_point": "/Discos/velho", "configuration": {"datadir": "/srv/velho"}},
+                  {"mount_id": 4, "mount_point": "/Discos/studio", "configuration": {"datadir": "/srv/studio"},
+                   "applicable_users": ["outro"], "applicable_groups": ["admin"]},
+                  {"mount_id": 5, "mount_point": "/Outra", "configuration": {"datadir": "/x"}}]
+        calls: list[tuple] = []
+
+        def occ(*args):
+            calls.append(args)
+            return "Storage created with id 9\n" if args[0] == "files_external:create" else ""
+
+        with mock.patch.object(nextcloud, "occ", side_effect=occ), \
+                mock.patch.object(nextcloud, "occ_output", return_value=(0, json.dumps(listed))), mock.patch.object(sys, "stdout", io.StringIO()):
+            app.drives.sync()
+        self.assertIn(("app:enable", "files_external"), calls)
+        self.assertIn(("files_external:delete", "--yes", "3"), calls)
+        self.assertNotIn(("files_external:delete", "--yes", "5"), calls)
+        self.assertIn(("files_external:create", "/Discos/storage-vault", "local", "null::null", "-c", "datadir=/srv/storage-vault"), calls)
+        self.assertIn(("files_external:applicable", "--add-user", "dono", "4"), calls)
+        self.assertIn(("files_external:applicable", "--remove-user", "outro", "4"), calls)
+        self.assertIn(("files_external:applicable", "--remove-group", "admin", "4"), calls)
+        self.assertIn(("files_external:applicable", "--add-user", "dono", "9"), calls)
+        self.assertIn(("files_external:option", "9", "readonly", "true"), calls)
+        self.assertIn(("files_external:option", "4", "readonly", "false"), calls)
+        self.assertLess(calls.index(("files_external:applicable", "--add-user", "dono", "9")), calls.index(("files_external:option", "9", "readonly", "true")))
+
+    def test_drives_heal_and_missing(self) -> None:
+        srv, _ = self._disks()
+        nextcloud.save_drives([("studio", False)])
+        with mock.patch.object(app.drives.run, "output", return_value=(0, f"{os.stat(srv / 'studio').st_dev + 1}\n")), \
+                mock.patch.object(sys, "stdout", io.StringIO()):
+            self.assertEqual(app.drives.heal(), ["studio"])
+        self.assertEqual([call[1] for call in self.host.calls if call[0] == "restart"], [nextcloud.NAME, nextcloud.CRON])
+        with mock.patch.object(app.drives.run, "output", return_value=(0, f"{os.stat(srv / 'studio').st_dev}\n")):
+            self.assertEqual(app.drives.stale(), [])
+        self.host.running = {spec.name for spec in nextcloud.specs()}
+        with mock.patch.object(disks, "responds", return_value=False), mock.patch.object(app.disks, "available", return_value=True):
+            self.assertIn("drive:studio", app.collect({}))
+
     def test_actions(self) -> None:
         self.assertEqual([(a.id, a.remote) for a in app.actions()],
-                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("bring", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
+                         [("summary", True), ("changes", False), ("password", False), ("repair", True), ("mailboxes", True), ("bring", False), ("drives", False), ("watch", True), ("backup-now", True), ("restore-version", False)])
         self.assertEqual([item.id for item in app.items()][-1], "backup")
 
 
